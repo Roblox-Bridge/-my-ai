@@ -3,7 +3,7 @@ export default {
     const url = new URL(request.url);
 
     // =========================
-    // API: CHAT
+    // CHAT API
     // =========================
     if (url.pathname === "/api/chat" && request.method === "POST") {
       try {
@@ -21,8 +21,7 @@ export default {
           return Response.json(
             {
               error: "Workers AI binding is missing.",
-              details:
-                "The AI binding named 'AI' was not available inside the Worker."
+              details: "AI binding was not found in the Worker environment."
             },
             { status: 500 }
           );
@@ -35,7 +34,7 @@ export default {
               {
                 role: "system",
                 content:
-                  "You are My AI, a helpful, accurate and concise general-purpose AI assistant. Answer clearly and naturally."
+                  "You are My AI, a helpful, accurate and concise general-purpose AI assistant."
               },
               {
                 role: "user",
@@ -49,9 +48,9 @@ export default {
           reply:
             result?.response ||
             result?.result?.response ||
-            "The AI returned an empty response.",
-          raw: result
+            "The AI returned an empty response."
         });
+
       } catch (error) {
         return Response.json(
           {
@@ -65,7 +64,7 @@ export default {
     }
 
     // =========================
-    // MAIN WEBSITE
+    // WEBSITE
     // =========================
     if (request.method === "GET") {
       return new Response(HTML, {
@@ -80,20 +79,26 @@ export default {
 };
 
 
-// ======================================================
+// =====================================================
 // HTML
-// ======================================================
+// =====================================================
 
 const HTML = `<!DOCTYPE html>
 <html lang="en">
+
 <head>
+
 <meta charset="UTF-8">
-<meta name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
+/>
 
 <title>My AI</title>
 
 <style>
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -105,6 +110,11 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
+}
+
+body {
+  background: #212121;
+  color: #ffffff;
   font-family:
     -apple-system,
     BlinkMacSystemFont,
@@ -114,56 +124,47 @@ body {
     sans-serif;
 }
 
-body {
-  background: #212121;
-  color: #fff;
-}
-
 .app {
-  display: flex;
   width: 100%;
   height: 100vh;
+  display: flex;
 }
 
-/* =========================
-   SIDEBAR
-========================= */
+/* SIDEBAR */
 
 .sidebar {
   width: 260px;
   height: 100%;
   background: #171717;
   border-right: 1px solid #303030;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  padding: 12px;
 }
 
 .brand {
+  padding: 12px 10px 20px;
   font-size: 21px;
   font-weight: 700;
-  padding: 12px 10px 20px;
 }
 
 .new-chat {
   width: 100%;
-  border: 1px solid #3b3b3b;
-  background: #212121;
-  color: white;
-  border-radius: 9px;
   padding: 12px;
-  cursor: pointer;
-  text-align: left;
+  border: 1px solid #3b3b3b;
+  border-radius: 9px;
+  background: #212121;
+  color: #ffffff;
   font-size: 15px;
+  text-align: left;
+  cursor: pointer;
 }
 
 .new-chat:hover {
   background: #2a2a2a;
 }
 
-/* =========================
-   MAIN
-========================= */
+/* MAIN */
 
 .main {
   flex: 1;
@@ -173,24 +174,20 @@ body {
   flex-direction: column;
 }
 
-/* =========================
-   TOPBAR
-========================= */
+/* TOP BAR */
 
 .topbar {
   height: 58px;
   flex-shrink: 0;
-  border-bottom: 1px solid #303030;
   display: flex;
   align-items: center;
   padding: 0 20px;
+  border-bottom: 1px solid #303030;
   font-size: 17px;
   font-weight: 600;
 }
 
-/* =========================
-   CHAT
-========================= */
+/* CHAT */
 
 .chat {
   flex: 1;
@@ -204,9 +201,7 @@ body {
   margin: auto;
 }
 
-/* =========================
-   WELCOME
-========================= */
+/* WELCOME */
 
 .welcome {
   min-height: 60vh;
@@ -221,16 +216,14 @@ body {
   font-weight: 600;
 }
 
-/* =========================
-   MESSAGE
-========================= */
+/* MESSAGE */
 
 .message {
   display: flex;
   gap: 14px;
   margin: 24px 0;
-  line-height: 1.65;
   font-size: 15.5px;
+  line-height: 1.65;
 }
 
 .avatar {
@@ -238,16 +231,12 @@ body {
   height: 32px;
   min-width: 32px;
   border-radius: 50%;
-  background: #444;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  background: #444444;
+  font-size: 11px;
   font-weight: 700;
-}
-
-.message.user .avatar {
-  background: #555;
 }
 
 .message.ai .avatar {
@@ -261,9 +250,11 @@ body {
   overflow-wrap: anywhere;
 }
 
-/* =========================
-   COMPOSER
-========================= */
+.loading {
+  color: #aaaaaa;
+}
+
+/* COMPOSER */
 
 .composer-area {
   position: fixed;
@@ -271,43 +262,41 @@ body {
   right: 0;
   bottom: 0;
   padding: 18px;
-  background:
-    linear-gradient(
-      to top,
-      #212121 70%,
-      rgba(33,33,33,0)
-    );
+  background: linear-gradient(
+    to top,
+    #212121 70%,
+    rgba(33, 33, 33, 0)
+  );
 }
 
 .composer {
   max-width: 850px;
   margin: auto;
-  background: #2f2f2f;
-  border: 1px solid #4a4a4a;
-  border-radius: 16px;
   display: flex;
   align-items: flex-end;
   padding: 10px;
-  box-shadow: 0 5px 30px rgba(0,0,0,.25);
+  background: #2f2f2f;
+  border: 1px solid #4a4a4a;
+  border-radius: 16px;
 }
 
 textarea {
   flex: 1;
+  min-height: 42px;
+  max-height: 160px;
+  padding: 10px;
   resize: none;
   border: none;
   outline: none;
   background: transparent;
-  color: white;
+  color: #ffffff;
+  font-family: inherit;
   font-size: 15px;
   line-height: 1.5;
-  min-height: 42px;
-  max-height: 160px;
-  padding: 10px;
-  font-family: inherit;
 }
 
 textarea::placeholder {
-  color: #aaa;
+  color: #aaaaaa;
 }
 
 .send {
@@ -315,33 +304,22 @@ textarea::placeholder {
   height: 40px;
   border: none;
   border-radius: 10px;
-  background: white;
-  color: #111;
+  background: #ffffff;
+  color: #111111;
   font-size: 18px;
   cursor: pointer;
 }
 
 .send:hover {
-  background: #ddd;
+  background: #dddddd;
 }
 
 .send:disabled {
-  opacity: .5;
+  opacity: 0.5;
   cursor: default;
 }
 
-/* =========================
-   LOADING
-========================= */
-
-.loading {
-  color: #aaa;
-  font-style: italic;
-}
-
-/* =========================
-   MOBILE
-========================= */
+/* MOBILE */
 
 @media (max-width: 700px) {
 
@@ -376,9 +354,13 @@ textarea::placeholder {
     gap: 10px;
     font-size: 15px;
   }
+
 }
+
 </style>
+
 </head>
+
 
 <body>
 
@@ -390,7 +372,10 @@ textarea::placeholder {
       My AI
     </div>
 
-    <button class="new-chat" onclick="newChat()">
+    <button
+      class="new-chat"
+      onclick="newChat()"
+    >
       ＋ New chat
     </button>
 
@@ -404,11 +389,20 @@ textarea::placeholder {
     </header>
 
 
-    <section class="chat" id="chat">
+    <section
+      class="chat"
+      id="chat"
+    >
 
-      <div class="chat-inner" id="chatInner">
+      <div
+        class="chat-inner"
+        id="chatInner"
+      >
 
-        <div class="welcome" id="welcome">
+        <div
+          class="welcome"
+          id="welcome"
+        >
           <h1>How can I help?</h1>
         </div>
 
@@ -447,16 +441,21 @@ textarea::placeholder {
 
 <script>
 
-const textarea = document.getElementById("message");
-const sendButton = document.getElementById("send");
-const chatInner = document.getElementById("chatInner");
+const textarea =
+  document.getElementById("message");
+
+const sendButton =
+  document.getElementById("send");
+
+const chatInner =
+  document.getElementById("chatInner");
 
 
 // =========================
 // AUTO RESIZE
 // =========================
 
-textarea.addEventListener("input", () => {
+textarea.addEventListener("input", function () {
 
   textarea.style.height = "auto";
 
@@ -470,9 +469,12 @@ textarea.addEventListener("input", () => {
 // ENTER TO SEND
 // =========================
 
-textarea.addEventListener("keydown", (event) => {
+textarea.addEventListener("keydown", function (event) {
 
-  if (event.key === "Enter" && !event.shiftKey) {
+  if (
+    event.key === "Enter" &&
+    !event.shiftKey
+  ) {
 
     event.preventDefault();
 
@@ -489,18 +491,22 @@ textarea.addEventListener("keydown", (event) => {
 
 function addMessage(type, text) {
 
-  const welcome = document.getElementById("welcome");
+  const welcome =
+    document.getElementById("welcome");
 
   if (welcome) {
     welcome.remove();
   }
 
-  const message = document.createElement("div");
+  const message =
+    document.createElement("div");
 
   message.className =
     "message " + type;
 
-  const avatar = document.createElement("div");
+
+  const avatar =
+    document.createElement("div");
 
   avatar.className = "avatar";
 
@@ -508,7 +514,8 @@ function addMessage(type, text) {
     type === "user" ? "You" : "AI";
 
 
-  const content = document.createElement("div");
+  const content =
+    document.createElement("div");
 
   content.className = "content";
 
@@ -522,9 +529,12 @@ function addMessage(type, text) {
   chatInner.appendChild(message);
 
 
-  const chat = document.getElementById("chat");
+  const chat =
+    document.getElementById("chat");
 
-  chat.scrollTop = chat.scrollHeight;
+  chat.scrollTop =
+    chat.scrollHeight;
+
 
   return content;
 }
@@ -539,7 +549,9 @@ async function sendMessage() {
   const message =
     textarea.value.trim();
 
-  if (!message) return;
+  if (!message) {
+    return;
+  }
 
 
   textarea.value = "";
@@ -549,11 +561,17 @@ async function sendMessage() {
   sendButton.disabled = true;
 
 
-  addMessage("user", message);
+  addMessage(
+    "user",
+    message
+  );
 
 
   const aiContent =
-    addMessage("ai", "Thinking...");
+    addMessage(
+      "ai",
+      "Thinking..."
+    );
 
   aiContent.classList.add("loading");
 
@@ -561,35 +579,41 @@ async function sendMessage() {
   try {
 
     const response =
-      await fetch("/api/chat", {
+      await fetch(
+        "/api/chat",
+        {
+          method: "POST",
 
-        method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
 
-        headers: {
-          "Content-Type": "application/json"
-        },
-
-        body: JSON.stringify({
-          message: message
-        })
-
-      });
+          body: JSON.stringify({
+            message: message
+          })
+        }
+      );
 
 
     const data =
       await response.json();
 
 
-    aiContent.classList.remove("loading");
+    aiContent.classList.remove(
+      "loading"
+    );
 
 
     if (!response.ok) {
 
       aiContent.textContent =
         "AI Error: " +
-        (data.details ||
-         data.error ||
-         "Unknown error");
+        (
+          data.details ||
+          data.error ||
+          "Unknown error"
+        );
 
       sendButton.disabled = false;
 
@@ -604,11 +628,16 @@ async function sendMessage() {
 
   } catch (error) {
 
-    aiContent.classList.remove("loading");
+    aiContent.classList.remove(
+      "loading"
+    );
 
     aiContent.textContent =
       "Connection error: " +
-      (error.message || error);
+      (
+        error.message ||
+        String(error)
+      );
 
   }
 
@@ -633,15 +662,14 @@ async function sendMessage() {
 
 function newChat() {
 
-  chatInner.innerHTML = `
-
-    <div class="welcome" id="welcome">
-      <h1>How can I help?</h1>
-    </div>
-
-  `;
+  chatInner.innerHTML =
+    '<div class="welcome" id="welcome">' +
+      '<h1>How can I help?</h1>' +
+    '</div>';
 
   textarea.value = "";
+
+  textarea.style.height = "auto";
 
   textarea.focus();
 
@@ -650,4 +678,5 @@ function newChat() {
 </script>
 
 </body>
+
 </html>`;
