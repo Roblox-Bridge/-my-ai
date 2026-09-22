@@ -1,0 +1,11 @@
+{
+  "name": "my-ai",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@cloudflare/ai-utils": "latest"
+  },
+  "devDependencies": {
+    "wrangler": "latest"
+  }
+}
