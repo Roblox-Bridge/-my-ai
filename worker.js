@@ -21,20 +21,21 @@ export default {
           return Response.json(
             {
               error: "Workers AI binding is missing.",
-              details: "AI binding was not found in the Worker environment."
+              details:
+                "The AI binding named AI was not found in the Worker."
             },
             { status: 500 }
           );
         }
 
         const result = await env.AI.run(
-          "@cf/meta/llama-3.1-8b-instruct",
+          "@cf/zai-org/glm-4.7-flash",
           {
             messages: [
               {
                 role: "system",
                 content:
-                  "You are My AI, a helpful, accurate and concise general-purpose AI assistant."
+                  "You are My AI, a helpful, accurate and concise general-purpose AI assistant. Give clear answers and use simple formatting."
               },
               {
                 role: "user",
@@ -44,11 +45,24 @@ export default {
           }
         );
 
+        const reply =
+          result?.response ||
+          result?.result?.response ||
+          result?.choices?.[0]?.message?.content ||
+          "";
+
+        if (!reply) {
+          return Response.json(
+            {
+              error: "AI returned an empty response.",
+              details: JSON.stringify(result)
+            },
+            { status: 502 }
+          );
+        }
+
         return Response.json({
-          reply:
-            result?.response ||
-            result?.result?.response ||
-            "The AI returned an empty response."
+          reply: reply
         });
 
       } catch (error) {
@@ -74,7 +88,9 @@ export default {
       });
     }
 
-    return new Response("Not Found", { status: 404 });
+    return new Response("Not Found", {
+      status: 404
+    });
   }
 };
 
@@ -130,7 +146,9 @@ body {
   display: flex;
 }
 
-/* SIDEBAR */
+/* =========================
+   SIDEBAR
+========================= */
 
 .sidebar {
   width: 260px;
@@ -164,7 +182,9 @@ body {
   background: #2a2a2a;
 }
 
-/* MAIN */
+/* =========================
+   MAIN
+========================= */
 
 .main {
   flex: 1;
@@ -174,7 +194,9 @@ body {
   flex-direction: column;
 }
 
-/* TOP BAR */
+/* =========================
+   TOP BAR
+========================= */
 
 .topbar {
   height: 58px;
@@ -187,12 +209,14 @@ body {
   font-weight: 600;
 }
 
-/* CHAT */
+/* =========================
+   CHAT
+========================= */
 
 .chat {
   flex: 1;
   overflow-y: auto;
-  padding: 30px 18px 140px;
+  padding: 30px 18px 150px;
 }
 
 .chat-inner {
@@ -201,7 +225,9 @@ body {
   margin: auto;
 }
 
-/* WELCOME */
+/* =========================
+   WELCOME
+========================= */
 
 .welcome {
   min-height: 60vh;
@@ -216,7 +242,9 @@ body {
   font-weight: 600;
 }
 
-/* MESSAGE */
+/* =========================
+   MESSAGE
+========================= */
 
 .message {
   display: flex;
@@ -243,9 +271,12 @@ body {
   background: #10a37f;
 }
 
-.content {
+.content-area {
   flex: 1;
   min-width: 0;
+}
+
+.content {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -254,7 +285,40 @@ body {
   color: #aaaaaa;
 }
 
-/* COMPOSER */
+/* =========================
+   COPY BUTTON
+========================= */
+
+.copy-row {
+  margin-top: 9px;
+  display: flex;
+  align-items: center;
+}
+
+.copy-button {
+  border: 1px solid #444444;
+  background: #2a2a2a;
+  color: #bdbdbd;
+  border-radius: 7px;
+  padding: 5px 9px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: 0.15s ease;
+}
+
+.copy-button:hover {
+  background: #363636;
+  color: #ffffff;
+}
+
+.copy-button.copied {
+  color: #10a37f;
+  border-color: #10a37f;
+}
+
+/* =========================
+   COMPOSER
+========================= */
 
 .composer-area {
   position: fixed;
@@ -319,7 +383,9 @@ textarea::placeholder {
   cursor: default;
 }
 
-/* MOBILE */
+/* =========================
+   MOBILE
+========================= */
 
 @media (max-width: 700px) {
 
@@ -334,7 +400,7 @@ textarea::placeholder {
   .chat {
     padding-left: 13px;
     padding-right: 13px;
-    padding-bottom: 130px;
+    padding-bottom: 135px;
   }
 
   .composer-area {
@@ -455,34 +521,97 @@ const chatInner =
 // AUTO RESIZE
 // =========================
 
-textarea.addEventListener("input", function () {
+textarea.addEventListener(
+  "input",
+  function () {
 
-  textarea.style.height = "auto";
+    textarea.style.height = "auto";
 
-  textarea.style.height =
-    Math.min(textarea.scrollHeight, 160) + "px";
+    textarea.style.height =
+      Math.min(
+        textarea.scrollHeight,
+        160
+      ) + "px";
 
-});
+  }
+);
 
 
 // =========================
 // ENTER TO SEND
 // =========================
 
-textarea.addEventListener("keydown", function (event) {
+textarea.addEventListener(
+  "keydown",
+  function (event) {
 
-  if (
-    event.key === "Enter" &&
-    !event.shiftKey
-  ) {
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey
+    ) {
 
-    event.preventDefault();
+      event.preventDefault();
 
-    sendMessage();
+      sendMessage();
+
+    }
+
+  }
+);
+
+
+// =========================
+// COPY TEXT
+// =========================
+
+async function copyText(text, button) {
+
+  try {
+
+    await navigator.clipboard.writeText(text);
+
+    button.textContent = "✓ Copied!";
+
+    button.classList.add("copied");
+
+    setTimeout(
+      function () {
+
+        button.textContent = "📋 Copy";
+
+        button.classList.remove("copied");
+
+      },
+      1500
+    );
+
+  } catch (error) {
+
+    const temp =
+      document.createElement("textarea");
+
+    temp.value = text;
+
+    document.body.appendChild(temp);
+
+    temp.select();
+
+    document.execCommand("copy");
+
+    temp.remove();
+
+    button.textContent = "✓ Copied!";
+
+    setTimeout(
+      function () {
+        button.textContent = "📋 Copy";
+      },
+      1500
+    );
 
   }
 
-});
+}
 
 
 // =========================
@@ -498,6 +627,7 @@ function addMessage(type, text) {
     welcome.remove();
   }
 
+
   const message =
     document.createElement("div");
 
@@ -511,20 +641,77 @@ function addMessage(type, text) {
   avatar.className = "avatar";
 
   avatar.textContent =
-    type === "user" ? "You" : "AI";
+    type === "user"
+      ? "You"
+      : "AI";
+
+
+  const contentArea =
+    document.createElement("div");
+
+  contentArea.className =
+    "content-area";
 
 
   const content =
     document.createElement("div");
 
-  content.className = "content";
+  content.className =
+    "content";
 
-  content.textContent = text;
+  content.textContent =
+    text;
+
+
+  contentArea.appendChild(content);
+
+
+  if (type === "ai") {
+
+    const copyRow =
+      document.createElement("div");
+
+    copyRow.className =
+      "copy-row";
+
+
+    const copyButton =
+      document.createElement("button");
+
+    copyButton.className =
+      "copy-button";
+
+    copyButton.textContent =
+      "📋 Copy";
+
+
+    copyButton.addEventListener(
+      "click",
+      function () {
+
+        copyText(
+          content.textContent,
+          copyButton
+        );
+
+      }
+    );
+
+
+    copyRow.appendChild(
+      copyButton
+    );
+
+    contentArea.appendChild(
+      copyRow
+    );
+
+  }
 
 
   message.appendChild(avatar);
 
-  message.appendChild(content);
+  message.appendChild(contentArea);
 
   chatInner.appendChild(message);
 
@@ -537,6 +724,7 @@ function addMessage(type, text) {
 
 
   return content;
+
 }
 
 
@@ -573,7 +761,9 @@ async function sendMessage() {
       "Thinking..."
     );
 
-  aiContent.classList.add("loading");
+  aiContent.classList.add(
+    "loading"
+  );
 
 
   try {
@@ -632,6 +822,7 @@ async function sendMessage() {
       "loading"
     );
 
+
     aiContent.textContent =
       "Connection error: " +
       (
@@ -669,7 +860,8 @@ function newChat() {
 
   textarea.value = "";
 
-  textarea.style.height = "auto";
+  textarea.style.height =
+    "auto";
 
   textarea.focus();
 
