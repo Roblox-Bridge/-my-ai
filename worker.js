@@ -23,25 +23,25 @@ export default {
         }
 
         const result = await env.AI.run(
-          "@cf/meta/llama-3.1-8b-instruct",
-          {
-            messages: [
-              {
-                role: "system",
-                content:
-                  "You are My AI, a helpful, accurate and concise general-purpose AI assistant."
-              },
-              {
-                role: "user",
-                content: message
-              }
-            ]
-          }
-        );
+  "@cf/meta/llama-3.1-8b-instruct",
+  {
+    messages: [
+      {
+        role: "system",
+        content: "You are My AI, a helpful AI assistant."
+      },
+      {
+        role: "user",
+        content: message
+      }
+    ]
+  }
+);
 
-        return Response.json({
-          reply: result.response || "No response generated."
-        });
+return Response.json({
+  reply: result.response ?? null,
+  raw: result
+});
 
       } catch (error) {
         return Response.json(
