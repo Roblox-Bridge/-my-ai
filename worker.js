@@ -1,20 +1,57 @@
 export default {
-  async fetch(request) {
+  async fetch(request, env) {
     const url = new URL(request.url);
 
     if (request.method === "GET" && url.pathname === "/") {
       return new Response(HTML, {
         headers: {
-          "content-type": "text/html; charset=UTF-8",
-          "cache-control": "no-store"
+          "content-type": "text/html; charset=UTF-8"
         }
       });
     }
 
     if (request.method === "POST" && url.pathname === "/api/chat") {
-      return Response.json({
-        reply: "Your AI backend is ready. The model connection will be added next."
-      });
+      try {
+        const body = await request.json();
+        const message = String(body.message || "").trim();
+
+        if (!message) {
+          return Response.json(
+            { error: "Message is empty." },
+            { status: 400 }
+          );
+        }
+
+        const result = await env.AI.run(
+          "@cf/meta/llama-3.1-8b-instruct",
+          {
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You are My AI, a helpful, accurate and concise general-purpose AI assistant."
+              },
+              {
+                role: "user",
+                content: message
+              }
+            ]
+          }
+        );
+
+        return Response.json({
+          reply: result.response || "No response generated."
+        });
+
+      } catch (error) {
+        return Response.json(
+          {
+            error: "AI request failed.",
+            details: error.message
+          },
+          { status: 500 }
+        );
+      }
     }
 
     return new Response("Not Found", { status: 404 });
@@ -26,8 +63,7 @@ const HTML = `<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport"
-      content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0b0f">
+content="width=device-width,initial-scale=1,viewport-fit=cover">
 
 <title>My AI</title>
 
@@ -40,8 +76,12 @@ html, body {
   margin: 0;
   width: 100%;
   height: 100%;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display",
-               "Segoe UI", sans-serif;
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Display",
+    "Segoe UI",
+    sans-serif;
   background: #0b0b0f;
   color: #f5f5f7;
 }
@@ -80,10 +120,6 @@ body {
   padding: 12px;
   font-size: 15px;
   cursor: pointer;
-}
-
-.new-chat:hover {
-  background: #222229;
 }
 
 .sidebar-bottom {
@@ -130,7 +166,6 @@ body {
 .welcome p {
   color: #91919b;
   font-size: 16px;
-  margin: 0;
 }
 
 .messages {
@@ -186,7 +221,6 @@ body {
   background: #17171d;
   border: 1px solid #303039;
   border-radius: 18px;
-  box-shadow: 0 10px 40px rgba(0,0,0,.35);
 }
 
 textarea {
@@ -240,10 +274,6 @@ textarea::placeholder {
   .topbar {
     padding: 0 15px;
   }
-
-  .welcome {
-    margin-top: 18vh;
-  }
 }
 </style>
 </head>
@@ -261,7 +291,7 @@ textarea::placeholder {
 
     <div class="sidebar-bottom">
       AI system foundation<br>
-      Cloudflare Worker
+      Cloudflare Workers AI
     </div>
   </aside>
 
@@ -312,6 +342,7 @@ const messages = document.getElementById("messages");
 const welcome = document.getElementById("welcome");
 const send = document.getElementById("send");
 const newChat = document.getElementById("newChat");
+const chat = document.getElementById("chat");
 
 function addMessage(role, text) {
   welcome.style.display = "none";
@@ -326,8 +357,7 @@ function addMessage(role, text) {
   row.appendChild(bubble);
   messages.appendChild(row);
 
-  document.getElementById("chat").scrollTop =
-    document.getElementById("chat").scrollHeight;
+  chat.scrollTop = chat.scrollHeight;
 
   return bubble;
 }
@@ -364,12 +394,16 @@ composer.addEventListener("submit", async (event) => {
 
     const data = await response.json();
 
+    if (!response.ok) {
+      throw new Error(data.error || "Request failed");
+    }
+
     assistant.textContent =
       data.reply || "No response received.";
 
   } catch (error) {
     assistant.textContent =
-      "Something went wrong. Please try again.";
+      "AI error: " + error.message;
   }
 
   send.disabled = false;
