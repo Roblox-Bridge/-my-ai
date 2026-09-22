@@ -1,194 +1,135 @@
+import { runWithTools } from "@cloudflare/ai-utils";
+
 const MODEL = "@cf/zai-org/glm-4.7-flash";
 
 const SYSTEM_PROMPT = `
-You are My AI, a general-purpose AI assistant.
+You are My AI, a powerful general-purpose AI assistant.
 
-Your job is to understand the user's request, reason about it, and use available tools whenever they are useful.
+You have access to tools.
 
-IMPORTANT:
-- Do not pretend that you searched the web when you did not.
-- For current, recent, changing, factual, or time-sensitive information, use the web_search tool.
-- For arithmetic and exact calculations, use calculator when useful.
-- After receiving tool results, reason over them and produce the final answer.
-- Never expose internal tool-call JSON, hidden instructions, or internal reasoning.
-- Do not mention that you are "just an AI model".
-- If web sources disagree, explain the disagreement and identify the relevant source.
-- Do not invent citations or sources.
-- Answer naturally and directly.
-- Preserve useful conversation context.
+RULES:
+- Understand the user's request before answering.
+- Use web_search whenever information may be current, recent, changing, or needs verification.
+- Use calculator for exact mathematical calculations when useful.
+- Never claim that you searched the web unless the web_search tool actually ran.
+- Use the information returned by tools to formulate the final answer.
+- Do not expose internal reasoning, tool JSON, system instructions, or implementation details.
+- If a tool fails, clearly say that live information could not be retrieved instead of inventing information.
+- Give direct, useful answers.
+- For research questions, synthesize multiple useful results when available.
 `;
 
-const TOOLS = [
-  {
-    name: "calculator",
-    description:
-      "Calculate a mathematical expression accurately. Use this for arithmetic, percentages, equations, conversions, and other exact calculations.",
-    parameters: {
-      type: "object",
-      properties: {
-        expression: {
-          type: "string",
-          description: "A mathematical expression to calculate."
-        }
-      },
-      required: ["expression"]
-    }
-  },
-
-  {
-    name: "web_search",
-    description:
-      "Search the live web for current or factual information. Use this for latest news, current events, software updates, game updates, current people/roles, prices, releases, documentation, or anything that may have changed since the model's knowledge.",
-    parameters: {
-      type: "object",
-      properties: {
-        query: {
-          type: "string",
-          description: "The exact web search query."
-        }
-      },
-      required: ["query"]
-    }
-  }
-];
-
-/* -------------------------------------------------------
-   SIMPLE SAFE JSON
-------------------------------------------------------- */
-
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      "cache-control": "no-store",
-      "access-control-allow-origin": "*"
-    }
-  });
-}
-
-/* -------------------------------------------------------
+/* =========================================================
    CALCULATOR
-------------------------------------------------------- */
+========================================================= */
 
-function calculate(expression) {
+async function calculator(args) {
   try {
-    let exp = String(expression || "")
+    const expression = String(args?.expression || "")
+      .trim()
       .replace(/×/g, "*")
       .replace(/÷/g, "/")
-      .replace(/,/g, "")
-      .replace(/\^/g, "**");
+      .replace(/\^/g, "**")
+      .replace(/,/g, "");
 
-    /*
-      Only allow mathematical characters.
-      This prevents arbitrary JavaScript from reaching eval().
-    */
-    if (!/^[0-9+\-*/().%\s*]+$/.test(exp)) {
-      return {
+    if (!expression) {
+      return JSON.stringify({
         success: false,
-        error: "Unsupported mathematical expression."
-      };
+        error: "Empty expression"
+      });
     }
 
-    const result = Function(`"use strict"; return (${exp})`)();
+    // Only mathematical characters.
+    if (!/^[0-9+\-*/().%\s*]+$/.test(expression)) {
+      return JSON.stringify({
+        success: false,
+        error: "Unsupported expression"
+      });
+    }
+
+    const result = Function(
+      `"use strict"; return (${expression})`
+    )();
 
     if (!Number.isFinite(result)) {
-      return {
+      return JSON.stringify({
         success: false,
-        error: "Result is not finite."
-      };
+        error: "Result is not finite"
+      });
     }
 
-    return {
+    return JSON.stringify({
       success: true,
       expression,
       result
-    };
-  } catch {
-    return {
+    });
+  } catch (error) {
+    return JSON.stringify({
       success: false,
-      error: "Could not calculate the expression."
-    };
+      error: String(error?.message || error)
+    });
   }
 }
 
-/* -------------------------------------------------------
+/* =========================================================
    WEB SEARCH
-------------------------------------------------------- */
+========================================================= */
 
-/*
-  This function intentionally uses a real HTTP search
-  endpoint instead of pretending that a search happened.
+async function webSearch(args) {
+  const query = String(args?.query || "").trim();
 
-  It uses DuckDuckGo's public HTML search page so no
-  separate search API key is required.
-
-  If the endpoint ever becomes unavailable, the AI will
-  receive an explicit tool error rather than fake results.
-*/
-
-async function webSearch(query) {
-  const q = String(query || "").trim();
-
-  if (!q) {
-    return {
+  if (!query) {
+    return JSON.stringify({
       success: false,
-      error: "Empty search query."
-    };
+      error: "Search query is empty"
+    });
   }
 
   try {
     const url =
       "https://html.duckduckgo.com/html/?q=" +
-      encodeURIComponent(q);
+      encodeURIComponent(query);
 
     const response = await fetch(url, {
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (compatible; MyAI/1.0; +https://workers.cloudflare.com)"
+          "Mozilla/5.0 (compatible; MyAI/1.0)"
       }
     });
 
     if (!response.ok) {
-      return {
+      return JSON.stringify({
         success: false,
-        error: `Search request failed with HTTP ${response.status}.`
-      };
+        error:
+          "Web search failed with HTTP " +
+          response.status
+      });
     }
 
     const html = await response.text();
 
-    const results = parseDuckDuckGo(html);
+    const results = parseSearchResults(html);
 
-    if (!results.length) {
-      return {
-        success: true,
-        query: q,
-        results: [],
-        message: "No usable search results were found."
-      };
-    }
-
-    return {
+    return JSON.stringify({
       success: true,
-      query: q,
+      query,
       results: results.slice(0, 8)
-    };
+    });
   } catch (error) {
-    return {
+    return JSON.stringify({
       success: false,
-      error: "Live web search failed.",
+      error: "Live web search failed",
       detail: String(error?.message || error)
-    };
+    });
   }
 }
 
-/* -------------------------------------------------------
-   DUCKDUCKGO PARSER
-------------------------------------------------------- */
+/* =========================================================
+   SEARCH PARSER
+========================================================= */
 
-function decodeHtml(text) {
-  return String(text || "")
+function decodeHtml(value) {
+  return String(value || "")
     .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
     .replace(/&#x27;/g, "'")
@@ -197,59 +138,35 @@ function decodeHtml(text) {
     .replace(/&gt;/g, ">");
 }
 
-function stripTags(text) {
+function cleanHtml(value) {
   return decodeHtml(
-    String(text || "")
+    String(value || "")
       .replace(/<script[\s\S]*?<\/script>/gi, "")
       .replace(/<style[\s\S]*?<\/style>/gi, "")
-      .replace(/<[^>]+>/g, " ")
+      .replace(/<[^>]*>/g, " ")
       .replace(/\s+/g, " ")
       .trim()
   );
 }
 
-function parseDuckDuckGo(html) {
+function parseSearchResults(html) {
   const results = [];
 
-  /*
-    DuckDuckGo HTML result structure commonly contains:
-
-    <a class="result__a" href="...">Title</a>
-    <a class="result__snippet">Snippet</a>
-  */
-
-  const blocks = html.match(
-    /<div[^>]*class="[^"]*result[^"]*"[\s\S]*?<\/div>\s*<\/div>/gi
+  const matches = html.match(
+    /<a[^>]+class="[^"]*result__a[^"]*"[^>]*>[\s\S]*?<\/a>/gi
   ) || [];
 
-  for (const block of blocks) {
-    const titleMatch = block.match(
-      /class="[^"]*result__a[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i
+  for (const match of matches) {
+    const hrefMatch = match.match(
+      /href="([^"]+)"/i
     );
 
-    if (!titleMatch) continue;
+    if (!hrefMatch) continue;
 
-    let url = titleMatch[1];
+    let url = hrefMatch[1];
 
-    const title = stripTags(titleMatch[2]);
-
-    const snippetMatch = block.match(
-      /class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>/i
-    ) || block.match(
-      /class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/div>/i
-    );
-
-    const snippet = snippetMatch
-      ? stripTags(snippetMatch[1])
-      : "";
-
-    /*
-      DuckDuckGo can return redirect URLs.
-      Try to recover the actual target.
-    */
     try {
       const parsed = new URL(url);
-
       const uddg = parsed.searchParams.get("uddg");
 
       if (uddg) {
@@ -257,107 +174,76 @@ function parseDuckDuckGo(html) {
       }
     } catch {}
 
+    const title = cleanHtml(match);
+
     if (!title || !url) continue;
 
     results.push({
       title,
-      url,
-      snippet
+      url
     });
   }
 
-  /*
-    Fallback parser if the page structure changes.
-  */
-  if (!results.length) {
-    const anchors =
-      html.match(
-        /<a[^>]+class="[^"]*result__a[^"]*"[^>]*>[\s\S]*?<\/a>/gi
-      ) || [];
+  return results;
+}
 
-    for (const anchor of anchors.slice(0, 8)) {
-      const hrefMatch = anchor.match(/href="([^"]+)"/i);
+/* =========================================================
+   TOOLS
+========================================================= */
 
-      if (!hrefMatch) continue;
+const tools = [
+  {
+    name: "calculator",
 
-      let url = hrefMatch[1];
+    description:
+      "Calculate exact mathematical expressions.",
 
-      try {
-        const parsed = new URL(url);
-        const uddg = parsed.searchParams.get("uddg");
+    parameters: {
+      type: "object",
 
-        if (uddg) {
-          url = decodeURIComponent(uddg);
+      properties: {
+        expression: {
+          type: "string",
+          description:
+            "Mathematical expression to calculate."
         }
-      } catch {}
+      },
 
-      const title = stripTags(anchor);
+      required: ["expression"]
+    },
 
-      if (title && url) {
-        results.push({
-          title,
-          url,
-          snippet: ""
-        });
-      }
-    }
+    function: calculator
+  },
+
+  {
+    name: "web_search",
+
+    description:
+      "Search the live web for current, recent, changing, or factual information.",
+
+    parameters: {
+      type: "object",
+
+      properties: {
+        query: {
+          type: "string",
+          description:
+            "Search query to send to the live web."
+        }
+      },
+
+      required: ["query"]
+    },
+
+    function: webSearch
   }
+];
 
-  return results.slice(0, 8);
-}
+/* =========================================================
+   RESPONSE TEXT
+========================================================= */
 
-/* -------------------------------------------------------
-   TOOL EXECUTION
-------------------------------------------------------- */
-
-async function executeTool(name, args) {
-  if (name === "calculator") {
-    return calculate(args?.expression);
-  }
-
-  if (name === "web_search") {
-    return await webSearch(args?.query);
-  }
-
-  return {
-    success: false,
-    error: `Unknown tool: ${name}`
-  };
-}
-
-/* -------------------------------------------------------
-   MODEL CALL
-------------------------------------------------------- */
-
-async function runModel(env, messages, options = {}) {
-  const input = {
-    messages,
-    tools: TOOLS,
-    tool_choice: options.toolChoice || "auto",
-    parallel_tool_calls: true,
-    max_tokens: 4096,
-    temperature: 0.2
-  };
-
-  /*
-    We also provide Cloudflare's built-in web-search option
-    as an additional model capability.
-
-    The actual web_search function above remains available,
-    so the application does not depend on this option alone.
-  */
-  if (options.enableBuiltinSearch) {
-    input.web_search_options = {};
-  }
-
-  return await env.AI.run(MODEL, input);
-}
-
-/* -------------------------------------------------------
-   EXTRACT TEXT
-------------------------------------------------------- */
-
-function extractText(response) {
+function extractResponseText(response) {
   if (!response) return "";
 
   if (typeof response === "string") {
@@ -368,148 +254,62 @@ function extractText(response) {
     return response.response;
   }
 
-  if (typeof response.content === "string") {
-    return response.content;
-  }
-
-  if (Array.isArray(response.content)) {
-    return response.content
-      .map(x => {
-        if (typeof x === "string") return x;
-        return x?.text || "";
-      })
-      .join("");
-  }
-
   if (Array.isArray(response.choices)) {
-    const message = response.choices?.[0]?.message;
+    const message =
+      response.choices?.[0]?.message;
 
-    if (message?.content) {
-      if (typeof message.content === "string") {
-        return message.content;
-      }
+    if (typeof message?.content === "string") {
+      return message.content;
+    }
 
-      if (Array.isArray(message.content)) {
-        return message.content
-          .map(x => x?.text || "")
-          .join("");
-      }
+    if (Array.isArray(message?.content)) {
+      return message.content
+        .map(part => part?.text || "")
+        .join("");
     }
   }
 
   return "";
 }
 
-/* -------------------------------------------------------
-   EXTRACT TOOL CALLS
-------------------------------------------------------- */
+/* =========================================================
+   SOURCE EXTRACTION
+========================================================= */
 
-function extractToolCalls(response) {
-  if (!response) return [];
+function extractSources(text) {
+  const urls = [];
 
-  if (Array.isArray(response.tool_calls)) {
-    return response.tool_calls;
-  }
+  const regex =
+    /https?:\/\/[^\s)\]>"']+/g;
 
-  if (Array.isArray(response.choices)) {
-    const message = response.choices?.[0]?.message;
+  const matches =
+    String(text || "").match(regex) || [];
 
-    if (Array.isArray(message?.tool_calls)) {
-      return message.tool_calls;
+  for (const url of matches) {
+    if (!urls.includes(url)) {
+      urls.push(url);
     }
   }
 
-  return [];
+  return urls.slice(0, 12);
 }
 
-/* -------------------------------------------------------
-   NORMALIZE TOOL CALL
-------------------------------------------------------- */
-
-function normalizeToolCall(call) {
-  let name = "";
-  let args = {};
-
-  if (call?.name) {
-    name = call.name;
-  }
-
-  if (call?.function?.name) {
-    name = call.function.name;
-  }
-
-  let rawArgs =
-    call?.arguments ??
-    call?.function?.arguments ??
-    call?.parameters ??
-    {};
-
-  if (typeof rawArgs === "string") {
-    try {
-      rawArgs = JSON.parse(rawArgs);
-    } catch {
-      rawArgs = {};
-    }
-  }
-
-  args = rawArgs || {};
-
-  return {
-    id: call?.id || call?.tool_call_id || crypto.randomUUID(),
-    name,
-    args
-  };
-}
-
-/* -------------------------------------------------------
-   SOURCES
-------------------------------------------------------- */
-
-function collectSources(toolResults) {
-  const sources = [];
-
-  for (const item of toolResults) {
-    if (
-      item?.result?.success &&
-      Array.isArray(item.result.results)
-    ) {
-      for (const result of item.result.results) {
-        if (!result?.url) continue;
-
-        sources.push({
-          title: result.title || result.url,
-          url: result.url,
-          snippet: result.snippet || ""
-        });
-      }
-    }
-  }
-
-  const unique = [];
-  const seen = new Set();
-
-  for (const source of sources) {
-    if (seen.has(source.url)) continue;
-
-    seen.add(source.url);
-    unique.push(source);
-  }
-
-  return unique.slice(0, 12);
-}
-
-/* -------------------------------------------------------
+/* =========================================================
    AGENT
-------------------------------------------------------- */
+========================================================= */
 
-async function runAgent(env, userMessage, history = []) {
+async function runAgent(env, userMessage, history) {
+  const safeHistory = Array.isArray(history)
+    ? history.slice(-10)
+    : [];
+
   const messages = [
     {
       role: "system",
       content: SYSTEM_PROMPT
     },
 
-    ...history.slice(-12),
+    ...safeHistory,
 
     {
       role: "user",
@@ -517,132 +317,76 @@ async function runAgent(env, userMessage, history = []) {
     }
   ];
 
-  const allToolResults = [];
-
-  /*
-    Maximum number of reasoning/tool rounds.
-    This allows multi-step research.
-  */
-  for (let round = 0; round < 5; round++) {
-    let response;
-
-    try {
-      response = await runModel(env, messages, {
-        toolChoice: "auto",
-        enableBuiltinSearch: true
-      });
-    } catch (error) {
-      /*
-        One retry with built-in search disabled.
-        This prevents a temporary search capability
-        error from killing the whole conversation.
-      */
-      try {
-        response = await runModel(env, messages, {
-          toolChoice: "auto",
-          enableBuiltinSearch: false
-        });
-      } catch (error2) {
-        throw new Error(
-          `AI inference failed: ${String(
-            error2?.message || error2
-          )}`
-        );
-      }
+  const response = await runWithTools(
+    env.AI,
+    MODEL,
+    {
+      messages,
+      tools
+    },
+    {
+      maxRecursiveToolRuns: 5,
+      strictValidation: true,
+      verbose: false,
+      streamFinalResponse: false
     }
+  );
 
-    const toolCalls = extractToolCalls(response);
+  const answer =
+    extractResponseText(response) ||
+    "I couldn't generate a response.";
 
-    /*
-      No tools requested = final answer.
-    */
-    if (!toolCalls.length) {
-      let answer = extractText(response);
-
-      if (!answer) {
-        answer =
-          "I couldn't generate a response. Please try again.";
-      }
-
-      return {
-        answer,
-        sources: collectSources(allToolResults)
-      };
-    }
-
-    /*
-      Preserve assistant's tool-call message.
-      The Workers AI API accepts the standard
-      assistant/tool round-trip format.
-    */
-    let assistantMessage = null;
-
-    if (Array.isArray(response?.choices)) {
-      assistantMessage =
-        response.choices?.[0]?.message || null;
-    }
-
-    if (assistantMessage) {
-      messages.push(assistantMessage);
-    } else {
-      messages.push({
-        role: "assistant",
-        content: null,
-        tool_calls: toolCalls
-      });
-    }
-
-    /*
-      Execute all requested tools.
-    */
-    for (const rawCall of toolCalls) {
-      const call = normalizeToolCall(rawCall);
-
-      const result = await executeTool(
-        call.name,
-        call.args
-      );
-
-      const stored = {
-        call,
-        result
-      };
-
-      allToolResults.push(stored);
-
-      messages.push({
-        role: "tool",
-        tool_call_id: call.id,
-        name: call.name,
-        content: JSON.stringify(result)
-      });
-    }
-  }
-
-  /*
-    Safety fallback if the model keeps requesting tools.
-  */
   return {
-    answer:
-      "I reached the maximum number of research steps. Please try the request again.",
-    sources: collectSources(allToolResults)
+    answer,
+    sources: extractSources(answer)
   };
 }
 
-/* -------------------------------------------------------
-   HTML
-------------------------------------------------------- */
+/* =========================================================
+   JSON
+========================================================= */
+
+function json(data, status = 200) {
+  return new Response(
+    JSON.stringify(data),
+    {
+      status,
+
+      headers: {
+        "content-type":
+          "application/json; charset=utf-8",
+
+        "cache-control":
+          "no-store",
+
+        "access-control-allow-origin":
+          "*"
+      }
+    }
+  );
+}
+
+/* =========================================================
+   UI
+========================================================= */
 
 const HTML = String.raw`<!DOCTYPE html>
+
 <html lang="en">
+
 <head>
+
 <meta charset="UTF-8">
-<meta name="viewport"
-      content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
+
+<meta
+  name="viewport"
+  content="width=device-width,initial-scale=1"
+/>
 
 <title>My AI</title>
 
 <style>
+
 * {
   box-sizing: border-box;
 }
@@ -650,7 +394,6 @@ const HTML = String.raw`<!DOCTYPE html>
 html,
 body {
   margin: 0;
-  padding: 0;
   width: 100%;
   height: 100%;
   background: #212121;
@@ -669,18 +412,16 @@ body {
 }
 
 .app {
-  display: flex;
   width: 100%;
   height: 100%;
+  display: flex;
 }
 
 .sidebar {
   width: 260px;
   background: #171717;
-  border-right: 1px solid #2b2b2b;
+  border-right: 1px solid #2c2c2c;
   padding: 14px;
-  display: flex;
-  flex-direction: column;
 }
 
 .logo {
@@ -692,17 +433,12 @@ body {
 
 .new-chat {
   width: 100%;
-  padding: 12px 14px;
+  padding: 12px;
+  border-radius: 10px;
   border: 1px solid #3a3a3a;
   background: #222;
-  color: #fff;
-  border-radius: 10px;
+  color: white;
   cursor: pointer;
-  font-size: 14px;
-}
-
-.new-chat:hover {
-  background: #2a2a2a;
 }
 
 .main {
@@ -714,10 +450,10 @@ body {
 
 .topbar {
   height: 58px;
-  border-bottom: 1px solid #303030;
   display: flex;
   align-items: center;
   padding: 0 20px;
+  border-bottom: 1px solid #303030;
   font-weight: 600;
 }
 
@@ -729,7 +465,7 @@ body {
 
 .chat-inner {
   max-width: 850px;
-  margin: 0 auto;
+  margin: auto;
 }
 
 .welcome {
@@ -739,11 +475,11 @@ body {
 
 .welcome h1 {
   font-size: 32px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .welcome p {
-  color: #a9a9a9;
+  color: #999;
 }
 
 .message {
@@ -758,10 +494,10 @@ body {
   height: 34px;
   border-radius: 9px;
   display: flex;
-  align-items: center;
   justify-content: center;
+  align-items: center;
   background: #303030;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -770,41 +506,39 @@ body {
 }
 
 .content {
-  min-width: 0;
   flex: 1;
+  min-width: 0;
   line-height: 1.65;
   white-space: pre-wrap;
-  word-wrap: break-word;
+  overflow-wrap: anywhere;
 }
 
-.ai-copy {
+.copy {
   margin-top: 9px;
   padding: 6px 10px;
+  border-radius: 7px;
   border: 1px solid #3a3a3a;
   background: #262626;
   color: #ccc;
-  border-radius: 7px;
   cursor: pointer;
-  font-size: 12px;
 }
 
-.ai-copy:hover {
+.copy:hover {
   background: #303030;
 }
 
 .sources {
   margin-top: 12px;
   padding: 12px;
+  border-radius: 10px;
   background: #191919;
   border: 1px solid #303030;
-  border-radius: 10px;
 }
 
 .sources-title {
   font-size: 12px;
   color: #aaa;
-  margin-bottom: 8px;
-  font-weight: 600;
+  margin-bottom: 7px;
 }
 
 .source {
@@ -812,14 +546,10 @@ body {
   color: #8ab4ff;
   text-decoration: none;
   font-size: 12px;
-  padding: 5px 0;
+  margin: 5px 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.source:hover {
-  text-decoration: underline;
 }
 
 .composer-wrap {
@@ -836,13 +566,13 @@ body {
 
 .composer {
   max-width: 850px;
-  margin: 0 auto;
+  margin: auto;
   display: flex;
   gap: 10px;
+  padding: 9px;
   background: #2b2b2b;
   border: 1px solid #444;
   border-radius: 15px;
-  padding: 9px;
 }
 
 textarea {
@@ -850,31 +580,28 @@ textarea {
   resize: none;
   min-height: 44px;
   max-height: 180px;
+  padding: 11px;
+  background: transparent;
   border: 0;
   outline: 0;
-  background: transparent;
   color: white;
-  padding: 11px;
-  font-size: 15px;
-  font-family: inherit;
+  font: inherit;
 }
 
 .send {
-  align-self: flex-end;
   width: 44px;
   height: 44px;
   border: 0;
   border-radius: 11px;
-  background: #fff;
-  color: #111;
+  background: white;
+  color: black;
   cursor: pointer;
   font-size: 18px;
-  font-weight: 700;
+  font-weight: bold;
 }
 
 .send:disabled {
   opacity: .5;
-  cursor: not-allowed;
 }
 
 .typing {
@@ -882,7 +609,8 @@ textarea {
   font-style: italic;
 }
 
-@media (max-width: 700px) {
+@media(max-width:700px) {
+
   .sidebar {
     display: none;
   }
@@ -900,7 +628,9 @@ textarea {
     font-size: 27px;
   }
 }
+
 </style>
+
 </head>
 
 <body>
@@ -908,11 +638,18 @@ textarea {
 <div class="app">
 
   <aside class="sidebar">
-    <div class="logo">My AI</div>
 
-    <button class="new-chat" onclick="newChat()">
+    <div class="logo">
+      My AI
+    </div>
+
+    <button
+      class="new-chat"
+      onclick="newChat()"
+    >
       ＋ New chat
     </button>
+
   </aside>
 
   <main class="main">
@@ -921,15 +658,33 @@ textarea {
       My AI
     </div>
 
-    <div class="chat" id="chat">
-      <div class="chat-inner" id="chatInner">
+    <div
+      class="chat"
+      id="chat"
+    >
 
-        <div class="welcome" id="welcome">
-          <h1>How can I help you?</h1>
-          <p>Ask anything.</p>
+      <div
+        class="chat-inner"
+        id="chatInner"
+      >
+
+        <div
+          class="welcome"
+          id="welcome"
+        >
+
+          <h1>
+            How can I help you?
+          </h1>
+
+          <p>
+            Ask anything.
+          </p>
+
         </div>
 
       </div>
+
     </div>
 
   </main>
@@ -942,8 +697,8 @@ textarea {
 
     <textarea
       id="input"
-      placeholder="Message My AI..."
       rows="1"
+      placeholder="Message My AI..."
     ></textarea>
 
     <button
@@ -959,29 +714,55 @@ textarea {
 </div>
 
 <script>
-let conversation = [];
+
+let history = [];
 let busy = false;
 
-const input = document.getElementById("input");
-const send = document.getElementById("send");
-const chatInner = document.getElementById("chatInner");
-const chat = document.getElementById("chat");
+const input =
+  document.getElementById("input");
 
-input.addEventListener("keydown", function(event) {
-  if (event.key === "Enter" && !event.shiftKey) {
-    event.preventDefault();
-    sendMessage();
+const send =
+  document.getElementById("send");
+
+const chat =
+  document.getElementById("chat");
+
+const chatInner =
+  document.getElementById("chatInner");
+
+input.addEventListener(
+  "keydown",
+  event => {
+
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey
+    ) {
+
+      event.preventDefault();
+
+      sendMessage();
+    }
   }
-});
+);
 
-input.addEventListener("input", function() {
-  this.style.height = "auto";
-  this.style.height =
-    Math.min(this.scrollHeight, 180) + "px";
-});
+input.addEventListener(
+  "input",
+  () => {
 
-function escapeHtml(text) {
-  return String(text)
+    input.style.height = "auto";
+
+    input.style.height =
+      Math.min(
+        input.scrollHeight,
+        180
+      ) + "px";
+  }
+);
+
+function escapeHtml(value) {
+
+  return String(value)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -989,119 +770,194 @@ function escapeHtml(text) {
     .replaceAll("'", "&#039;");
 }
 
-function addMessage(role, text, sources = []) {
-  const welcome = document.getElementById("welcome");
+function addMessage(
+  role,
+  text,
+  sources = []
+) {
+
+  const welcome =
+    document.getElementById(
+      "welcome"
+    );
 
   if (welcome) {
     welcome.remove();
   }
 
-  const wrapper = document.createElement("div");
-  wrapper.className =
-    "message " + (role === "user" ? "user" : "ai");
+  const message =
+    document.createElement("div");
 
-  const avatar = document.createElement("div");
+  message.className =
+    "message " + role;
+
+  const avatar =
+    document.createElement("div");
+
   avatar.className = "avatar";
+
   avatar.textContent =
-    role === "user" ? "You" : "AI";
+    role === "user"
+      ? "You"
+      : "AI";
 
-  const body = document.createElement("div");
-  body.className = "content";
+  const content =
+    document.createElement("div");
 
-  body.innerHTML =
-    escapeHtml(text)
-      .replace(/\\n/g, "<br>");
+  content.className =
+    "content";
+
+  content.innerHTML =
+    escapeHtml(text);
 
   if (role === "ai") {
-    const copy = document.createElement("button");
-    copy.className = "ai-copy";
+
+    const copy =
+      document.createElement(
+        "button"
+      );
+
+    copy.className = "copy";
     copy.textContent = "Copy";
 
-    copy.onclick = async function() {
+    copy.onclick = async () => {
+
       try {
-        await navigator.clipboard.writeText(text);
-        copy.textContent = "Copied";
+
+        await navigator.clipboard
+          .writeText(text);
+
+        copy.textContent =
+          "Copied";
 
         setTimeout(() => {
-          copy.textContent = "Copy";
+          copy.textContent =
+            "Copy";
         }, 1200);
+
       } catch {
-        copy.textContent = "Failed";
+
+        copy.textContent =
+          "Failed";
       }
     };
 
-    body.appendChild(copy);
+    content.appendChild(copy);
 
-    if (Array.isArray(sources) && sources.length) {
-      const box = document.createElement("div");
-      box.className = "sources";
+    if (
+      Array.isArray(sources) &&
+      sources.length
+    ) {
 
-      const title = document.createElement("div");
-      title.className = "sources-title";
-      title.textContent = "Sources";
+      const box =
+        document.createElement(
+          "div"
+        );
+
+      box.className =
+        "sources";
+
+      const title =
+        document.createElement(
+          "div"
+        );
+
+      title.className =
+        "sources-title";
+
+      title.textContent =
+        "Sources";
 
       box.appendChild(title);
 
-      sources.forEach(source => {
-        if (!source || !source.url) return;
+      sources.forEach(url => {
 
-        const a = document.createElement("a");
-        a.className = "source";
-        a.href = source.url;
+        const a =
+          document.createElement(
+            "a"
+          );
+
+        a.className =
+          "source";
+
+        a.href = url;
+
         a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        a.textContent =
-          source.title || source.url;
+
+        a.rel =
+          "noopener noreferrer";
+
+        a.textContent = url;
 
         box.appendChild(a);
       });
 
-      body.appendChild(box);
+      content.appendChild(box);
     }
   }
 
-  wrapper.appendChild(avatar);
-  wrapper.appendChild(body);
+  message.appendChild(avatar);
+  message.appendChild(content);
 
-  chatInner.appendChild(wrapper);
+  chatInner.appendChild(message);
 
-  chat.scrollTop = chat.scrollHeight;
+  chat.scrollTop =
+    chat.scrollHeight;
 }
 
 function addTyping() {
-  const wrapper = document.createElement("div");
 
-  wrapper.className = "message ai";
-  wrapper.id = "typing";
+  const message =
+    document.createElement(
+      "div"
+    );
 
-  wrapper.innerHTML =
+  message.id =
+    "typing";
+
+  message.className =
+    "message ai";
+
+  message.innerHTML =
     '<div class="avatar">AI</div>' +
-    '<div class="content typing">Thinking...</div>';
+    '<div class="content typing">' +
+    'Thinking...' +
+    '</div>';
 
-  chatInner.appendChild(wrapper);
+  chatInner.appendChild(message);
 
-  chat.scrollTop = chat.scrollHeight;
+  chat.scrollTop =
+    chat.scrollHeight;
 }
 
 function removeTyping() {
-  const el = document.getElementById("typing");
 
-  if (el) {
-    el.remove();
+  const element =
+    document.getElementById(
+      "typing"
+    );
+
+  if (element) {
+    element.remove();
   }
 }
 
 async function sendMessage() {
+
   if (busy) return;
 
-  const text = input.value.trim();
+  const text =
+    input.value.trim();
 
   if (!text) return;
 
   busy = true;
   send.disabled = true;
 
-  addMessage("user", text);
+  addMessage(
+    "user",
+    text
+  );
 
   input.value = "";
   input.style.height = "auto";
@@ -1109,32 +965,32 @@ async function sendMessage() {
   addTyping();
 
   try {
-    const response = await fetch("/api/chat", {
-      method: "POST",
 
-      headers: {
-        "content-type": "application/json"
-      },
+    const response =
+      await fetch(
+        "/api/chat",
+        {
+          method: "POST",
 
-      body: JSON.stringify({
-        message: text,
-        history: conversation
-      })
-    });
+          headers: {
+            "content-type":
+              "application/json"
+          },
 
-    let data;
-
-    try {
-      data = await response.json();
-    } catch {
-      throw new Error(
-        "Server returned an invalid response."
+          body: JSON.stringify({
+            message: text,
+            history
+          })
+        }
       );
-    }
+
+    const data =
+      await response.json();
 
     removeTyping();
 
     if (!response.ok) {
+
       throw new Error(
         data?.error ||
         "Request failed."
@@ -1143,7 +999,7 @@ async function sendMessage() {
 
     const answer =
       data?.reply ||
-      "I couldn't generate a response.";
+      "No response generated.";
 
     addMessage(
       "ai",
@@ -1151,34 +1007,37 @@ async function sendMessage() {
       data?.sources || []
     );
 
-    conversation.push({
+    history.push({
       role: "user",
       content: text
     });
 
-    conversation.push({
+    history.push({
       role: "assistant",
       content: answer
     });
 
-    /*
-      Keep browser-side history small.
-    */
-    if (conversation.length > 24) {
-      conversation =
-        conversation.slice(-24);
+    if (history.length > 20) {
+
+      history =
+        history.slice(-20);
     }
 
   } catch (error) {
+
     removeTyping();
 
     addMessage(
       "ai",
       "Error: " +
-      (error?.message || "Something went wrong.")
+      (
+        error?.message ||
+        "Something went wrong."
+      )
     );
 
   } finally {
+
     busy = false;
     send.disabled = false;
     input.focus();
@@ -1186,7 +1045,8 @@ async function sendMessage() {
 }
 
 function newChat() {
-  conversation = [];
+
+  history = [];
 
   chatInner.innerHTML =
     '<div class="welcome" id="welcome">' +
@@ -1198,113 +1058,119 @@ function newChat() {
   input.style.height = "auto";
   input.focus();
 }
+
 </script>
 
 </body>
+
 </html>`;
 
-/* -------------------------------------------------------
-   ROUTES
-------------------------------------------------------- */
+/* =========================================================
+   WORKER
+========================================================= */
 
 export default {
+
   async fetch(request, env) {
 
-    const url = new URL(request.url);
+    const url =
+      new URL(request.url);
 
-    /*
-      CORS / OPTIONS
-    */
-    if (request.method === "OPTIONS") {
+    if (
+      request.method === "OPTIONS"
+    ) {
+
       return new Response(null, {
         headers: {
-          "access-control-allow-origin": "*",
+          "access-control-allow-origin":
+            "*",
+
           "access-control-allow-methods":
             "GET,POST,OPTIONS",
+
           "access-control-allow-headers":
             "Content-Type"
         }
       });
     }
 
-    /*
-      HOME
-    */
     if (
       request.method === "GET" &&
       url.pathname === "/"
     ) {
-      return new Response(HTML, {
-        headers: {
-          "content-type":
-            "text/html; charset=utf-8"
+
+      return new Response(
+        HTML,
+        {
+          headers: {
+            "content-type":
+              "text/html; charset=utf-8"
+          }
         }
-      });
+      );
     }
 
-    /*
-      HEALTH
-    */
     if (
       request.method === "GET" &&
       url.pathname === "/api/health"
     ) {
+
       return json({
         ok: true,
         model: MODEL,
+        architecture:
+          "Cloudflare AI Utils Agent",
         tools: [
           "web_search",
           "calculator"
-        ],
-        architecture:
-          "agentic-tool-calling"
+        ]
       });
     }
 
-    /*
-      CHAT
-    */
     if (
       request.method === "POST" &&
       url.pathname === "/api/chat"
     ) {
+
       try {
-        const body = await request.json();
+
+        const body =
+          await request.json();
 
         const message =
-          String(body?.message || "").trim();
+          String(
+            body?.message || ""
+          ).trim();
 
         if (!message) {
+
           return json(
             {
-              error: "Message is empty."
+              error:
+                "Message is empty."
             },
             400
           );
         }
 
-        const history =
-          Array.isArray(body?.history)
-            ? body.history
-            : [];
-
         const result =
           await runAgent(
             env,
             message,
-            history
+            body?.history
           );
 
         return json({
           reply: result.answer,
-          sources: result.sources || [],
+          sources: result.sources,
           model: MODEL,
           agent: true
         });
 
       } catch (error) {
+
         console.error(
-          "CHAT ERROR:",
+          "MY AI ERROR:",
           error
         );
 
@@ -1314,7 +1180,7 @@ export default {
               String(
                 error?.message ||
                 error ||
-                "Unknown server error"
+                "AI request failed."
               )
           },
           500
