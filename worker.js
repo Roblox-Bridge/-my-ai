@@ -38,7 +38,7 @@ const HTML_CONTENT = `<!DOCTYPE html>
         <div class="space-y-6">
             <div class="glass-card rounded-xl p-5 orange-glow">
                 <h2 class="text-sm font-semibold uppercase tracking-wider text-orange-400 mb-4">Groq Free API Key (Optional)</h2>
-                <p class="text-xs text-gray-400 mb-3">If added, uses Llama 3 70B Ultra High-Speed Engine. Otherwise falls back to Cloudflare Native AI.</p>
+                <p class="text-xs text-gray-400 mb-3">If added, uses Llama 3.3 70B Ultra High-Speed Engine. Otherwise falls back to Cloudflare Native AI.</p>
                 <input type="password" id="groqKey" placeholder="gsk_..." class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-orange-500">
             </div>
 
@@ -168,7 +168,7 @@ export default {
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              model: model || 'llama3-70b-8192',
+              model: model || 'llama-3.3-70b-versatile',
               messages: [
                 { role: 'system', content: systemPrompt || 'You are AetherAI, an ultra-intelligent multi-agent system.' },
                 { role: 'user', content: prompt }
@@ -183,7 +183,8 @@ export default {
           });
         }
 
-        const answer = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
+        // Active Cloudflare Native AI Model
+        const answer = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
           messages: [
             { role: 'system', content: systemPrompt || 'You are AetherAI Multi-Agent Router.' },
             { role: 'user', content: prompt }
