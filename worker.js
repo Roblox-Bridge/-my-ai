@@ -1,7 +1,6 @@
 // ============================================================
 // AetherAI Studio
 // Cloudflare Worker + xKiro
-// Single-file ChatGPT-style AI interface
 // ============================================================
 
 const HTML = String.raw`
@@ -23,7 +22,7 @@ const HTML = String.raw`
   --panel2: #2a2a2a;
   --border: #3a3a3a;
   --text: #f5f5f5;
-  --muted: #a0a0a0;
+  --muted: #999;
   --accent: #10a37f;
 }
 
@@ -34,14 +33,7 @@ body {
   height: 100%;
   background: var(--bg);
   color: var(--text);
-  font-family:
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 body {
@@ -66,7 +58,7 @@ button {
 
 .sidebar {
   width: 270px;
-  background: #171717;
+  background: var(--panel);
   border-right: 1px solid #303030;
   display: flex;
   flex-direction: column;
@@ -87,7 +79,7 @@ button {
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  background: linear-gradient(135deg,#10a37f,#3b82f6);
+  background: linear-gradient(135deg, #10a37f, #3b82f6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -107,10 +99,6 @@ button {
 
 .new-chat:hover {
   background: #2d2d2d;
-}
-
-.sidebar-section {
-  margin-top: 8px;
 }
 
 .sidebar-title {
@@ -174,6 +162,7 @@ button {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
 
 .mobile-menu {
@@ -191,7 +180,7 @@ button {
 
 .model-select {
   min-width: 210px;
-  max-width: 360px;
+  max-width: 400px;
   background: #292929;
   color: white;
   border: 1px solid #444;
@@ -276,7 +265,7 @@ button {
 }
 
 .ai-avatar {
-  background: linear-gradient(135deg,#10a37f,#2563eb);
+  background: linear-gradient(135deg, #10a37f, #2563eb);
 }
 
 .message-main {
@@ -314,13 +303,14 @@ button {
 }
 
 .message-content code {
-  font-family:
-    ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    Monaco,
-    Consolas,
-    monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.message-content h1,
+.message-content h2,
+.message-content h3 {
+  margin-top: 18px;
+  margin-bottom: 8px;
 }
 
 .message-actions {
@@ -365,12 +355,7 @@ button {
   right: 0;
   bottom: 0;
   padding: 12px 20px 20px;
-  background:
-    linear-gradient(
-      to bottom,
-      transparent,
-      rgba(33,33,33,.94) 20%
-    );
+  background: linear-gradient(to bottom, transparent, rgba(33,33,33,.94) 20%);
 }
 
 .composer {
@@ -481,6 +466,7 @@ button {
 }
 
 @media(max-width:800px) {
+
   .sidebar {
     position: fixed;
     z-index: 20;
@@ -535,7 +521,7 @@ button {
       + New chat
     </button>
 
-    <div class="sidebar-section">
+    <div>
       <div class="sidebar-title">Chats</div>
       <div class="chat-history" id="chatHistory"></div>
     </div>
@@ -558,9 +544,7 @@ button {
           class="mobile-menu"
           id="mobileMenu"
           aria-label="Menu"
-        >
-          ☰
-        </button>
+        >☰</button>
 
         <div class="title">
           AetherAI
@@ -581,9 +565,7 @@ button {
           class="icon-btn"
           id="refreshModels"
           title="Refresh models"
-        >
-          ↻
-        </button>
+        >↻</button>
 
       </div>
 
@@ -634,17 +616,13 @@ button {
           class="tool-btn"
           id="webSearch"
           title="Enable web search"
-        >
-          🌐 Web
-        </button>
+        >🌐 Web</button>
 
         <button
           class="tool-btn"
           id="imageMode"
           title="Generate an image"
-        >
-          ✦ Image
-        </button>
+        >✦ Image</button>
 
       </div>
 
@@ -652,9 +630,7 @@ button {
         class="send-btn"
         id="send"
         title="Send"
-      >
-        ↑
-      </button>
+      >↑</button>
 
     </div>
 
@@ -691,37 +667,74 @@ button {
   var webSearchButton = document.getElementById("webSearch");
   var imageModeButton = document.getElementById("imageMode");
   var historyBox = document.getElementById("chatHistory");
-  var welcome = document.getElementById("welcome");
   var statusText = document.getElementById("statusText");
   var sidebar = document.getElementById("sidebar");
+  var welcome = document.getElementById("welcome");
 
   function escapeHtml(value) {
+
     return String(value)
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#039;");
+
   }
 
-  function escapeAttribute(value) {
-    return escapeHtml(value);
-  }
+  /*
+   * IMPORTANT:
+   * We intentionally do not put literal backtick characters
+   * inside this HTML template.
+   *
+   * String.fromCharCode(96) gives us the backtick character
+   * safely when we need to process Markdown code blocks.
+   */
 
   function markdownToHtml(text) {
 
     var safe = escapeHtml(text);
 
+    var bt =
+      String.fromCharCode(96);
+
+    var triple =
+      bt + bt + bt;
+
+    var codeBlockRegex =
+      new RegExp(
+        triple +
+        "([\\\\s\\\\S]*?)" +
+        triple,
+        "g"
+      );
+
+    var inlineCodeRegex =
+      new RegExp(
+        bt +
+        "([^" +
+        bt +
+        "]+)" +
+        bt,
+        "g"
+      );
+
     safe = safe.replace(
-      /```([\\s\\S]*?)```/g,
+      codeBlockRegex,
       function (match, code) {
-        return "<pre><code>" + code + "</code></pre>";
+        return "<pre><code>" +
+          code +
+          "</code></pre>";
       }
     );
 
     safe = safe.replace(
-      /`([^`]+)`/g,
-      "<code>$1</code>"
+      inlineCodeRegex,
+      function (match, code) {
+        return "<code>" +
+          code +
+          "</code>";
+      }
     );
 
     safe = safe.replace(
@@ -764,7 +777,10 @@ button {
       "<br>"
     );
 
-    return "<p>" + safe + "</p>";
+    return "<p>" +
+      safe +
+      "</p>";
+
   }
 
   function saveState() {
@@ -773,19 +789,27 @@ button {
 
       localStorage.setItem(
         "aether_messages",
-        JSON.stringify(state.messages)
+        JSON.stringify(
+          state.messages
+        )
       );
 
       localStorage.setItem(
         "aether_histories",
-        JSON.stringify(state.histories)
+        JSON.stringify(
+          state.histories
+        )
       );
 
     } catch (error) {
 
-      console.warn("Could not save state", error);
+      console.warn(
+        "Could not save state",
+        error
+      );
 
     }
+
   }
 
   function loadState() {
@@ -793,31 +817,47 @@ button {
     try {
 
       var messages =
-        localStorage.getItem("aether_messages");
+        localStorage.getItem(
+          "aether_messages"
+        );
 
       var histories =
-        localStorage.getItem("aether_histories");
+        localStorage.getItem(
+          "aether_histories"
+        );
 
       if (messages) {
-        state.messages = JSON.parse(messages);
+
+        state.messages =
+          JSON.parse(messages);
+
       }
 
       if (histories) {
-        state.histories = JSON.parse(histories);
+
+        state.histories =
+          JSON.parse(histories);
+
       }
 
     } catch (error) {
 
-      console.warn("Could not load state", error);
+      console.warn(
+        "Could not load state",
+        error
+      );
 
     }
+
   }
 
   function createId() {
 
     return (
       Date.now().toString(36) +
-      Math.random().toString(36).slice(2)
+      Math.random()
+        .toString(36)
+        .slice(2)
     );
 
   }
@@ -832,8 +872,10 @@ button {
   function clearWelcome() {
 
     if (welcome) {
+
       welcome.remove();
       welcome = null;
+
     }
 
   }
@@ -852,12 +894,20 @@ button {
       '<div class="avatar user-avatar">U</div>' +
       '<div class="message-main">' +
       '<div class="message-header">You</div>' +
-      '<div class="message-content">' +
-      markdownToHtml(text) +
-      '</div>' +
+      '<div class="message-content"></div>' +
       '</div>';
 
-    messagesInner.appendChild(wrapper);
+    var content =
+      wrapper.querySelector(
+        ".message-content"
+      );
+
+    content.innerHTML =
+      markdownToHtml(text);
+
+    messagesInner.appendChild(
+      wrapper
+    );
 
     scrollBottom();
 
@@ -873,24 +923,41 @@ button {
     wrapper.className =
       "message";
 
+    wrapper.innerHTML =
+      '<div class="avatar ai-avatar">A</div>' +
+      '<div class="message-main">' +
+      '<div class="message-header">AetherAI</div>' +
+      '<div class="message-content"></div>' +
+      '<div class="message-actions"></div>' +
+      '</div>';
+
     var content =
-      document.createElement("div");
-
-    content.className =
-      "message-content";
-
-    content.innerHTML =
-      initialText
-        ? markdownToHtml(initialText)
-        : '<div class="typing">' +
-          '<span></span><span></span><span></span>' +
-          '</div>';
+      wrapper.querySelector(
+        ".message-content"
+      );
 
     var actions =
-      document.createElement("div");
+      wrapper.querySelector(
+        ".message-actions"
+      );
 
-    actions.className =
-      "message-actions";
+    if (initialText) {
+
+      content.innerHTML =
+        markdownToHtml(
+          initialText
+        );
+
+    } else {
+
+      content.innerHTML =
+        '<div class="typing">' +
+        '<span></span>' +
+        '<span></span>' +
+        '<span></span>' +
+        '</div>';
+
+    }
 
     var copy =
       document.createElement("button");
@@ -908,41 +975,38 @@ button {
         var text =
           content.innerText || "";
 
-        navigator.clipboard
-          .writeText(text)
-          .then(function () {
+        if (
+          navigator.clipboard &&
+          navigator.clipboard.writeText
+        ) {
 
-            copy.textContent =
-              "Copied";
+          navigator.clipboard
+            .writeText(text)
+            .then(function () {
 
-            setTimeout(
-              function () {
-                copy.textContent =
-                  "Copy";
-              },
-              1200
-            );
+              copy.textContent =
+                "Copied";
 
-          });
+              setTimeout(
+                function () {
+                  copy.textContent =
+                    "Copy";
+                },
+                1200
+              );
+
+            });
+
+        }
 
       }
     );
 
     actions.appendChild(copy);
 
-    wrapper.innerHTML =
-      '<div class="avatar ai-avatar">A</div>' +
-      '<div class="message-main">' +
-      '<div class="message-header">AetherAI</div>' +
-      '</div>';
-
-    var main =
-      wrapper.querySelector(".message-main");
-
-    main.appendChild(content);
-    main.appendChild(actions);
-
-    messagesInner.appendChild(wrapper);
+    messagesInner.appendChild(
+      wrapper
+    );
 
     scrollBottom();
 
@@ -969,10 +1033,18 @@ button {
       '<div class="message-main">' +
       '<div class="message-header">AetherAI</div>' +
       '<div class="message-content"></div>' +
+      '<div class="message-actions"></div>' +
       '</div>';
 
     var content =
-      wrapper.querySelector(".message-content");
+      wrapper.querySelector(
+        ".message-content"
+      );
+
+    var actions =
+      wrapper.querySelector(
+        ".message-actions"
+      );
 
     var image =
       document.createElement("img");
@@ -986,13 +1058,9 @@ button {
     image.alt =
       "Generated image";
 
-    content.appendChild(image);
-
-    var actions =
-      document.createElement("div");
-
-    actions.className =
-      "message-actions";
+    content.appendChild(
+      image
+    );
 
     var copy =
       document.createElement("button");
@@ -1007,33 +1075,40 @@ button {
       "click",
       function () {
 
-        navigator.clipboard
-          .writeText(url)
-          .then(function () {
+        if (
+          navigator.clipboard &&
+          navigator.clipboard.writeText
+        ) {
 
-            copy.textContent =
-              "Copied";
+          navigator.clipboard
+            .writeText(url)
+            .then(function () {
 
-            setTimeout(
-              function () {
-                copy.textContent =
-                  "Copy image URL";
-              },
-              1200
-            );
+              copy.textContent =
+                "Copied";
 
-          });
+              setTimeout(
+                function () {
+                  copy.textContent =
+                    "Copy image URL";
+                },
+                1200
+              );
+
+            });
+
+        }
 
       }
     );
 
-    actions.appendChild(copy);
+    actions.appendChild(
+      copy
+    );
 
-    wrapper
-      .querySelector(".message-main")
-      .appendChild(actions);
-
-    messagesInner.appendChild(wrapper);
+    messagesInner.appendChild(
+      wrapper
+    );
 
     scrollBottom();
 
@@ -1060,7 +1135,9 @@ button {
       '</div>' +
       '</div>';
 
-    messagesInner.appendChild(wrapper);
+    messagesInner.appendChild(
+      wrapper
+    );
 
     scrollBottom();
 
@@ -1070,34 +1147,42 @@ button {
 
   function renderHistory() {
 
-    historyBox.innerHTML = "";
+    historyBox.innerHTML =
+      "";
 
     state.histories
       .slice()
       .reverse()
-      .forEach(function (item) {
+      .forEach(
+        function (item) {
 
-        var div =
-          document.createElement("div");
+          var div =
+            document.createElement("div");
 
-        div.className =
-          "history-item";
+          div.className =
+            "history-item";
 
-        div.textContent =
-          item.title || "New chat";
+          div.textContent =
+            item.title ||
+            "New chat";
 
-        div.addEventListener(
-          "click",
-          function () {
+          div.addEventListener(
+            "click",
+            function () {
 
-            loadConversation(item.id);
+              loadConversation(
+                item.id
+              );
 
-          }
-        );
+            }
+          );
 
-        historyBox.appendChild(div);
+          historyBox.appendChild(
+            div
+          );
 
-      });
+        }
+      );
 
   }
 
@@ -1120,7 +1205,8 @@ button {
     state.messages =
       found.messages || [];
 
-    messagesInner.innerHTML = "";
+    messagesInner.innerHTML =
+      "";
 
     if (!state.messages.length) {
 
@@ -1136,29 +1222,43 @@ button {
         '</div>';
 
       welcome =
-        document.getElementById("welcome");
+        document.getElementById(
+          "welcome"
+        );
 
     } else {
 
       state.messages.forEach(
         function (message) {
 
-          if (message.role === "user") {
+          if (
+            message.role === "user"
+          ) {
+
             addUserMessage(
               message.content
             );
+
           }
 
-          if (message.role === "assistant") {
+          if (
+            message.role === "assistant"
+          ) {
+
             addAssistantMessage(
               message.content
             );
+
           }
 
-          if (message.role === "image") {
+          if (
+            message.role === "image"
+          ) {
+
             addImageMessage(
               message.url
             );
+
           }
 
         }
@@ -1188,7 +1288,10 @@ button {
     var current =
       state.histories.find(
         function (item) {
-          return item.id === state.currentChatId;
+          return (
+            item.id ===
+            state.currentChatId
+          );
         }
       );
 
@@ -1202,15 +1305,18 @@ button {
     var firstUser =
       state.messages.find(
         function (item) {
-          return item.role === "user";
+          return (
+            item.role === "user"
+          );
         }
       );
 
     if (firstUser) {
 
       current.title =
-        String(firstUser.content)
-          .slice(0, 45);
+        String(
+          firstUser.content
+        ).slice(0, 45);
 
     }
 
@@ -1224,7 +1330,8 @@ button {
     state.currentChatId =
       createId();
 
-    state.messages = [];
+    state.messages =
+      [];
 
     messagesInner.innerHTML =
       '<div class="welcome" id="welcome">' +
@@ -1238,7 +1345,9 @@ button {
       '</div>';
 
     welcome =
-      document.getElementById("welcome");
+      document.getElementById(
+        "welcome"
+      );
 
     saveCurrentConversation();
 
@@ -1252,12 +1361,16 @@ button {
     try {
 
       var response =
-        await fetch("/api/models?modality=chat");
+        await fetch(
+          "/api/models?modality=chat"
+        );
 
       if (!response.ok) {
+
         throw new Error(
           "Model request failed"
         );
+
       }
 
       var data =
@@ -1268,94 +1381,136 @@ button {
           ? data.data
           : [];
 
-      modelSelect.innerHTML = "";
+      modelSelect.innerHTML =
+        "";
 
       var freeModels =
         state.models.filter(
           function (model) {
+
             return (
-              String(model.access_tier || "")
-                .toLowerCase() === "free"
+              String(
+                model.access_tier ||
+                ""
+              ).toLowerCase() ===
+              "free"
             );
+
           }
         );
 
-      var allModels =
-        state.models;
+      var added = {};
 
-      var groups = [
-        {
-          label: "Free models",
-          models: freeModels
-        },
-        {
-          label: "All models",
-          models: allModels
-        }
-      ];
+      if (freeModels.length) {
 
-      var added =
-        {};
+        var freeGroup =
+          document.createElement(
+            "optgroup"
+          );
 
-      groups.forEach(
-        function (group) {
+        freeGroup.label =
+          "Free models";
 
-          if (!group.models.length) {
+        freeModels.forEach(
+          function (model) {
+
+            if (
+              !model.id ||
+              added[model.id]
+            ) {
+              return;
+            }
+
+            added[model.id] =
+              true;
+
+            var option =
+              document.createElement(
+                "option"
+              );
+
+            option.value =
+              model.id;
+
+            option.textContent =
+              model.id;
+
+            freeGroup.appendChild(
+              option
+            );
+
+          }
+        );
+
+        modelSelect.appendChild(
+          freeGroup
+        );
+
+      }
+
+      var allGroup =
+        document.createElement(
+          "optgroup"
+        );
+
+      allGroup.label =
+        "All models";
+
+      state.models.forEach(
+        function (model) {
+
+          if (
+            !model.id ||
+            added[model.id]
+          ) {
             return;
           }
 
-          var optgroup =
-            document.createElement("optgroup");
+          added[model.id] =
+            true;
 
-          optgroup.label =
-            group.label;
+          var option =
+            document.createElement(
+              "option"
+            );
 
-          group.models.forEach(
-            function (model) {
+          option.value =
+            model.id;
 
-              var id =
-                model.id;
-
-              if (!id || added[id]) {
-                return;
-              }
-
-              added[id] =
-                true;
-
-              var option =
-                document.createElement("option");
-
-              option.value =
-                id;
-
-              option.textContent =
-                id +
-                (
+          option.textContent =
+            model.id +
+            (
+              model.access_tier
+                ? " · " +
                   model.access_tier
-                    ? " · " +
-                      model.access_tier
-                    : ""
-                );
+                : ""
+            );
 
-              optgroup.appendChild(
-                option
-              );
-
-            }
-          );
-
-          modelSelect.appendChild(
-            optgroup
+          allGroup.appendChild(
+            option
           );
 
         }
       );
 
-      if (!modelSelect.options.length) {
+      if (
+        allGroup.children.length
+      ) {
+
+        modelSelect.appendChild(
+          allGroup
+        );
+
+      }
+
+      if (
+        !modelSelect.options.length
+      ) {
 
         var fallback =
-          document.createElement("option");
+          document.createElement(
+            "option"
+          );
 
         fallback.value =
           "openai/gpt-5.6-sol";
@@ -1372,7 +1527,7 @@ button {
       statusText.textContent =
         freeModels.length +
         " free · " +
-        allModels.length +
+        state.models.length +
         " total models";
 
     } catch (error) {
@@ -1396,7 +1551,9 @@ button {
     try {
 
       var response =
-        await fetch("/api/models?modality=image");
+        await fetch(
+          "/api/models?modality=image"
+        );
 
       if (!response.ok) {
         return;
@@ -1421,26 +1578,76 @@ button {
 
   }
 
+  function extractDelta(data) {
+
+    if (
+      data &&
+      data.choices &&
+      data.choices[0]
+    ) {
+
+      var choice =
+        data.choices[0];
+
+      if (
+        choice.delta &&
+        typeof choice.delta.content ===
+        "string"
+      ) {
+
+        return choice.delta.content;
+
+      }
+
+      if (
+        typeof choice.text ===
+        "string"
+      ) {
+
+        return choice.text;
+
+      }
+
+    }
+
+    if (
+      data &&
+      typeof data.content ===
+      "string"
+    ) {
+
+      return data.content;
+
+    }
+
+    return "";
+
+  }
+
   async function sendText() {
 
     var text =
       input.value.trim();
 
-    if (!text || state.streaming) {
+    if (
+      !text ||
+      state.streaming
+    ) {
+
       return;
+
     }
-
-    var selectedModel =
-      modelSelect.value;
-
-    input.value = "";
-    resizeTextarea();
 
     state.streaming =
       true;
 
     sendButton.disabled =
       true;
+
+    input.value =
+      "";
+
+    resizeTextarea();
 
     addUserMessage(text);
 
@@ -1453,7 +1660,9 @@ button {
 
     if (state.imageMode) {
 
-      await generateImage(text);
+      await generateImage(
+        text
+      );
 
       state.streaming =
         false;
@@ -1466,7 +1675,9 @@ button {
     }
 
     var assistant =
-      addAssistantMessage("");
+      addAssistantMessage(
+        ""
+      );
 
     var accumulated =
       "";
@@ -1474,23 +1685,38 @@ button {
     try {
 
       var response =
-        await fetch("/api/chat", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            model: selectedModel,
-            messages: state.messages
-              .filter(function (message) {
-                return (
-                  message.role === "user" ||
-                  message.role === "assistant"
-                );
-              }),
-            web_search: state.webSearch
-          })
-        });
+        await fetch(
+          "/api/chat",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json"
+            },
+            body:
+              JSON.stringify({
+                model:
+                  modelSelect.value,
+
+                messages:
+                  state.messages.filter(
+                    function (message) {
+
+                      return (
+                        message.role ===
+                          "user" ||
+                        message.role ===
+                          "assistant"
+                      );
+
+                    }
+                  ),
+
+                web_search:
+                  state.webSearch
+              })
+          }
+        );
 
       if (!response.ok) {
 
@@ -1505,9 +1731,11 @@ button {
       }
 
       if (!response.body) {
+
         throw new Error(
-          "Streaming is not supported by this response"
+          "Streaming response unavailable"
         );
+
       }
 
       var reader =
@@ -1531,11 +1759,13 @@ button {
         buffer +=
           decoder.decode(
             result.value,
-            { stream: true }
+            {
+              stream: true
+            }
           );
 
         var lines =
-          buffer.split("\\n");
+          buffer.split("\n");
 
         buffer =
           lines.pop() || "";
@@ -1549,49 +1779,60 @@ button {
           var line =
             lines[i].trim();
 
-          if (!line) {
+          if (
+            !line ||
+            line.indexOf("data:") !== 0
+          ) {
+
             continue;
+
           }
 
-          if (line.indexOf("data:") === 0) {
+          var payload =
+            line.slice(5).trim();
 
-            var payload =
-              line.slice(5).trim();
+          if (
+            payload === "[DONE]"
+          ) {
 
-            if (payload === "[DONE]") {
-              continue;
-            }
+            continue;
 
-            try {
+          }
 
-              var json =
-                JSON.parse(payload);
+          try {
 
-              var delta =
-                extractDelta(json);
-
-              if (delta) {
-
-                accumulated +=
-                  delta;
-
-                assistant.content.innerHTML =
-                  markdownToHtml(
-                    accumulated
-                  );
-
-                scrollBottom();
-
-              }
-
-            } catch (parseError) {
-
-              console.warn(
-                "SSE parse error",
-                parseError
+            var json =
+              JSON.parse(
+                payload
               );
 
+            var delta =
+              extractDelta(
+                json
+              );
+
+            if (delta) {
+
+              accumulated +=
+                delta;
+
+              assistant
+                .content
+                .innerHTML =
+                markdownToHtml(
+                  accumulated
+                );
+
+              scrollBottom();
+
             }
+
+          } catch (parseError) {
+
+            console.warn(
+              "SSE parse error",
+              parseError
+            );
 
           }
 
@@ -1604,7 +1845,9 @@ button {
         accumulated =
           "The model returned an empty response.";
 
-        assistant.content.innerHTML =
+        assistant
+          .content
+          .innerHTML =
           markdownToHtml(
             accumulated
           );
@@ -1622,16 +1865,15 @@ button {
 
       console.error(error);
 
-      var errorMessage =
-        "Error: " +
-        (
-          error.message ||
-          "Unknown error"
-        );
-
-      assistant.content.innerHTML =
+      assistant
+        .content
+        .innerHTML =
         markdownToHtml(
-          errorMessage
+          "Error: " +
+          (
+            error.message ||
+            "Unknown error"
+          )
         );
 
     } finally {
@@ -1648,86 +1890,58 @@ button {
 
   }
 
-  function extractDelta(data) {
-
-    if (
-      data &&
-      data.choices &&
-      data.choices[0]
-    ) {
-
-      var choice =
-        data.choices[0];
-
-      if (
-        choice.delta &&
-        typeof choice.delta.content ===
-        "string"
-      ) {
-        return choice.delta.content;
-      }
-
-      if (
-        typeof choice.text ===
-        "string"
-      ) {
-        return choice.text;
-      }
-
-    }
-
-    if (
-      data &&
-      typeof data.content ===
-      "string"
-    ) {
-      return data.content;
-    }
-
-    return "";
-
-  }
-
   async function generateImage(prompt) {
 
     var loading =
       addImageLoading();
 
-    var model =
-      "";
-
-    if (state.imageModels.length) {
-
-      var freeImage =
-        state.imageModels.find(
-          function (item) {
-            return (
-              String(item.access_tier || "")
-                .toLowerCase() === "free"
-            );
-          }
-        );
-
-      model =
-        freeImage
-          ? freeImage.id
-          : state.imageModels[0].id;
-
-    }
-
     try {
 
+      var imageModel =
+        "";
+
+      if (
+        state.imageModels.length
+      ) {
+
+        var free =
+          state.imageModels.find(
+            function (item) {
+
+              return (
+                String(
+                  item.access_tier ||
+                  ""
+                ).toLowerCase() ===
+                "free"
+              );
+
+            }
+          );
+
+        imageModel =
+          free
+            ? free.id
+            : state.imageModels[0].id;
+
+      }
+
       var response =
-        await fetch("/api/images", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            prompt: prompt,
-            model: model
-          })
-        });
+        await fetch(
+          "/api/images",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json"
+            },
+            body:
+              JSON.stringify({
+                prompt: prompt,
+                model: imageModel
+              })
+          }
+        );
 
       if (!response.ok) {
 
@@ -1736,7 +1950,7 @@ button {
 
         throw new Error(
           errorText ||
-          "Image generation request failed"
+          "Image generation failed"
         );
 
       }
@@ -1752,38 +1966,40 @@ button {
           data.data.id
         );
 
+      var directUrl =
+        findImageUrl(data);
+
+      if (directUrl) {
+
+        loading.remove();
+
+        addImageMessage(
+          directUrl
+        );
+
+        state.messages.push({
+          role: "image",
+          url: directUrl
+        });
+
+        saveCurrentConversation();
+
+        return;
+
+      }
+
       if (!jobId) {
 
-        var directUrl =
-          findImageUrl(data);
-
-        if (directUrl) {
-
-          loading.remove();
-
-          addImageMessage(
-            directUrl
-          );
-
-          state.messages.push({
-            role: "image",
-            url: directUrl
-          });
-
-          saveCurrentConversation();
-
-          return;
-
-        }
-
         throw new Error(
-          "No image job ID was returned"
+          "No image job ID returned"
         );
 
       }
 
       var imageUrl =
-        await pollImage(jobId);
+        await pollImage(
+          jobId
+        );
 
       loading.remove();
 
@@ -1802,10 +2018,14 @@ button {
 
       loading.remove();
 
-      var failed =
-        addAssistantMessage("");
+      var assistant =
+        addAssistantMessage(
+          ""
+        );
 
-      failed.content.innerHTML =
+      assistant
+        .content
+        .innerHTML =
         markdownToHtml(
           "Image generation error: " +
           (
@@ -1828,14 +2048,18 @@ button {
       typeof data.url ===
       "string"
     ) {
+
       return data.url;
+
     }
 
     if (
       typeof data.image_url ===
       "string"
     ) {
+
       return data.image_url;
+
     }
 
     if (
@@ -1856,7 +2080,9 @@ button {
           typeof item.url ===
           "string"
         ) {
+
           return item.url;
+
         }
 
       }
@@ -1869,30 +2095,36 @@ button {
 
   async function pollImage(jobId) {
 
-    var maxAttempts =
-      120;
-
     for (
       var attempt = 0;
-      attempt < maxAttempts;
+      attempt < 120;
       attempt++
     ) {
 
-      await sleep(2000);
+      await new Promise(
+        function (resolve) {
+          setTimeout(
+            resolve,
+            2000
+          );
+        }
+      );
 
       var response =
         await fetch(
           "/api/images/" +
-          encodeURIComponent(jobId)
+          encodeURIComponent(
+            jobId
+          )
         );
 
       if (!response.ok) {
 
-        var text =
+        var errorText =
           await response.text();
 
         throw new Error(
-          text ||
+          errorText ||
           "Image status request failed"
         );
 
@@ -1935,19 +2167,6 @@ button {
 
     throw new Error(
       "Image generation timed out"
-    );
-
-  }
-
-  function sleep(ms) {
-
-    return new Promise(
-      function (resolve) {
-        setTimeout(
-          resolve,
-          ms
-        );
-      }
     );
 
   }
@@ -2005,8 +2224,10 @@ button {
     .addEventListener(
       "click",
       function () {
+
         loadModels();
         loadImageModels();
+
       }
     );
 
@@ -2015,9 +2236,11 @@ button {
     .addEventListener(
       "click",
       function () {
+
         sidebar.classList.toggle(
           "open"
         );
+
       }
     );
 
@@ -2048,17 +2271,10 @@ button {
         state.imageMode
       );
 
-      if (state.imageMode) {
-
-        input.placeholder =
-          "Describe the image you want...";
-
-      } else {
-
-        input.placeholder =
-          "Message AetherAI...";
-
-      }
+      input.placeholder =
+        state.imageMode
+          ? "Describe the image you want..."
+          : "Message AetherAI...";
 
     }
   );
@@ -2080,7 +2296,7 @@ button {
 
 
 // ============================================================
-// Helpers
+// JSON helper
 // ============================================================
 
 function json(data, status = 200) {
@@ -2088,17 +2304,27 @@ function json(data, status = 200) {
   return new Response(
     JSON.stringify(data),
     {
-      status,
+      status: status,
       headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        "Cache-Control": "no-store"
+        "Content-Type":
+          "application/json; charset=utf-8",
+        "Cache-Control":
+          "no-store"
       }
     }
   );
 
 }
 
-function errorResponse(message, status = 500) {
+
+// ============================================================
+// Error helper
+// ============================================================
+
+function errorResponse(
+  message,
+  status = 500
+) {
 
   return json(
     {
@@ -2109,18 +2335,26 @@ function errorResponse(message, status = 500) {
 
 }
 
+
+// ============================================================
+// xKiro configuration
+// ============================================================
+
 function getBaseUrl(env) {
 
   return (
     env.XKIRO_BASE_URL ||
     "https://api.xkiro.com/v1"
-  ).replace(/\/+$/, "");
+  ).replace(
+    /\/+$/,
+    ""
+  );
 
 }
 
 function getApiKey(env) {
 
-  return (
+  return String(
     env.XKIRO_API_KEY ||
     ""
   ).trim();
@@ -2144,6 +2378,11 @@ function requireApiKey(env) {
 
 }
 
+
+// ============================================================
+// xKiro request helper
+// ============================================================
+
 async function xkiroFetch(
   env,
   path,
@@ -2152,9 +2391,6 @@ async function xkiroFetch(
 
   var apiKey =
     requireApiKey(env);
-
-  var base =
-    getBaseUrl(env);
 
   var headers =
     new Headers(
@@ -2181,10 +2417,10 @@ async function xkiroFetch(
   }
 
   return fetch(
-    base + path,
+    getBaseUrl(env) + path,
     {
       ...options,
-      headers
+      headers: headers
     }
   );
 
@@ -2192,7 +2428,7 @@ async function xkiroFetch(
 
 
 // ============================================================
-// Models
+// Model list
 // ============================================================
 
 async function handleModels(
@@ -2201,7 +2437,9 @@ async function handleModels(
 ) {
 
   var url =
-    new URL(request.url);
+    new URL(
+      request.url
+    );
 
   var modality =
     url.searchParams.get(
@@ -2233,13 +2471,16 @@ async function handleModels(
   return new Response(
     body,
     {
-      status: response.status,
+      status:
+        response.status,
+
       headers: {
         "Content-Type":
           response.headers.get(
             "Content-Type"
           ) ||
           "application/json",
+
         "Cache-Control":
           "no-store"
       }
@@ -2250,7 +2491,7 @@ async function handleModels(
 
 
 // ============================================================
-// Chat
+// Chat completion
 // ============================================================
 
 async function handleChat(
@@ -2280,7 +2521,9 @@ async function handleChat(
     "openai/gpt-5.6-sol";
 
   var messages =
-    Array.isArray(body.messages)
+    Array.isArray(
+      body.messages
+    )
       ? body.messages
       : [];
 
@@ -2312,12 +2555,16 @@ async function handleChat(
       "/chat/completions",
       {
         method: "POST",
+
         headers: {
           "Content-Type":
             "application/json"
         },
+
         body:
-          JSON.stringify(payload)
+          JSON.stringify(
+            payload
+          )
       }
     );
 
@@ -2332,6 +2579,7 @@ async function handleChat(
       {
         status:
           upstream.status,
+
         headers: {
           "Content-Type":
             "application/json"
@@ -2345,13 +2593,17 @@ async function handleChat(
     upstream.body,
     {
       status: 200,
+
       headers: {
         "Content-Type":
           "text/event-stream; charset=utf-8",
+
         "Cache-Control":
           "no-cache, no-transform",
+
         "Connection":
           "keep-alive",
+
         "X-Accel-Buffering":
           "no"
       }
@@ -2418,29 +2670,35 @@ async function handleImageCreate(
       "/images/generations",
       {
         method: "POST",
+
         headers: {
           "Content-Type":
             "application/json"
         },
+
         body:
-          JSON.stringify(payload)
+          JSON.stringify(
+            payload
+          )
       }
     );
 
-  var text =
+  var bodyText =
     await response.text();
 
   return new Response(
-    text,
+    bodyText,
     {
       status:
         response.status,
+
       headers: {
         "Content-Type":
           response.headers.get(
             "Content-Type"
           ) ||
           "application/json",
+
         "Cache-Control":
           "no-store"
       }
@@ -2449,6 +2707,10 @@ async function handleImageCreate(
 
 }
 
+
+// ============================================================
+// Image status
+// ============================================================
 
 async function handleImageStatus(
   jobId,
@@ -2464,20 +2726,22 @@ async function handleImageStatus(
       )
     );
 
-  var text =
+  var body =
     await response.text();
 
   return new Response(
-    text,
+    body,
     {
       status:
         response.status,
+
       headers: {
         "Content-Type":
           response.headers.get(
             "Content-Type"
           ) ||
           "application/json",
+
         "Cache-Control":
           "no-store"
       }
@@ -2488,20 +2752,25 @@ async function handleImageStatus(
 
 
 // ============================================================
-// Health
+// Health endpoint
 // ============================================================
 
 function handleHealth(env) {
 
   return json({
     ok: true,
-    service: "AetherAI Studio",
+
+    service:
+      "AetherAI Studio",
+
     xkiroConfigured:
       Boolean(
         getApiKey(env)
       ),
+
     baseUrl:
       getBaseUrl(env),
+
     defaultModel:
       env.DEFAULT_CHAT_MODEL ||
       "openai/gpt-5.6-sol"
@@ -2523,23 +2792,29 @@ export default {
   ) {
 
     var url =
-      new URL(request.url);
+      new URL(
+        request.url
+      );
 
     try {
 
       if (
-        request.method === "OPTIONS"
+        request.method ===
+        "OPTIONS"
       ) {
 
         return new Response(
           null,
           {
             status: 204,
+
             headers: {
               "Access-Control-Allow-Origin":
                 "*",
+
               "Access-Control-Allow-Methods":
                 "GET,POST,OPTIONS",
+
               "Access-Control-Allow-Headers":
                 "Content-Type,Authorization"
             }
@@ -2547,6 +2822,11 @@ export default {
         );
 
       }
+
+
+      // --------------------------------------------------------
+      // Main UI
+      // --------------------------------------------------------
 
       if (
         url.pathname === "/" &&
@@ -2557,9 +2837,11 @@ export default {
           HTML,
           {
             status: 200,
+
             headers: {
               "Content-Type":
                 "text/html; charset=utf-8",
+
               "Cache-Control":
                 "no-store"
             }
@@ -2567,6 +2849,11 @@ export default {
         );
 
       }
+
+
+      // --------------------------------------------------------
+      // Health
+      // --------------------------------------------------------
 
       if (
         url.pathname === "/health" &&
@@ -2578,6 +2865,11 @@ export default {
         );
 
       }
+
+
+      // --------------------------------------------------------
+      // Models
+      // --------------------------------------------------------
 
       if (
         url.pathname === "/api/models" &&
@@ -2591,6 +2883,11 @@ export default {
 
       }
 
+
+      // --------------------------------------------------------
+      // Chat
+      // --------------------------------------------------------
+
       if (
         url.pathname === "/api/chat" &&
         request.method === "POST"
@@ -2603,6 +2900,11 @@ export default {
 
       }
 
+
+      // --------------------------------------------------------
+      // Image creation
+      // --------------------------------------------------------
+
       if (
         url.pathname === "/api/images" &&
         request.method === "POST"
@@ -2614,6 +2916,11 @@ export default {
         );
 
       }
+
+
+      // --------------------------------------------------------
+      // Image polling
+      // --------------------------------------------------------
 
       if (
         url.pathname.startsWith(
@@ -2645,10 +2952,16 @@ export default {
 
       }
 
+
+      // --------------------------------------------------------
+      // Not found
+      // --------------------------------------------------------
+
       return new Response(
         "Not Found",
         {
           status: 404,
+
           headers: {
             "Content-Type":
               "text/plain; charset=utf-8"
