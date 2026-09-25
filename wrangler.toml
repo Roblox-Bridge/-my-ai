@@ -1,1 +1,7 @@
+name = "my-ai"
+main = "worker.js"
+compatibility_date = "2026-09-25"
 
+[vars]
+XKIRO_BASE_URL = "https://api.xkiro.com/v1"
+DEFAULT_CHAT_MODEL = "openai/gpt-5.6-sol"
