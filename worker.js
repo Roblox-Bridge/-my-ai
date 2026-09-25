@@ -1,3 +1,8 @@
+// single-line comment
+
+/*
+  multi-line comment
+*/
 const DEFAULT_MODEL = "openai/gpt-5.6-sol";
 const MAX_MESSAGES = 60;
 const MAX_CHARS = 16000;
