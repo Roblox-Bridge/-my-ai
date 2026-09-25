@@ -1,9 +1,13 @@
-name = "aether-ai-hub"
+name = "aetherai-studio"
 main = "worker.js"
-compatibility_date = "2024-09-01"
+compatibility_date = "2026-09-25"
+
+workers_dev = true
 
 [ai]
 binding = "AI"
 
 [vars]
-DEFAULT_MODEL = "@cf/meta/llama-3.1-8b-instruct"
+DEFAULT_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast"
+GROQ_MODEL = "llama-3.3-70b-versatile"
+IMAGE_MODEL = "@cf/stabilityai/stable-diffusion-xl-base-1.0"
