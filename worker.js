@@ -1,6 +1,147 @@
+const HTML_CONTENT = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AetherAI Hub - Cloudflare Multi-Agent Orchestrator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0b0f19; color: #f3f4f6; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        .glass-card { background: rgba(17, 24, 39, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .orange-glow { box-shadow: 0 0 20px rgba(249, 115, 22, 0.15); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="border-b border-gray-800 bg-gray-950/80 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
+        <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center font-bold text-white shadow-lg">A</div>
+            <div>
+                <h1 class="font-bold text-lg leading-none text-white">AetherAI <span class="text-xs text-orange-500 font-mono font-normal">v2.4-CF</span></h1>
+                <p class="text-xs text-gray-400">Autonomous Multi-Agent Orchestrator</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-4">
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-950 text-emerald-400 border border-emerald-800">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span> 24/7 Cloudflare Active
+            </span>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 p-6 max-w-7xl mx-auto w-full grid grid-cols-1 md:grid-cols-3 gap-6">
+
+        <!-- Controls & Config -->
+        <div class="space-y-6">
+            <div class="glass-card rounded-xl p-5 orange-glow">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-orange-400 mb-4">Groq Free API Key (Optional)</h2>
+                <p class="text-xs text-gray-400 mb-3">If added, uses Llama 3 70B Ultra High-Speed Engine. Otherwise falls back to Cloudflare Native AI.</p>
+                <input type="password" id="groqKey" placeholder="gsk_..." class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-orange-500">
+            </div>
+
+            <div class="glass-card rounded-xl p-5">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-300 mb-4">Mode Selection</h2>
+                <select id="modeSelect" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 mb-4 focus:outline-none focus:border-orange-500">
+                    <option value="text">Multi-Agent Text & Logic Engine</option>
+                    <option value="image">Cloudflare Image Generator (SDXL)</option>
+                </select>
+
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-300 mb-2">Agent Persona</h2>
+                <select id="agentRole" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-orange-500">
+                    <option value="You are a Lead Software Architect and Code Reviewer.">Coder / Engineer Agent</option>
+                    <option value="You are a Research Scientist specializing in deep search analysis.">Researcher Agent</option>
+                    <option value="You are a Creative Writer and Prompt Strategist.">Creative Strategist Agent</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Interactive Terminal Workspace -->
+        <div class="md:col-span-2 glass-card rounded-xl p-6 flex flex-col h-[600px]">
+            <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-300 mb-3">Execution Terminal</h2>
+            
+            <div id="outputArea" class="flex-1 bg-gray-950 rounded-lg p-4 font-mono text-xs text-gray-300 overflow-y-auto space-y-3 border border-gray-800">
+                <div class="text-gray-500">// System ready. Type a prompt to execute multi-agent task or generate images.</div>
+            </div>
+
+            <!-- Input Controls -->
+            <div class="mt-4 flex space-x-2">
+                <input type="text" id="userInput" placeholder="Ask AI or describe image to generate..." class="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-gray-100 focus:outline-none focus:border-orange-500">
+                <button onclick="executeTask()" id="runBtn" class="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-semibold px-6 py-2.5 rounded-lg text-sm transition-all shadow-md">Run AI</button>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        async function executeTask() {
+            const input = document.getElementById('userInput').value.trim();
+            const mode = document.getElementById('modeSelect').value;
+            const groqKey = document.getElementById('groqKey').value.trim();
+            const systemPrompt = document.getElementById('agentRole').value;
+            const outputArea = document.getElementById('outputArea');
+            const runBtn = document.getElementById('runBtn');
+
+            if (!input) return;
+
+            outputArea.innerHTML += \`<div class="text-orange-400 font-bold">&gt; \${input}</div>\`;
+            outputArea.scrollTop = outputArea.scrollHeight;
+            document.getElementById('userInput').value = '';
+
+            runBtn.disabled = true;
+            runBtn.innerText = 'Processing...';
+
+            try {
+                if (mode === 'text') {
+                    outputArea.innerHTML += \`<div class="text-gray-500">[Agent System Routing...] Calling LLM Engine...</div>\`;
+                    
+                    const res = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: input, systemPrompt: systemPrompt, groqApiKey: groqKey })
+                    });
+                    
+                    const data = await res.json();
+                    if(data.error) throw new Error(data.error);
+
+                    const reply = data.choices[0].message.content;
+                    outputArea.innerHTML += \`<div class="text-emerald-400 whitespace-pre-wrap">\${reply}</div>\`;
+
+                } else if (mode === 'image') {
+                    outputArea.innerHTML += \`<div class="text-gray-500">[Workers AI] Generating Image via SDXL...</div>\`;
+                    
+                    const res = await fetch('/api/generate-image', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: input })
+                    });
+
+                    if (!res.ok) throw new Error('Image generation failed');
+
+                    const blob = await res.blob();
+                    const imgUrl = URL.createObjectURL(blob);
+
+                    outputArea.innerHTML += \`
+                        <div class="my-2">
+                            <img src="\${imgUrl}" class="max-w-xs rounded-lg border border-gray-700 shadow-md">
+                        </div>\`;
+                }
+            } catch (err) {
+                outputArea.innerHTML += \`<div class="text-red-400">Error: \${err.message}</div>\`;
+            }
+
+            runBtn.disabled = false;
+            runBtn.innerText = 'Run AI';
+            outputArea.scrollTop = outputArea.scrollHeight;
+        }
+    </script>
+</body>
+</html>`;
+
 export default {
   async fetch(request, env, ctx) {
-    // CORS Headers for Frontend API Calls
     const corsHeaders = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -13,13 +154,12 @@ export default {
 
     const url = new URL(request.url);
 
-    // 1. Text Generation Endpoint (Multi-Agent Routing)
+    // 1. Chat API Endpoint
     if (url.pathname === '/api/chat' && request.method === 'POST') {
       try {
         const body = await request.json();
         const { prompt, model, systemPrompt, groqApiKey } = body;
 
-        // If Groq API Key is provided, use Groq Llama-3 70B for maximum power
         if (groqApiKey) {
           const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
@@ -43,7 +183,6 @@ export default {
           });
         }
 
-        // Fallback to Cloudflare Workers Native AI (100% Free Built-in)
         const answer = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
           messages: [
             { role: 'system', content: systemPrompt || 'You are AetherAI Multi-Agent Router.' },
@@ -63,25 +202,19 @@ export default {
       }
     }
 
-    // 2. Image Generation Endpoint (Flux / Stable Diffusion)
+    // 2. Image Generation Endpoint
     if (url.pathname === '/api/generate-image' && request.method === 'POST') {
       try {
         const body = await request.json();
         const { prompt } = body;
 
-        const inputs = { prompt: prompt };
-
-        // Running Stable Diffusion XL on Cloudflare Workers AI
         const imageBuffer = await env.AI.run(
           '@cf/stabilityai/stable-diffusion-xl-base-1.0',
-          inputs
+          { prompt: prompt }
         );
 
         return new Response(imageBuffer, {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'image/png',
-          },
+          headers: { ...corsHeaders, 'Content-Type': 'image/png' },
         });
       } catch (err) {
         return new Response(JSON.stringify({ error: err.message }), {
@@ -91,6 +224,10 @@ export default {
       }
     }
 
-    return new Response('AetherAI Cloudflare Engine Running 24/7', { status: 200, headers: corsHeaders });
+    // 3. Render Dashboard UI on Home Page Root (/)
+    return new Response(HTML_CONTENT, {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' }
+    });
   }
 };
