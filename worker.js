@@ -154,7 +154,7 @@ export default {
 
     const url = new URL(request.url);
 
-    // 1. Chat API Endpoint
+    // 1. Text Generation Endpoint
     if (url.pathname === '/api/chat' && request.method === 'POST') {
       try {
         const body = await request.json();
@@ -224,7 +224,7 @@ export default {
       }
     }
 
-    // 3. Render Dashboard UI on Home Page Root (/)
+    // 3. Serve Frontend Dashboard
     return new Response(HTML_CONTENT, {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' }
