@@ -1,8 +1,10 @@
-{
-  "name": "my-ai",
-  "main": "worker.js",
-  "compatibility_date": "2026-09-22",
-  "ai": {
-    "binding": "AI"
-  }
-}
+name = "aether-ai-hub"
+main = "worker.js"
+compatibility_date = "2024-09-01"
+
+[ai]
+binding = "AI"
+
+[vars]
+# OpenRouter / Groq fallback configuration
+DEFAULT_MODEL = "@cf/meta/llama-3-8b-instruct"
