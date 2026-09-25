@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-
   <meta
     name="viewport"
     content="width=device-width, initial-scale=1.0"
@@ -12,2393 +11,703 @@
 
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            studio: {
-              bg: "#080b12",
-              panel: "#0d111b",
-              panel2: "#111827",
-              border: "#202938",
-              purple: "#8b5cf6",
-              cyan: "#22d3ee"
-            }
-          }
-        }
-      }
-    };
-  </script>
-
   <style>
     * {
       box-sizing: border-box;
     }
 
-    html,
     body {
       margin: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #080b12;
-      color: #e5e7eb;
-      font-family:
-        Inter,
-        ui-sans-serif,
-        system-ui,
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        sans-serif;
-    }
-
-    button,
-    input,
-    textarea,
-    select {
-      outline: none;
+      min-height: 100vh;
+      background:
+        radial-gradient(
+          circle at top left,
+          rgba(99,102,241,.18),
+          transparent 35%
+        ),
+        radial-gradient(
+          circle at bottom right,
+          rgba(168,85,247,.14),
+          transparent 35%
+        ),
+        #07070b;
+      color: #f4f4f5;
+      font-family: Inter, system-ui, sans-serif;
     }
 
     .glass {
-      background:
-        linear-gradient(
-          135deg,
-          rgba(255,255,255,.045),
-          rgba(255,255,255,.018)
-        );
-
-      border: 1px solid rgba(255,255,255,.07);
-
+      background: rgba(18,18,25,.72);
+      border: 1px solid rgba(255,255,255,.08);
       backdrop-filter: blur(22px);
       -webkit-backdrop-filter: blur(22px);
     }
 
-    .glass-heavy {
-      background:
-        rgba(11,15,25,.82);
-
-      border: 1px solid rgba(255,255,255,.075);
-
-      backdrop-filter: blur(30px);
-      -webkit-backdrop-filter: blur(30px);
-    }
-
-    .glow {
-      box-shadow:
-        0 0 70px rgba(139,92,246,.08);
-    }
-
-    .soft-glow {
-      box-shadow:
-        0 0 25px rgba(139,92,246,.16);
-    }
-
-    .scrollbar {
-      scrollbar-width: thin;
-      scrollbar-color: #273244 transparent;
-    }
-
-    .scrollbar::-webkit-scrollbar {
-      width: 5px;
-    }
-
-    .scrollbar::-webkit-scrollbar-thumb {
-      background: #273244;
-      border-radius: 20px;
-    }
-
     .message {
-      animation:
-        messageIn .22s ease-out;
+      white-space: pre-wrap;
+      line-height: 1.7;
     }
 
-    @keyframes messageIn {
-      from {
-        opacity: 0;
-        transform: translateY(7px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+    textarea {
+      resize: none;
     }
 
-    .thinking-dot {
-      animation:
-        thinking 1.2s infinite;
+    ::-webkit-scrollbar {
+      width: 7px;
     }
 
-    .thinking-dot:nth-child(2) {
-      animation-delay: .15s;
-    }
-
-    .thinking-dot:nth-child(3) {
-      animation-delay: .3s;
-    }
-
-    @keyframes thinking {
-      0%, 100% {
-        opacity: .2;
-        transform: translateY(0);
-      }
-
-      40% {
-        opacity: 1;
-        transform: translateY(-3px);
-      }
-    }
-
-    .gradient-text {
-      background:
-        linear-gradient(
-          90deg,
-          #fff,
-          #c4b5fd,
-          #67e8f9
-        );
-
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-    }
-
-    .code {
-      background: #080b12;
-      border: 1px solid #202938;
-      border-radius: 10px;
-      padding: 14px;
-      overflow-x: auto;
-      font-family:
-        "SFMono-Regular",
-        Consolas,
-        monospace;
-      font-size: 12px;
-    }
-
-    .history-item.active {
-      background: rgba(139,92,246,.12);
-      border-color: rgba(139,92,246,.22);
-    }
-
-    .mode-card.active {
-      border-color: rgba(139,92,246,.45);
-      background: rgba(139,92,246,.10);
-    }
-
-    .hidden-panel {
-      display: none;
+    ::-webkit-scrollbar-thumb {
+      background: #27272a;
+      border-radius: 999px;
     }
   </style>
 </head>
 
 <body>
 
-<div class="relative w-full h-full">
+<div class="min-h-screen flex">
 
-  <!-- Background glow -->
-
-  <div
-    class="absolute -top-48 -left-48
-           w-[500px] h-[500px]
-           rounded-full
-           bg-violet-600/10
-           blur-[130px]
-           pointer-events-none"
-  ></div>
-
-  <div
-    class="absolute -bottom-48 -right-48
-           w-[500px] h-[500px]
-           rounded-full
-           bg-cyan-500/10
-           blur-[130px]
-           pointer-events-none"
-  ></div>
-
-
-  <!-- APPLICATION -->
-
-  <div
-    id="app"
-    class="relative flex w-full h-full"
+  <!-- SIDEBAR -->
+  <aside
+    class="hidden md:flex w-72 border-r border-white/10
+           bg-black/20 flex-col p-4"
   >
 
+    <div class="flex items-center gap-3 mb-7">
+      <div
+        class="w-10 h-10 rounded-xl
+               bg-gradient-to-br from-indigo-500 to-purple-600
+               flex items-center justify-center font-bold"
+      >
+        A
+      </div>
 
-    <!-- SIDEBAR -->
+      <div>
+        <div class="font-semibold">
+          AetherAI
+        </div>
+        <div class="text-xs text-zinc-500">
+          Studio
+        </div>
+      </div>
+    </div>
 
-    <aside
-      id="sidebar"
-      class="
-        fixed lg:relative
-        z-50
-        left-0 top-0
-        h-full
-        w-[280px]
-        shrink-0
-        glass-heavy
-        border-r border-white/[.06]
-        flex flex-col
-        transform -translate-x-full
-        lg:translate-x-0
-        transition-transform duration-300
-      "
+    <button
+      onclick="newChat()"
+      class="w-full py-3 rounded-xl
+             bg-white text-black font-semibold
+             hover:bg-zinc-200 transition"
+    >
+      + New conversation
+    </button>
+
+    <div class="mt-7 text-xs uppercase
+                tracking-wider text-zinc-500">
+      Workspace
+    </div>
+
+    <button
+      onclick="showChat()"
+      class="mt-3 w-full text-left px-3 py-3
+             rounded-xl bg-white/5 hover:bg-white/10"
+    >
+      💬 AI Chat
+    </button>
+
+    <button
+      onclick="showImage()"
+      class="mt-2 w-full text-left px-3 py-3
+             rounded-xl hover:bg-white/10"
+    >
+      🎨 Image Studio
+    </button>
+
+    <div class="mt-auto text-xs text-zinc-600">
+      AetherAI Studio
+    </div>
+  </aside>
+
+
+  <!-- MAIN -->
+  <main class="flex-1 min-w-0">
+
+    <!-- TOPBAR -->
+    <header
+      class="h-16 border-b border-white/10
+             flex items-center justify-between
+             px-5 md:px-8"
     >
 
-      <!-- Logo -->
+      <div class="font-semibold">
+        <span id="pageTitle">
+          AI Chat
+        </span>
+      </div>
+
+      <div class="flex items-center gap-3">
+
+        <select
+          id="persona"
+          class="glass rounded-xl px-3 py-2
+                 text-sm outline-none"
+        >
+          <option value="architect">
+            Software Architect
+          </option>
+
+          <option value="researcher">
+            Research Analyst
+          </option>
+
+          <option value="creative">
+            Creative Strategist
+          </option>
+        </select>
+
+        <div
+          id="status"
+          class="hidden sm:flex items-center gap-2
+                 text-xs text-green-400"
+        >
+          <span
+            class="w-2 h-2 rounded-full bg-green-400"
+          ></span>
+          Online
+        </div>
+
+      </div>
+    </header>
+
+
+    <!-- CHAT -->
+    <section
+      id="chatView"
+      class="flex flex-col h-[calc(100vh-4rem)]"
+    >
 
       <div
-        class="
-          h-[72px]
-          px-5
-          flex items-center
-          justify-between
-          border-b border-white/[.06]
-        "
+        id="messages"
+        class="flex-1 overflow-y-auto px-4 md:px-8 py-8"
       >
 
-        <div class="flex items-center gap-3">
+        <div
+          id="welcome"
+          class="max-w-3xl mx-auto
+                 min-h-full flex flex-col
+                 justify-center"
+        >
 
           <div
-            class="
-              w-9 h-9
-              rounded-xl
-              flex items-center justify-center
-              bg-gradient-to-br
-              from-violet-500
-              to-cyan-400
-              shadow-lg
-              shadow-violet-500/20
-            "
+            class="text-4xl md:text-6xl
+                   font-bold tracking-tight"
           >
-            <span class="font-black">
-              A
+            Build with
+            <span
+              class="bg-gradient-to-r
+                     from-indigo-400 to-purple-400
+                     bg-clip-text text-transparent"
+            >
+              AetherAI
             </span>
           </div>
 
-          <div>
-            <div
-              class="
-                font-semibold
-                tracking-tight
-              "
+          <p
+            class="mt-5 text-zinc-400
+                   text-lg"
+          >
+            Chat, research ideas, write code,
+            and create with your AI workspace.
+          </p>
+
+          <div
+            class="grid md:grid-cols-3
+                   gap-3 mt-8"
+          >
+
+            <button
+              onclick="useSuggestion('Build me a modern website architecture')"
+              class="glass p-4 rounded-2xl text-left
+                     hover:bg-white/10"
             >
+              <b>Architecture</b>
+              <div class="text-sm text-zinc-500 mt-1">
+                Design a software system
+              </div>
+            </button>
+
+            <button
+              onclick="useSuggestion('Research and explain this topic clearly')"
+              class="glass p-4 rounded-2xl text-left
+                     hover:bg-white/10"
+            >
+              <b>Research</b>
+              <div class="text-sm text-zinc-500 mt-1">
+                Analyze a topic
+              </div>
+            </button>
+
+            <button
+              onclick="useSuggestion('Give me 10 original AI project ideas')"
+              class="glass p-4 rounded-2xl text-left
+                     hover:bg-white/10"
+            >
+              <b>Ideas</b>
+              <div class="text-sm text-zinc-500 mt-1">
+                Generate creative concepts
+              </div>
+            </button>
+
+          </div>
+        </div>
+
+      </div>
+
+
+      <!-- COMPOSER -->
+      <div class="p-4 md:p-6">
+
+        <div
+          class="max-w-4xl mx-auto glass rounded-2xl p-3"
+        >
+
+          <textarea
+            id="prompt"
+            rows="2"
+            placeholder="Message AetherAI..."
+            class="w-full bg-transparent
+                   outline-none px-3 py-2
+                   text-white placeholder-zinc-600"
+          ></textarea>
+
+          <div
+            class="flex items-center
+                   justify-between mt-2"
+          >
+
+            <div class="text-xs text-zinc-600 px-3">
               AetherAI
             </div>
 
-            <div
-              class="
-                text-[10px]
-                text-slate-500
-              "
+            <button
+              id="sendBtn"
+              onclick="sendMessage()"
+              class="px-5 py-2.5 rounded-xl
+                     bg-white text-black
+                     font-semibold
+                     hover:bg-zinc-200"
             >
-              STUDIO
-            </div>
+              Send
+            </button>
+
           </div>
-
         </div>
-
-        <button
-          id="closeSidebar"
-          class="
-            lg:hidden
-            text-slate-500
-            hover:text-white
-          "
-        >
-          ×
-        </button>
 
       </div>
 
-
-      <!-- New chat -->
-
-      <div class="p-4">
-
-        <button
-          id="newChat"
-          class="
-            w-full
-            rounded-xl
-            px-4 py-3
-            flex items-center
-            justify-center
-            gap-2
-            bg-white/[.055]
-            hover:bg-white/[.09]
-            border border-white/[.07]
-            transition
-          "
-        >
-
-          <span class="text-lg">
-            +
-          </span>
-
-          <span class="text-sm font-medium">
-            New conversation
-          </span>
-
-        </button>
-
-      </div>
+    </section>
 
 
-      <!-- Navigation -->
+    <!-- IMAGE STUDIO -->
+    <section
+      id="imageView"
+      class="hidden p-5 md:p-10"
+    >
 
-      <div class="px-3">
+      <div class="max-w-5xl mx-auto">
+
+        <h1 class="text-3xl font-bold">
+          Image Studio
+        </h1>
+
+        <p class="text-zinc-500 mt-2">
+          Generate images with SDXL.
+        </p>
 
         <div
-          class="
-            px-3 pb-2
-            text-[10px]
-            uppercase
-            tracking-[.18em]
-            text-slate-600
-            font-semibold
-          "
-        >
-          Workspace
-        </div>
-
-        <button
-          class="
-            w-full
-            flex items-center
-            gap-3
-            px-3 py-2.5
-            rounded-lg
-            bg-white/[.045]
-            text-sm
-          "
+          class="glass rounded-2xl p-5 mt-8"
         >
 
-          <span>⌂</span>
+          <label class="text-sm text-zinc-400">
+            Prompt
+          </label>
 
-          <span>
-            Studio
-          </span>
+          <textarea
+            id="imagePrompt"
+            rows="5"
+            class="w-full mt-2 rounded-xl
+                   bg-black/30 border
+                   border-white/10
+                   p-4 outline-none"
+            placeholder="A cinematic futuristic city..."
+          ></textarea>
 
-        </button>
+          <label
+            class="block mt-5 text-sm text-zinc-400"
+          >
+            Negative prompt
+          </label>
 
-      </div>
+          <textarea
+            id="negativePrompt"
+            rows="2"
+            class="w-full mt-2 rounded-xl
+                   bg-black/30 border
+                   border-white/10
+                   p-4 outline-none"
+            placeholder="blurry, low quality"
+          ></textarea>
 
+          <button
+            onclick="generateImage()"
+            class="mt-5 px-6 py-3 rounded-xl
+                   bg-white text-black
+                   font-semibold"
+          >
+            Generate image
+          </button>
 
-      <!-- History -->
-
-      <div
-        class="
-          flex-1
-          min-h-0
-          px-3
-          mt-5
-          overflow-y-auto
-          scrollbar
-        "
-      >
-
-        <div
-          class="
-            px-3 mb-2
-            text-[10px]
-            uppercase
-            tracking-[.18em]
-            text-slate-600
-            font-semibold
-          "
-        >
-          Recent
         </div>
 
         <div
-          id="history"
-          class="space-y-1"
+          id="imageResult"
+          class="mt-8"
         ></div>
 
       </div>
 
+    </section>
 
-      <!-- Bottom -->
-
-      <div
-        class="
-          p-4
-          border-t border-white/[.06]
-        "
-      >
-
-        <div
-          class="
-            flex items-center
-            justify-between
-            px-2
-          "
-        >
-
-          <div
-            class="
-              flex items-center
-              gap-2
-            "
-          >
-
-            <span
-              class="
-                w-2 h-2
-                rounded-full
-                bg-emerald-400
-                shadow-[0_0_10px_rgba(52,211,153,.7)]
-              "
-            ></span>
-
-            <span
-              class="
-                text-[11px]
-                text-slate-500
-              "
-            >
-              Edge online
-            </span>
-
-          </div>
-
-          <span
-            class="
-              text-[10px]
-              text-slate-700
-            "
-          >
-            v1.0
-          </span>
-
-        </div>
-
-      </div>
-
-    </aside>
-
-
-    <!-- MAIN -->
-
-    <main
-      class="
-        flex-1
-        min-w-0
-        h-full
-        flex
-        flex-col
-      "
-    >
-
-
-      <!-- TOPBAR -->
-
-      <header
-        class="
-          h-[72px]
-          shrink-0
-          glass
-          border-b border-white/[.06]
-          px-4 md:px-6
-          flex items-center
-          justify-between
-          z-20
-        "
-      >
-
-        <div
-          class="
-            flex items-center
-            gap-3
-          "
-        >
-
-          <button
-            id="openSidebar"
-            class="
-              lg:hidden
-              w-9 h-9
-              rounded-lg
-              hover:bg-white/[.06]
-            "
-          >
-            ☰
-          </button>
-
-
-          <!-- Model selector -->
-
-          <div class="relative">
-
-            <button
-              id="modelButton"
-              class="
-                flex items-center
-                gap-2
-                rounded-xl
-                px-3 py-2
-                hover:bg-white/[.05]
-                transition
-              "
-            >
-
-              <span
-                class="
-                  w-2 h-2
-                  rounded-full
-                  bg-violet-400
-                "
-              ></span>
-
-              <span
-                id="modelName"
-                class="
-                  text-sm
-                  font-medium
-                "
-              >
-                Llama 3.1 8B
-              </span>
-
-              <span
-                class="
-                  text-slate-600
-                  text-xs
-                "
-              >
-                ▾
-              </span>
-
-            </button>
-
-            <div
-              id="modelMenu"
-              class="
-                hidden
-                absolute
-                left-0
-                top-12
-                w-64
-                glass-heavy
-                rounded-xl
-                p-2
-                shadow-2xl
-                z-50
-              "
-            >
-
-              <button
-                data-model="llama"
-                class="
-                  w-full
-                  text-left
-                  rounded-lg
-                  px-3 py-3
-                  hover:bg-white/[.05]
-                "
-              >
-                <div class="text-sm">
-                  Llama 3.1 8B
-                </div>
-
-                <div
-                  class="
-                    text-[10px]
-                    text-slate-600
-                    mt-1
-                  "
-                >
-                  Cloudflare Workers AI
-                </div>
-              </button>
-
-              <button
-                data-model="groq"
-                class="
-                  w-full
-                  text-left
-                  rounded-lg
-                  px-3 py-3
-                  hover:bg-white/[.05]
-                "
-              >
-                <div class="text-sm">
-                  Llama 3.3 70B
-                </div>
-
-                <div
-                  class="
-                    text-[10px]
-                    text-slate-600
-                    mt-1
-                  "
-                >
-                  Groq accelerator
-                </div>
-              </button>
-
-            </div>
-
-          </div>
-
-        </div>
-
-
-        <div
-          class="
-            flex items-center
-            gap-3
-          "
-        >
-
-          <div
-            class="
-              hidden sm:flex
-              items-center
-              gap-2
-              px-3 py-1.5
-              rounded-full
-              bg-emerald-400/[.07]
-              border
-              border-emerald-400/[.15]
-            "
-          >
-
-            <span
-              class="
-                w-1.5 h-1.5
-                rounded-full
-                bg-emerald-400
-              "
-            ></span>
-
-            <span
-              id="status"
-              class="
-                text-[10px]
-                text-emerald-300
-              "
-            >
-              Llama 3.1 8B Active
-            </span>
-
-          </div>
-
-          <button
-            id="settingsButton"
-            class="
-              w-9 h-9
-              rounded-lg
-              hover:bg-white/[.06]
-              text-slate-500
-              hover:text-white
-            "
-          >
-            ⚙
-          </button>
-
-        </div>
-
-      </header>
-
-
-      <!-- WORKSPACE -->
-
-      <section
-        class="
-          flex-1
-          min-h-0
-          relative
-        "
-      >
-
-
-        <!-- CHAT WORKSPACE -->
-
-        <div
-          id="chatWorkspace"
-          class="
-            absolute
-            inset-0
-            flex flex-col
-          "
-        >
-
-          <!-- Messages -->
-
-          <div
-            id="messages"
-            class="
-              flex-1
-              min-h-0
-              overflow-y-auto
-              scrollbar
-              px-4 md:px-8
-              py-8
-            "
-          >
-
-            <!-- Welcome -->
-
-            <div
-              id="welcome"
-              class="
-                min-h-full
-                flex
-                items-center
-                justify-center
-              "
-            >
-
-              <div
-                class="
-                  max-w-3xl
-                  w-full
-                  text-center
-                  px-4
-                "
-              >
-
-                <div
-                  class="
-                    mx-auto
-                    w-16 h-16
-                    rounded-2xl
-                    flex items-center
-                    justify-center
-                    bg-gradient-to-br
-                    from-violet-500/20
-                    to-cyan-400/10
-                    border
-                    border-white/[.08]
-                    soft-glow
-                    mb-6
-                  "
-                >
-                  <span class="text-2xl">
-                    ✦
-                  </span>
-                </div>
-
-                <h1
-                  class="
-                    text-3xl
-                    md:text-5xl
-                    font-bold
-                    tracking-tight
-                  "
-                >
-                  Build with
-                  <span class="gradient-text">
-                    AetherAI
-                  </span>
-                </h1>
-
-                <p
-                  class="
-                    mt-4
-                    text-sm
-                    md:text-base
-                    text-slate-500
-                    max-w-xl
-                    mx-auto
-                    leading-7
-                  "
-                >
-                  A modern AI workspace for coding,
-                  reasoning, research, strategy and
-                  image generation.
-                </p>
-
-
-                <!-- Suggestions -->
-
-                <div
-                  class="
-                    mt-8
-                    grid
-                    grid-cols-1
-                    sm:grid-cols-2
-                    gap-3
-                    max-w-2xl
-                    mx-auto
-                  "
-                >
-
-                  <button
-                    data-suggestion="Design a scalable architecture for my next AI project."
-                    class="
-                      suggestion
-                      glass
-                      rounded-xl
-                      p-4
-                      text-left
-                      hover:bg-white/[.055]
-                      transition
-                    "
-                  >
-
-                    <div
-                      class="
-                        text-sm
-                        font-medium
-                      "
-                    >
-                      Architecture
-                    </div>
-
-                    <div
-                      class="
-                        text-xs
-                        text-slate-600
-                        mt-1
-                      "
-                    >
-                      Design a scalable AI system
-                    </div>
-
-                  </button>
-
-
-                  <button
-                    data-suggestion="Help me analyze this problem step by step and explain the reasoning clearly."
-                    class="
-                      suggestion
-                      glass
-                      rounded-xl
-                      p-4
-                      text-left
-                      hover:bg-white/[.055]
-                      transition
-                    "
-                  >
-
-                    <div
-                      class="
-                        text-sm
-                        font-medium
-                      "
-                    >
-                      Deep reasoning
-                    </div>
-
-                    <div
-                      class="
-                        text-xs
-                        text-slate-600
-                        mt-1
-                      "
-                    >
-                      Break down a difficult problem
-                    </div>
-
-                  </button>
-
-
-                  <button
-                    data-suggestion="Give me three original product ideas I could build with AI."
-                    class="
-                      suggestion
-                      glass
-                      rounded-xl
-                      p-4
-                      text-left
-                      hover:bg-white/[.055]
-                      transition
-                    "
-                  >
-
-                    <div
-                      class="
-                        text-sm
-                        font-medium
-                      "
-                    >
-                      Product ideas
-                    </div>
-
-                    <div
-                      class="
-                        text-xs
-                        text-slate-600
-                        mt-1
-                      "
-                    >
-                      Explore something new
-                    </div>
-
-                  </button>
-
-
-                  <button
-                    data-suggestion="Write a production-ready JavaScript implementation for this idea."
-                    class="
-                      suggestion
-                      glass
-                      rounded-xl
-                      p-4
-                      text-left
-                      hover:bg-white/[.055]
-                      transition
-                    "
-                  >
-
-                    <div
-                      class="
-                        text-sm
-                        font-medium
-                      "
-                    >
-                      Code
-                    </div>
-
-                    <div
-                      class="
-                        text-xs
-                        text-slate-600
-                        mt-1
-                      "
-                    >
-                      Build a working implementation
-                    </div>
-
-                  </button>
-
-                </div>
-
-              </div>
-
-            </div>
-
-          </div>
-
-
-          <!-- COMPOSER -->
-
-          <div
-            class="
-              shrink-0
-              px-4 md:px-8
-              pb-5
-            "
-          >
-
-            <div
-              class="
-                max-w-4xl
-                mx-auto
-              "
-            >
-
-              <div
-                class="
-                  glass-heavy
-                  glow
-                  rounded-2xl
-                  p-2
-                "
-              >
-
-                <textarea
-                  id="input"
-                  rows="1"
-                  maxlength="16000"
-                  placeholder="Message AetherAI..."
-                  class="
-                    w-full
-                    bg-transparent
-                    px-4
-                    pt-3
-                    pb-2
-                    text-sm
-                    leading-6
-                    placeholder:text-slate-600
-                    max-h-48
-                    scrollbar
-                  "
-                ></textarea>
-
-
-                <div
-                  class="
-                    flex
-                    items-center
-                    justify-between
-                    px-2 pb-1
-                  "
-                >
-
-                  <div
-                    class="
-                      flex
-                      items-center
-                      gap-1
-                    "
-                  >
-
-                    <button
-                      id="modeButton"
-                      class="
-                        px-3 py-1.5
-                        rounded-lg
-                        text-[11px]
-                        text-slate-500
-                        hover:text-white
-                        hover:bg-white/[.05]
-                      "
-                    >
-                      ✦ Text
-                    </button>
-
-                    <button
-                      id="imageButton"
-                      class="
-                        px-3 py-1.5
-                        rounded-lg
-                        text-[11px]
-                        text-slate-500
-                        hover:text-white
-                        hover:bg-white/[.05]
-                      "
-                    >
-                      ◈ Image
-                    </button>
-
-                  </div>
-
-
-                  <button
-                    id="send"
-                    class="
-                      w-10 h-10
-                      rounded-xl
-                      flex items-center
-                      justify-center
-                      bg-gradient-to-br
-                      from-violet-500
-                      to-violet-600
-                      hover:from-violet-400
-                      hover:to-violet-500
-                      disabled:opacity-30
-                      transition
-                    "
-                  >
-                    ↑
-                  </button>
-
-                </div>
-
-              </div>
-
-
-              <div
-                class="
-                  text-center
-                  text-[10px]
-                  text-slate-700
-                  mt-2
-                "
-              >
-                AetherAI can make mistakes.
-                Check important information.
-              </div>
-
-            </div>
-
-          </div>
-
-        </div>
-
-
-        <!-- IMAGE WORKSPACE -->
-
-        <div
-          id="imageWorkspace"
-          class="
-            hidden
-            absolute
-            inset-0
-            overflow-y-auto
-            scrollbar
-            px-4 md:px-8
-            py-8
-          "
-        >
-
-          <div
-            class="
-              max-w-5xl
-              mx-auto
-            "
-          >
-
-            <div class="mb-8">
-
-              <div
-                class="
-                  text-xs
-                  uppercase
-                  tracking-[.18em]
-                  text-violet-400
-                  font-semibold
-                "
-              >
-                Creative Engine
-              </div>
-
-              <h2
-                class="
-                  mt-2
-                  text-3xl
-                  font-bold
-                "
-              >
-                Create an image
-              </h2>
-
-              <p
-                class="
-                  mt-2
-                  text-sm
-                  text-slate-500
-                "
-              >
-                Describe what you want SDXL to generate.
-              </p>
-
-            </div>
-
-
-            <div
-              class="
-                grid
-                lg:grid-cols-[1fr_330px]
-                gap-5
-              "
-            >
-
-              <!-- Prompt -->
-
-              <div
-                class="
-                  glass-heavy
-                  rounded-2xl
-                  p-5
-                "
-              >
-
-                <label
-                  class="
-                    text-xs
-                    text-slate-500
-                  "
-                >
-                  Prompt
-                </label>
-
-                <textarea
-                  id="imagePrompt"
-                  rows="8"
-                  placeholder="A cinematic futuristic city at night, volumetric lighting, ultra detailed..."
-                  class="
-                    w-full
-                    mt-3
-                    rounded-xl
-                    bg-black/20
-                    border
-                    border-white/[.07]
-                    p-4
-                    text-sm
-                    leading-6
-                    resize-none
-                  "
-                ></textarea>
-
-                <label
-                  class="
-                    block
-                    mt-5
-                    text-xs
-                    text-slate-500
-                  "
-                >
-                  Negative prompt
-                </label>
-
-                <textarea
-                  id="negativePrompt"
-                  rows="3"
-                  placeholder="blurry, low quality, distorted..."
-                  class="
-                    w-full
-                    mt-3
-                    rounded-xl
-                    bg-black/20
-                    border
-                    border-white/[.07]
-                    p-4
-                    text-sm
-                    resize-none
-                  "
-                ></textarea>
-
-                <button
-                  id="generate"
-                  class="
-                    mt-5
-                    w-full
-                    py-3
-                    rounded-xl
-                    bg-gradient-to-r
-                    from-violet-500
-                    to-cyan-500
-                    font-medium
-                    hover:opacity-90
-                    disabled:opacity-40
-                  "
-                >
-                  Generate image
-                </button>
-
-              </div>
-
-
-              <!-- Info -->
-
-              <div
-                class="
-                  glass
-                  rounded-2xl
-                  p-5
-                  h-fit
-                "
-              >
-
-                <div
-                  class="
-                    text-sm
-                    font-semibold
-                  "
-                >
-                  SDXL Engine
-                </div>
-
-                <div
-                  class="
-                    mt-5
-                    space-y-4
-                  "
-                >
-
-                  <div
-                    class="
-                      flex justify-between
-                      text-xs
-                    "
-                  >
-                    <span class="text-slate-600">
-                      Model
-                    </span>
-
-                    <span>
-                      SDXL 1.0
-                    </span>
-                  </div>
-
-                  <div
-                    class="
-                      flex justify-between
-                      text-xs
-                    "
-                  >
-                    <span class="text-slate-600">
-                      Resolution
-                    </span>
-
-                    <span>
-                      1024 × 1024
-                    </span>
-                  </div>
-
-                  <div
-                    class="
-                      flex justify-between
-                      text-xs
-                    "
-                  >
-                    <span class="text-slate-600">
-                      Steps
-                    </span>
-
-                    <span>
-                      20
-                    </span>
-                  </div>
-
-                </div>
-
-              </div>
-
-            </div>
-
-
-            <!-- Generated image -->
-
-            <div
-              id="imageResult"
-              class="mt-6"
-            ></div>
-
-          </div>
-
-        </div>
-
-      </section>
-
-    </main>
-
-
-    <!-- SETTINGS DRAWER -->
-
-    <aside
-      id="settings"
-      class="
-        fixed
-        right-0
-        top-0
-        h-full
-        w-[320px]
-        z-[60]
-        glass-heavy
-        border-l
-        border-white/[.07]
-        translate-x-full
-        transition-transform
-        duration-300
-        p-5
-      "
-    >
-
-      <div
-        class="
-          flex items-center
-          justify-between
-          mb-7
-        "
-      >
-
-        <div
-          class="
-            font-semibold
-          "
-        >
-          Agent settings
-        </div>
-
-        <button
-          id="closeSettings"
-          class="
-            text-slate-500
-            hover:text-white
-          "
-        >
-          ×
-        </button>
-
-      </div>
-
-
-      <label
-        class="
-          text-xs
-          text-slate-500
-        "
-      >
-        Agent persona
-      </label>
-
-      <select
-        id="persona"
-        class="
-          mt-2
-          w-full
-          rounded-xl
-          bg-black/20
-          border
-          border-white/[.08]
-          px-3 py-3
-          text-sm
-        "
-      >
-
-        <option value="architect">
-          Software Architect
-        </option>
-
-        <option value="researcher">
-          Data Researcher
-        </option>
-
-        <option value="creative">
-          Creative Strategist
-        </option>
-
-      </select>
-
-
-      <label
-        class="
-          block
-          mt-6
-          text-xs
-          text-slate-500
-        "
-      >
-        Groq API key
-      </label>
-
-      <input
-        id="groqKey"
-        type="password"
-        autocomplete="off"
-        placeholder="Optional"
-        class="
-          mt-2
-          w-full
-          rounded-xl
-          bg-black/20
-          border
-          border-white/[.08]
-          px-3 py-3
-          text-sm
-        "
-      >
-
-      <p
-        class="
-          text-[10px]
-          text-slate-700
-          mt-2
-          leading-5
-        "
-      >
-        The browser sends this key with a chat request.
-        It is not stored by this interface.
-      </p>
-
-    </aside>
-
-  </div>
-
+  </main>
 </div>
 
 
 <script>
-(() => {
+let history = [];
 
-  const state = {
-    mode: "chat",
-    busy: false,
-    messages: [],
-    chats: [],
-    selectedModel: "llama"
-  };
+const messagesEl =
+  document.getElementById("messages");
 
+const promptEl =
+  document.getElementById("prompt");
 
-  const $ = id =>
-    document.getElementById(id);
+const sendBtn =
+  document.getElementById("sendBtn");
 
+function escapeHtml(text) {
+  return String(text)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
 
-  const sidebar =
-    $("sidebar");
-
-  const messages =
-    $("messages");
-
+function removeWelcome() {
   const welcome =
-    $("welcome");
+    document.getElementById("welcome");
 
-  const input =
-    $("input");
+  if (welcome) welcome.remove();
+}
 
-  const send =
-    $("send");
+function addMessage(role, text) {
+  removeWelcome();
 
-  const history =
-    $("history");
+  const wrapper =
+    document.createElement("div");
 
-  const settings =
-    $("settings");
+  wrapper.className =
+    "max-w-4xl mx-auto mb-6";
 
-  const imageWorkspace =
-    $("imageWorkspace");
+  const isUser = role === "user";
 
-  const chatWorkspace =
-    $("chatWorkspace");
-
-
-  function escapeHTML(value) {
-
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
-  }
-
-
-  function scrollBottom() {
-
-    requestAnimationFrame(() => {
-
-      messages.scrollTo({
-        top: messages.scrollHeight,
-        behavior: "smooth"
-      });
-
-    });
-
-  }
-
-
-  function setBusy(value) {
-
-    state.busy = value;
-
-    send.disabled = value;
-
-    if (value) {
-
-      send.innerHTML = `
-        <span class="flex gap-1">
-          <span class="thinking-dot w-1.5 h-1.5 rounded-full bg-white"></span>
-          <span class="thinking-dot w-1.5 h-1.5 rounded-full bg-white"></span>
-          <span class="thinking-dot w-1.5 h-1.5 rounded-full bg-white"></span>
-        </span>
-      `;
-
-    } else {
-
-      send.textContent = "↑";
-
-    }
-
-  }
-
-
-  function renderUser(text) {
-
-    welcome.classList.add(
-      "hidden"
-    );
-
-    const node =
-      document.createElement("div");
-
-    node.className =
-      "message max-w-4xl mx-auto flex justify-end mb-7";
-
-    node.innerHTML = `
-      <div class="max-w-[82%]">
-
-        <div
-          class="
-            text-[10px]
-            text-slate-600
-            mb-1.5
-            text-right
-          "
-        >
-          You
-        </div>
-
-        <div
-          class="
-            rounded-2xl
-            rounded-tr-md
-            px-4 py-3
-            bg-violet-500/[.10]
-            border
-            border-violet-500/[.14]
-            text-sm
-            leading-7
-            whitespace-pre-wrap
-            break-words
-          "
-        >
-          ${escapeHTML(text)}
-        </div>
-
+  wrapper.innerHTML = `
+    <div class="flex gap-3">
+      <div class="
+        w-9 h-9 rounded-xl flex-shrink-0
+        flex items-center justify-center
+        ${isUser
+          ? "bg-zinc-800"
+          : "bg-gradient-to-br from-indigo-500 to-purple-600"}
+      ">
+        ${isUser ? "U" : "A"}
       </div>
-    `;
 
-    messages.appendChild(node);
-
-    scrollBottom();
-  }
-
-
-  function renderAssistant(
-    text,
-    provider
-  ) {
-
-    welcome.classList.add(
-      "hidden"
-    );
-
-    const node =
-      document.createElement("div");
-
-    node.className =
-      "message max-w-4xl mx-auto mb-8";
-
-    node.innerHTML = `
-      <div
-        class="
-          flex items-center
-          gap-2
-          mb-2
-        "
-      >
-
-        <div
-          class="
-            w-6 h-6
-            rounded-lg
-            bg-gradient-to-br
-            from-violet-500
-            to-cyan-400
-            flex items-center
-            justify-center
-            text-[10px]
-            font-bold
-          "
-        >
-          A
+      <div class="flex-1 min-w-0">
+        <div class="text-xs text-zinc-500 mb-1">
+          ${isUser ? "You" : "AetherAI"}
         </div>
 
-        <span
-          class="
-            text-xs
-            font-medium
-          "
-        >
+        <div class="message text-zinc-200">
+          ${escapeHtml(text)}
+        </div>
+      </div>
+    </div>
+  `;
+
+  messagesEl.appendChild(wrapper);
+
+  messagesEl.scrollTop =
+    messagesEl.scrollHeight;
+}
+
+function useSuggestion(text) {
+  promptEl.value = text;
+  promptEl.focus();
+}
+
+function newChat() {
+  history = [];
+
+  messagesEl.innerHTML = `
+    <div
+      id="welcome"
+      class="max-w-3xl mx-auto
+             min-h-full flex flex-col
+             justify-center"
+    >
+      <div class="text-4xl md:text-6xl font-bold">
+        Build with
+        <span class="
+          bg-gradient-to-r
+          from-indigo-400 to-purple-400
+          bg-clip-text text-transparent
+        ">
           AetherAI
         </span>
-
-        <span
-          class="
-            text-[10px]
-            text-slate-700
-          "
-        >
-          ${escapeHTML(provider || "AI")}
-        </span>
-
       </div>
 
-      <div
-        class="
-          ml-8
-          text-sm
-          leading-7
-          text-slate-300
-          whitespace-pre-wrap
-          break-words
-        "
-      >
-        ${escapeHTML(text)}
-      </div>
-    `;
+      <p class="mt-5 text-zinc-400 text-lg">
+        Start a new conversation.
+      </p>
+    </div>
+  `;
+}
 
-    messages.appendChild(node);
+function showChat() {
+  document
+    .getElementById("chatView")
+    .classList.remove("hidden");
 
-    scrollBottom();
-  }
+  document
+    .getElementById("imageView")
+    .classList.add("hidden");
 
+  document
+    .getElementById("pageTitle")
+    .textContent = "AI Chat";
+}
 
-  function renderError(text) {
+function showImage() {
+  document
+    .getElementById("chatView")
+    .classList.add("hidden");
 
-    const node =
-      document.createElement("div");
+  document
+    .getElementById("imageView")
+    .classList.remove("hidden");
 
-    node.className =
-      "message max-w-4xl mx-auto mb-7";
+  document
+    .getElementById("pageTitle")
+    .textContent = "Image Studio";
+}
 
-    node.innerHTML = `
-      <div
-        class="
-          ml-8
-          rounded-xl
-          bg-red-500/[.06]
-          border
-          border-red-500/[.15]
-          p-4
-          text-sm
-          text-red-300
-        "
-      >
-        ${escapeHTML(text)}
-      </div>
-    `;
+async function sendMessage() {
+  const text = promptEl.value.trim();
 
-    messages.appendChild(node);
+  if (!text) return;
 
-    scrollBottom();
-  }
+  promptEl.value = "";
 
+  addMessage("user", text);
 
-  function addHistory(title) {
+  history.push({
+    role: "user",
+    content: text
+  });
 
-    state.chats.unshift(title);
+  sendBtn.disabled = true;
+  sendBtn.textContent = "Thinking...";
 
-    state.chats =
-      state.chats.slice(0, 20);
-
-    history.innerHTML = "";
-
-    state.chats.forEach(
-      (item, index) => {
-
-        const button =
-          document.createElement("button");
-
-        button.className =
-          "history-item w-full text-left px-3 py-2.5 rounded-lg text-xs text-slate-400 hover:bg-white/[.04] truncate";
-
-        button.textContent =
-          item;
-
-        if (index === 0) {
-
-          button.classList.add(
-            "active"
-          );
-
-        }
-
-        history.appendChild(
-          button
-        );
-
+  try {
+    const response = await fetch(
+      "/api/chat",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          messages: history,
+          persona:
+            document.getElementById(
+              "persona"
+            ).value
+        })
       }
     );
 
-  }
+    const data =
+      await response.json();
 
-
-  async function chatRequest(
-    prompt
-  ) {
-
-    state.messages.push({
-      role: "user",
-      content: prompt
-    });
-
-    const response =
-      await fetch(
-        "/api/chat",
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type":
-              "application/json"
-          },
-
-          body: JSON.stringify({
-            messages:
-              state.messages,
-
-            persona:
-              $("persona").value,
-
-            groqApiKey:
-              $("groqKey").value.trim()
-          })
-        }
-      );
-
-
-    let data;
-
-    try {
-
-      data =
-        await response.json();
-
-    } catch {
-
-      throw new Error(
-        "Invalid server response."
-      );
-
-    }
-
-
-    if (
-      !response.ok ||
-      !data.ok
-    ) {
-
+    if (!response.ok || !data.success) {
       throw new Error(
         data.error ||
         "AI request failed."
       );
-
     }
 
+    addMessage(
+      "assistant",
+      data.answer
+    );
 
-    state.messages.push({
+    history.push({
       role: "assistant",
-      content: data.response
+      content: data.answer
     });
 
+  } catch (error) {
 
-    renderAssistant(
-      data.response,
-      data.provider
+    addMessage(
+      "assistant",
+      "Error: " + error.message
     );
 
+  } finally {
+
+    sendBtn.disabled = false;
+    sendBtn.textContent = "Send";
   }
+}
 
+async function generateImage() {
+  const prompt =
+    document
+      .getElementById("imagePrompt")
+      .value.trim();
 
-  async function submit() {
+  const negativePrompt =
+    document
+      .getElementById("negativePrompt")
+      .value.trim();
 
-    if (state.busy) {
-      return;
-    }
-
-    const prompt =
-      input.value.trim();
-
-    if (!prompt) {
-      return;
-    }
-
-
-    input.value = "";
-
-    input.style.height =
-      "auto";
-
-
-    if (
-      state.messages.length === 0
-    ) {
-
-      addHistory(
-        prompt.length > 42
-          ? prompt.slice(0, 42) + "…"
-          : prompt
-      );
-
-    }
-
-
-    renderUser(prompt);
-
-    setBusy(true);
-
-
-    try {
-
-      await chatRequest(
-        prompt
-      );
-
-    } catch (error) {
-
-      renderError(
-        error instanceof Error
-          ? error.message
-          : "Something went wrong."
-      );
-
-    } finally {
-
-      setBusy(false);
-
-      input.focus();
-
-    }
-
-  }
-
-
-  function newChat() {
-
-    state.messages = [];
-
-    messages.innerHTML = "";
-
-    messages.appendChild(
-      welcome
+  const result =
+    document.getElementById(
+      "imageResult"
     );
 
-    welcome.classList.remove(
-      "hidden"
-    );
-
-    input.value = "";
-
-    input.focus();
-
+  if (!prompt) {
+    result.innerHTML = `
+      <div class="text-red-400">
+        Enter an image prompt.
+      </div>
+    `;
+    return;
   }
 
+  result.innerHTML = `
+    <div class="glass rounded-2xl p-6
+                text-zinc-400">
+      Generating image...
+    </div>
+  `;
 
-  function setMode(mode) {
+  try {
 
-    state.mode = mode;
-
-    if (mode === "image") {
-
-      chatWorkspace.classList.add(
-        "hidden"
+    const response =
+      await fetch(
+        "/api/generate-image",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+          body: JSON.stringify({
+            prompt,
+            negativePrompt,
+            steps: 20,
+            guidance: 7.5,
+            width: 1024,
+            height: 1024
+          })
+        }
       );
 
-      imageWorkspace.classList.remove(
-        "hidden"
-      );
+    if (!response.ok) {
+      let errorText =
+        "Image generation failed.";
 
-      $("status").textContent =
-        "SDXL Ready";
+      try {
+        const data =
+          await response.json();
 
-    } else {
+        errorText =
+          data.error || errorText;
 
-      imageWorkspace.classList.add(
-        "hidden"
-      );
+      } catch {}
 
-      chatWorkspace.classList.remove(
-        "hidden"
-      );
-
-      $("status").textContent =
-        state.selectedModel === "groq"
-          ? "Groq 70B Active"
-          : "Llama 3.1 8B Active";
-
+      throw new Error(errorText);
     }
 
-  }
+    const blob =
+      await response.blob();
 
-
-  async function generateImage() {
-
-    const prompt =
-      $("imagePrompt")
-        .value
-        .trim();
-
-    if (!prompt) {
-      return;
-    }
-
-
-    const button =
-      $("generate");
-
-    const result =
-      $("imageResult");
-
-
-    button.disabled = true;
-
-    button.textContent =
-      "Generating…";
-
+    const imageUrl =
+      URL.createObjectURL(blob);
 
     result.innerHTML = `
-      <div
-        class="
-          glass
-          rounded-2xl
-          p-10
-          text-center
-          text-sm
-          text-slate-500
-        "
-      >
-        Creating your image…
+      <div class="glass rounded-2xl p-4">
+        <img
+          src="${imageUrl}"
+          class="w-full rounded-xl"
+          alt="Generated image"
+        >
       </div>
     `;
 
+  } catch (error) {
 
-    try {
-
-      const response =
-        await fetch(
-          "/api/generate-image",
-          {
-            method: "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json"
-            },
-
-            body: JSON.stringify({
-
-              prompt,
-
-              negativePrompt:
-                $("negativePrompt")
-                  .value
-                  .trim()
-
-            })
-          }
-        );
-
-
-      if (!response.ok) {
-
-        let message =
-          "Image generation failed.";
-
-        try {
-
-          const data =
-            await response.json();
-
-          message =
-            data.error ||
-            message;
-
-        } catch {}
-
-        throw new Error(
-          message
-        );
-
-      }
-
-
-      const blob =
-        await response.blob();
-
-      const url =
-        URL.createObjectURL(
-          blob
-        );
-
-
-      result.innerHTML = `
-        <div
-          class="
-            glass
-            rounded-2xl
-            p-3
-          "
-        >
-
-          <img
-            src="${url}"
-            alt="Generated image"
-            class="
-              w-full
-              rounded-xl
-              block
-            "
-          >
-
-        </div>
-      `;
-
-    } catch (error) {
-
-      result.innerHTML = `
-        <div
-          class="
-            rounded-xl
-            p-4
-            bg-red-500/[.06]
-            border
-            border-red-500/[.15]
-            text-sm
-            text-red-300
-          "
-        >
-          ${escapeHTML(
-            error instanceof Error
-              ? error.message
-              : "Generation failed."
-          )}
-        </div>
-      `;
-
-    } finally {
-
-      button.disabled = false;
-
-      button.textContent =
-        "Generate image";
-
-    }
-
+    result.innerHTML = `
+      <div class="
+        glass rounded-2xl p-5
+        text-red-400
+      ">
+        ${escapeHtml(error.message)}
+      </div>
+    `;
   }
+}
 
-
-  // Sidebar
-
-  $("openSidebar")
-    .addEventListener(
-      "click",
-      () => {
-        sidebar.classList.remove(
-          "-translate-x-full"
-        );
-      }
-    );
-
-
-  $("closeSidebar")
-    .addEventListener(
-      "click",
-      () => {
-        sidebar.classList.add(
-          "-translate-x-full"
-        );
-      }
-    );
-
-
-  // Settings
-
-  $("settingsButton")
-    .addEventListener(
-      "click",
-      () => {
-        settings.classList.remove(
-          "translate-x-full"
-        );
-      }
-    );
-
-
-  $("closeSettings")
-    .addEventListener(
-      "click",
-      () => {
-        settings.classList.add(
-          "translate-x-full"
-        );
-      }
-    );
-
-
-  // New conversation
-
-  $("newChat")
-    .addEventListener(
-      "click",
-      newChat
-    );
-
-
-  // Send
-
-  send.addEventListener(
-    "click",
-    submit
-  );
-
-
-  input.addEventListener(
-    "keydown",
-    event => {
-
-      if (
-        event.key === "Enter" &&
-        !event.shiftKey
-      ) {
-
-        event.preventDefault();
-
-        submit();
-
-      }
-
+promptEl.addEventListener(
+  "keydown",
+  (event) => {
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey
+    ) {
+      event.preventDefault();
+      sendMessage();
     }
-  );
+  }
+);
 
+async function checkHealth() {
+  try {
+    const response =
+      await fetch("/api/health");
 
-  input.addEventListener(
-    "input",
-    () => {
+    const data =
+      await response.json();
 
-      input.style.height =
-        "auto";
-
-      input.style.height =
-        Math.min(
-          input.scrollHeight,
-          190
-        ) + "px";
-
+    if (data.success) {
+      document
+        .getElementById("status")
+        .classList.remove("hidden");
     }
-  );
+  } catch {}
+}
 
-
-  // Suggestions
-
-  document
-    .querySelectorAll(
-      ".suggestion"
-    )
-    .forEach(button => {
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          input.value =
-            button.dataset.suggestion;
-
-          input.focus();
-
-          input.dispatchEvent(
-            new Event("input")
-          );
-
-        }
-      );
-
-    });
-
-
-  // Text mode
-
-  $("modeButton")
-    .addEventListener(
-      "click",
-      () => {
-        setMode("chat");
-      }
-    );
-
-
-  // Image mode
-
-  $("imageButton")
-    .addEventListener(
-      "click",
-      () => {
-        setMode("image");
-      }
-    );
-
-
-  // Image generation
-
-  $("generate")
-    .addEventListener(
-      "click",
-      generateImage
-    );
-
-
-  // Model dropdown
-
-  $("modelButton")
-    .addEventListener(
-      "click",
-      () => {
-
-        $("modelMenu")
-          .classList.toggle(
-            "hidden"
-          );
-
-      }
-    );
-
-
-  document
-    .querySelectorAll(
-      "[data-model]"
-    )
-    .forEach(button => {
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          const model =
-            button.dataset.model;
-
-          state.selectedModel =
-            model;
-
-          $("modelMenu")
-            .classList.add(
-              "hidden"
-            );
-
-
-          if (
-            model === "groq"
-          ) {
-
-            $("modelName")
-              .textContent =
-              "Llama 3.3 70B";
-
-            $("status")
-              .textContent =
-              "Groq 70B Active";
-
-          } else {
-
-            $("modelName")
-              .textContent =
-              "Llama 3.1 8B";
-
-            $("status")
-              .textContent =
-              "Llama 3.1 8B Active";
-
-          }
-
-        }
-      );
-
-    });
-
-
-  // Escape closes menus
-
-  document.addEventListener(
-    "keydown",
-    event => {
-
-      if (
-        event.key === "Escape"
-      ) {
-
-        $("modelMenu")
-          .classList.add(
-            "hidden"
-          );
-
-        settings.classList.add(
-          "translate-x-full"
-        );
-
-      }
-
-    }
-  );
-
-
-})();
+checkHealth();
 </script>
 
 </body>
