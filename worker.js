@@ -1,140 +1,258 @@
 const HTML_CONTENT = `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AetherAI Hub - Cloudflare Multi-Agent Orchestrator</title>
+    <title>AetherAI — Next-Gen AI Workspace</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #0b0f19; color: #f3f4f6; }
-        .font-mono { font-family: 'JetBrains Mono', monospace; }
-        .glass-card { background: rgba(17, 24, 39, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
-        .orange-glow { box-shadow: 0 0 20px rgba(249, 115, 22, 0.15); }
+        body { background-color: #090d16; color: #f3f4f6; }
+        .glass-panel { background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .glass-input { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .glass-input:focus { border-color: #6366f1; box-shadow: 0 0 15px rgba(99, 102, 241, 0.25); }
+        .glow-effect { box-shadow: 0 0 30px -5px rgba(99, 102, 241, 0.15); }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
     </style>
 </head>
-<body class="min-h-screen flex flex-col">
+<body class="h-screen flex flex-col overflow-hidden">
 
-    <!-- Header -->
-    <header class="border-b border-gray-800 bg-gray-950/80 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
+    <!-- Top Navigation -->
+    <header class="border-b border-white/10 bg-slate-950/80 backdrop-blur-md px-6 py-3.5 flex justify-between items-center z-50">
         <div class="flex items-center space-x-3">
-            <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center font-bold text-white shadow-lg">A</div>
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-violet-600 to-purple-500 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/30">
+                ⚡
+            </div>
             <div>
-                <h1 class="font-bold text-lg leading-none text-white">AetherAI <span class="text-xs text-orange-500 font-mono font-normal">v2.4-CF</span></h1>
-                <p class="text-xs text-gray-400">Autonomous Multi-Agent Orchestrator</p>
+                <div class="flex items-center space-x-2">
+                    <h1 class="font-bold text-base text-white tracking-wide">AetherAI Studio</h1>
+                    <span class="text-[10px] font-mono bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-500/20">v3.0 Pro</span>
+                </div>
+                <p class="text-[11px] text-slate-400">Multi-Model Cloudflare & Groq Orchestrator</p>
             </div>
         </div>
-        <div class="flex items-center space-x-4">
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-950 text-emerald-400 border border-emerald-800">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span> 24/7 Cloudflare Active
-            </span>
+
+        <div class="flex items-center space-x-3">
+            <div class="hidden sm:flex items-center space-x-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full text-xs text-emerald-400 font-medium">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Llama 3.1 8B Active</span>
+            </div>
         </div>
     </header>
 
-    <!-- Main Workspace -->
-    <main class="flex-1 p-6 max-w-7xl mx-auto w-full grid grid-cols-1 md:grid-cols-3 gap-6">
+    <!-- App Layout -->
+    <div class="flex-1 flex overflow-hidden">
 
-        <!-- Controls & Config -->
-        <div class="space-y-6">
-            <div class="glass-card rounded-xl p-5 orange-glow">
-                <h2 class="text-sm font-semibold uppercase tracking-wider text-orange-400 mb-4">Groq Free API Key (Optional)</h2>
-                <p class="text-xs text-gray-400 mb-3">If added, uses Llama 3.3 70B Ultra High-Speed Engine. Otherwise falls back to Cloudflare Native AI.</p>
-                <input type="password" id="groqKey" placeholder="gsk_..." class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-orange-500">
+        <!-- Sidebar / Controls -->
+        <aside class="w-80 border-r border-white/10 bg-slate-950/40 p-5 flex flex-col justify-between hidden md:flex overflow-y-auto">
+            <div class="space-y-6">
+                <!-- API Engine Config -->
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Accelerator Key (Optional)</label>
+                    <input type="password" id="groqKey" placeholder="Paste Groq API Key (gsk_...)" class="w-full glass-input rounded-xl px-3.5 py-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none transition-all">
+                    <p class="text-[10px] text-slate-500 mt-1.5 leading-relaxed">Adds dynamic routing to Llama 3.3 70B for complex tasks.</p>
+                </div>
+
+                <!-- Execution Mode -->
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Operational Mode</label>
+                    <select id="modeSelect" class="w-full glass-input rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none cursor-pointer">
+                        <option value="text">✨ Text & Logic Engine</option>
+                        <option value="image">🎨 SDXL Image Generation</option>
+                    </select>
+                </div>
+
+                <!-- Agent Persona -->
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">System Persona</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center p-2.5 rounded-xl border border-white/5 bg-slate-900/40 hover:bg-slate-800/50 cursor-pointer transition">
+                            <input type="radio" name="agent" value="You are a Senior Software Architect and Expert Programmer." checked class="text-indigo-600 focus:ring-0">
+                            <span class="ml-2.5 text-xs font-medium text-slate-300">Software Architect</span>
+                        </label>
+                        <label class="flex items-center p-2.5 rounded-xl border border-white/5 bg-slate-900/40 hover:bg-slate-800/50 cursor-pointer transition">
+                            <input type="radio" name="agent" value="You are a Technical Researcher and Data Analyst." class="text-indigo-600 focus:ring-0">
+                            <span class="ml-2.5 text-xs font-medium text-slate-300">Data Researcher</span>
+                        </label>
+                        <label class="flex items-center p-2.5 rounded-xl border border-white/5 bg-slate-900/40 hover:bg-slate-800/50 cursor-pointer transition">
+                            <input type="radio" name="agent" value="You are an AI Prompt Engineer and Creative Writer." class="text-indigo-600 focus:ring-0">
+                            <span class="ml-2.5 text-xs font-medium text-slate-300">Creative Strategist</span>
+                        </label>
+                    </div>
+                </div>
             </div>
 
-            <div class="glass-card rounded-xl p-5">
-                <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-300 mb-4">Mode Selection</h2>
-                <select id="modeSelect" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 mb-4 focus:outline-none focus:border-orange-500">
-                    <option value="text">Multi-Agent Text & Logic Engine</option>
-                    <option value="image">Cloudflare Image Generator (SDXL)</option>
-                </select>
-
-                <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-300 mb-2">Agent Persona</h2>
-                <select id="agentRole" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-orange-500">
-                    <option value="You are a Lead Software Architect and Code Reviewer.">Coder / Engineer Agent</option>
-                    <option value="You are a Research Scientist specializing in deep search analysis.">Researcher Agent</option>
-                    <option value="You are a Creative Writer and Prompt Strategist.">Creative Strategist Agent</option>
-                </select>
+            <!-- Footer Badge -->
+            <div class="pt-4 border-t border-white/10 text-center">
+                <span class="text-[11px] text-slate-500 font-mono">Workers AI Engine v3.1</span>
             </div>
-        </div>
+        </aside>
 
-        <!-- Interactive Terminal Workspace -->
-        <div class="md:col-span-2 glass-card rounded-xl p-6 flex flex-col h-[600px]">
-            <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-300 mb-3">Execution Terminal</h2>
+        <!-- Main Chat / Canvas -->
+        <main class="flex-1 flex flex-col bg-slate-950/20 relative">
             
-            <div id="outputArea" class="flex-1 bg-gray-950 rounded-lg p-4 font-mono text-xs text-gray-300 overflow-y-auto space-y-3 border border-gray-800">
-                <div class="text-gray-500">// System ready. Type a prompt to execute multi-agent task or generate images.</div>
+            <!-- Chat Feed -->
+            <div id="chatContainer" class="flex-1 overflow-y-auto p-6 space-y-6">
+                <!-- Welcome Banner -->
+                <div id="welcomeCard" class="max-w-2xl mx-auto my-12 text-center space-y-4">
+                    <div class="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mx-auto text-indigo-400 text-2xl shadow-inner">
+                        🚀
+                    </div>
+                    <h2 class="text-xl font-semibold text-white">How can AetherAI assist you today?</h2>
+                    <p class="text-xs text-slate-400 leading-relaxed max-w-md mx-auto">
+                        Powered by upgraded Llama 3.1 models on Cloudflare's global edge network. Fast, reliable, and deprecation-free.
+                    </p>
+                </div>
             </div>
 
-            <!-- Input Controls -->
-            <div class="mt-4 flex space-x-2">
-                <input type="text" id="userInput" placeholder="Ask AI or describe image to generate..." class="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-gray-100 focus:outline-none focus:border-orange-500">
-                <button onclick="executeTask()" id="runBtn" class="bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-semibold px-6 py-2.5 rounded-lg text-sm transition-all shadow-md">Run AI</button>
+            <!-- Input Area -->
+            <div class="p-4 border-t border-white/10 bg-slate-950/60 backdrop-blur-md">
+                <div class="max-w-4xl mx-auto relative flex items-center">
+                    <textarea id="userInput" rows="1" placeholder="Type your message or image description..." class="w-full glass-input rounded-2xl pl-4 pr-24 py-3.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none resize-none transition-all" onkeydown="handleKeyDown(event)"></textarea>
+                    
+                    <button onclick="executeTask()" id="sendBtn" class="absolute right-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-medium px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 transition-all shadow-lg shadow-indigo-500/25">
+                        <span>Send</span>
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                    </button>
+                </div>
             </div>
-        </div>
 
-    </main>
+        </main>
+    </div>
 
     <script>
+        function handleKeyDown(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                executeTask();
+            }
+        }
+
         async function executeTask() {
-            const input = document.getElementById('userInput').value.trim();
+            const inputEl = document.getElementById('userInput');
+            const prompt = inputEl.value.trim();
+            if (!prompt) return;
+
+            const chatContainer = document.getElementById('chatContainer');
+            const welcomeCard = document.getElementById('welcomeCard');
+            if (welcomeCard) welcomeCard.remove();
+
             const mode = document.getElementById('modeSelect').value;
             const groqKey = document.getElementById('groqKey').value.trim();
-            const systemPrompt = document.getElementById('agentRole').value;
-            const outputArea = document.getElementById('outputArea');
-            const runBtn = document.getElementById('runBtn');
+            const systemPrompt = document.querySelector('input[name="agent"]:checked').value;
+            const sendBtn = document.getElementById('sendBtn');
 
-            if (!input) return;
+            // Render User Prompt
+            chatContainer.innerHTML += \`
+                <div class="flex justify-end max-w-4xl mx-auto">
+                    <div class="bg-indigo-600/90 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm max-w-[80%] shadow-md leading-relaxed">
+                        \${escapeHtml(prompt)}
+                    </div>
+                </div>
+            \`;
 
-            outputArea.innerHTML += \`<div class="text-orange-400 font-bold">&gt; \${input}</div>\`;
-            outputArea.scrollTop = outputArea.scrollHeight;
-            document.getElementById('userInput').value = '';
+            inputEl.value = '';
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            sendBtn.disabled = true;
+            sendBtn.classList.add('opacity-50');
 
-            runBtn.disabled = true;
-            runBtn.innerText = 'Processing...';
+            // Render Loading State
+            const loadingId = 'load-' + Date.now();
+            chatContainer.innerHTML += \`
+                <div id="\${loadingId}" class="flex justify-start max-w-4xl mx-auto">
+                    <div class="glass-panel text-slate-300 rounded-2xl rounded-tl-sm px-4 py-3 text-sm max-w-[85%] flex items-center space-x-3">
+                        <div class="w-2 h-2 rounded-full bg-indigo-400 animate-ping"></div>
+                        <span class="text-xs text-slate-400 font-mono">Processing via AI Engine...</span>
+                    </div>
+                </div>
+            \`;
+            chatContainer.scrollTop = chatContainer.scrollHeight;
 
             try {
                 if (mode === 'text') {
-                    outputArea.innerHTML += \`<div class="text-gray-500">[Agent System Routing...] Calling LLM Engine...</div>\`;
-                    
                     const res = await fetch('/api/chat', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: input, systemPrompt: systemPrompt, groqApiKey: groqKey })
+                        body: JSON.stringify({ prompt, systemPrompt, groqApiKey: groqKey })
                     });
                     
                     const data = await res.json();
+                    document.getElementById(loadingId).remove();
+
                     if(data.error) throw new Error(data.error);
 
                     const reply = data.choices[0].message.content;
-                    outputArea.innerHTML += \`<div class="text-emerald-400 whitespace-pre-wrap">\${reply}</div>\`;
-
-                } else if (mode === 'image') {
-                    outputArea.innerHTML += \`<div class="text-gray-500">[Workers AI] Generating Image via SDXL...</div>\`;
-                    
+                    chatContainer.innerHTML += \`
+                        <div class="flex justify-start max-w-4xl mx-auto">
+                            <div class="glass-panel text-slate-200 rounded-2xl rounded-tl-sm px-5 py-4 text-sm max-w-[85%] leading-relaxed border border-white/10 shadow-lg whitespace-pre-wrap">
+                                \${escapeHtml(reply)}
+                            </div>
+                        </div>
+                    \`;
+                } else {
                     const res = await fetch('/api/generate-image', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: input })
+                        body: JSON.stringify({ prompt })
                     });
 
-                    if (!res.ok) throw new Error('Image generation failed');
+                    document.getElementById(loadingId).remove();
+                    if (!res.ok) throw new Error('Failed to generate image');
 
                     const blob = await res.blob();
                     const imgUrl = URL.createObjectURL(blob);
 
-                    outputArea.innerHTML += \`
-                        <div class="my-2">
-                            <img src="\${imgUrl}" class="max-w-xs rounded-lg border border-gray-700 shadow-md">
-                        </div>\`;
+                    chatContainer.innerHTML += \`
+                        <div class="flex justify-start max-w-4xl mx-auto">
+                            <div class="glass-panel rounded-2xl rounded-tl-sm p-2 border border-white/10">
+                                <img src="\${imgUrl}" class="rounded-xl max-w-sm w-full object-cover shadow-2xl">
+                            </div>
+                        </div>
+                    \`;
                 }
             } catch (err) {
-                outputArea.innerHTML += \`<div class="text-red-400">Error: \${err.message}</div>\`;
+                document.getElementById(loadingId).remove();
+                chatContainer.innerHTML += \`
+                    <div class="flex justify-start max-w-4xl mx-auto">
+                        <div class="bg-red-500/10 border border-red-500/20 text-red-400 rounded-2xl px-4 py-3 text-xs">
+                            ❌ Error: \${err.message}
+                        </div>
+                    </div>
+                \`;
             }
 
-            runBtn.disabled = false;
-            runBtn.innerText = 'Run AI';
-            outputArea.scrollTop = outputArea.scrollHeight;
+            sendBtn.disabled = false;
+            sendBtn.classList.remove('opacity-50');
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
         }
     </script>
 </body>
@@ -154,11 +272,11 @@ export default {
 
     const url = new URL(request.url);
 
-    // 1. Text Generation Endpoint
+    // 1. Text Generation API
     if (url.pathname === '/api/chat' && request.method === 'POST') {
       try {
         const body = await request.json();
-        const { prompt, model, systemPrompt, groqApiKey } = body;
+        const { prompt, systemPrompt, groqApiKey } = body;
 
         if (groqApiKey) {
           const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -168,9 +286,9 @@ export default {
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              model: model || 'llama-3.3-70b-versatile',
+              model: 'llama-3.3-70b-versatile',
               messages: [
-                { role: 'system', content: systemPrompt || 'You are AetherAI, an ultra-intelligent multi-agent system.' },
+                { role: 'system', content: systemPrompt || 'You are an AI Assistant.' },
                 { role: 'user', content: prompt }
               ],
               temperature: 0.7
@@ -183,10 +301,10 @@ export default {
           });
         }
 
-        // Active Cloudflare Native AI Model
+        // Active Cloudflare Model (Llama 3.1 8B Instruct)
         const answer = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
           messages: [
-            { role: 'system', content: systemPrompt || 'You are AetherAI Multi-Agent Router.' },
+            { role: 'system', content: systemPrompt || 'You are an AI Assistant.' },
             { role: 'user', content: prompt }
           ]
         });
@@ -203,7 +321,7 @@ export default {
       }
     }
 
-    // 2. Image Generation Endpoint
+    // 2. Image Generation API
     if (url.pathname === '/api/generate-image' && request.method === 'POST') {
       try {
         const body = await request.json();
@@ -211,7 +329,7 @@ export default {
 
         const imageBuffer = await env.AI.run(
           '@cf/stabilityai/stable-diffusion-xl-base-1.0',
-          { prompt: prompt }
+          { prompt }
         );
 
         return new Response(imageBuffer, {
@@ -225,7 +343,7 @@ export default {
       }
     }
 
-    // 3. Serve Frontend Dashboard
+    // 3. UI Dashboard
     return new Response(HTML_CONTENT, {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' }
