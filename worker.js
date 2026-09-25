@@ -1,88 +1,16 @@
-const DEFAULT_MODEL = "openai/gpt-5.6-sol";
-const DEFAULT_IMAGE_MODEL = "sensenova/sensenova-u1.5-lite";
+// ============================================================
+// AetherAI Studio
+// Cloudflare Worker + xKiro
+// Single-file ChatGPT-style AI interface
+// ============================================================
 
-function json(data, status = 200, extraHeaders = {}) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "no-store",
-      ...extraHeaders,
-    },
-  });
-}
-
-function corsHeaders() {
-  return {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-  };
-}
-
-function withCors(response) {
-  const headers = new Headers(response.headers);
-
-  for (const [key, value] of Object.entries(corsHeaders())) {
-    headers.set(key, value);
-  }
-
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers,
-  });
-}
-
-function getApiKey(env) {
-  return env.XKIRO_API_KEY || "";
-}
-
-function getBaseUrl(env) {
-  return (env.XKIRO_BASE_URL || "https://api.xkiro.com/v1").replace(/\/+$/, "");
-}
-
-function getDefaultModel(env) {
-  return env.DEFAULT_CHAT_MODEL || DEFAULT_MODEL;
-}
-
-function sanitizeMessages(messages) {
-  if (!Array.isArray(messages)) return [];
-
-  return messages
-    .filter((m) => {
-      return (
-        m &&
-        ["user", "assistant", "system"].includes(m.role) &&
-        typeof m.content !== "undefined"
-      );
-    })
-    .map((m) => ({
-      role: m.role,
-      content: m.content,
-    }));
-}
-
-function errorMessage(data, fallback) {
-  return (
-    data?.error?.message ||
-    data?.message ||
-    data?.error ||
-    fallback
-  );
-}
-
-/* =========================================================
-   FRONTEND
-========================================================= */
-
-const HTML = String.raw`<!doctype html>
+const HTML = String.raw`
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0b0f">
-<title>AetherAI</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>AetherAI Studio</title>
 
 <style>
 * {
@@ -90,19 +18,17 @@ const HTML = String.raw`<!doctype html>
 }
 
 :root {
-  --bg: #0b0b0f;
-  --panel: #111116;
-  --panel2: #17171d;
-  --border: rgba(255,255,255,.09);
-  --text: #f5f5f7;
-  --muted: #9b9ba4;
-  --accent: #8b7cff;
-  --accent2: #6d5dfc;
-  --user: #25252d;
-  --danger: #ff5c68;
+  --bg: #212121;
+  --panel: #171717;
+  --panel2: #2a2a2a;
+  --border: #3a3a3a;
+  --text: #f5f5f5;
+  --muted: #a0a0a0;
+  --accent: #10a37f;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   width: 100%;
   height: 100%;
@@ -123,8 +49,8 @@ body {
 }
 
 button,
-textarea,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -134,296 +60,260 @@ button {
 
 .app {
   width: 100%;
-  height: 100dvh;
+  height: 100%;
   display: flex;
-  overflow: hidden;
 }
 
-/* ================= SIDEBAR ================= */
-
 .sidebar {
-  width: 275px;
-  background: #0d0d11;
-  border-right: 1px solid var(--border);
+  width: 270px;
+  background: #171717;
+  border-right: 1px solid #303030;
   display: flex;
   flex-direction: column;
-  transition: transform .22s ease;
-  z-index: 50;
+  padding: 12px;
+  flex-shrink: 0;
 }
 
 .brand {
-  padding: 20px 18px 14px;
-  font-size: 20px;
-  font-weight: 750;
-  letter-spacing: -.5px;
-}
-
-.brand span {
-  color: var(--accent);
-}
-
-.new-chat {
-  margin: 4px 12px 14px;
-  border: 1px solid var(--border);
-  background: var(--panel);
-  color: var(--text);
-  border-radius: 11px;
-  padding: 11px 13px;
-  text-align: left;
-}
-
-.new-chat:hover {
-  background: var(--panel2);
-}
-
-.history {
-  flex: 1;
-  overflow-y: auto;
-  padding: 5px 10px;
-}
-
-.history-title {
-  color: var(--muted);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  padding: 8px;
-}
-
-.chat-item {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  color: #dddde4;
-  padding: 10px;
-  border-radius: 9px;
-  text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.chat-item:hover,
-.chat-item.active {
-  background: rgba(255,255,255,.07);
-}
-
-.sidebar-footer {
-  padding: 12px;
-  border-top: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 12px;
-}
-
-/* ================= MAIN ================= */
-
-.main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-}
-
-.topbar {
-  height: 62px;
-  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 16px;
-  background: rgba(11,11,15,.92);
-  backdrop-filter: blur(15px);
-  z-index: 20;
+  padding: 10px 8px 16px;
+  font-weight: 700;
+  font-size: 17px;
 }
 
-.menu-btn {
-  display: none;
-  width: 38px;
-  height: 38px;
-  border: 1px solid var(--border);
-  background: var(--panel);
-  color: white;
+.logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(135deg,#10a37f,#3b82f6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+}
+
+.new-chat {
+  width: 100%;
+  padding: 11px 13px;
   border-radius: 9px;
+  border: 1px solid #444;
+  background: #222;
+  color: white;
+  text-align: left;
+  margin-bottom: 14px;
 }
 
-.model-wrap {
-  position: relative;
+.new-chat:hover {
+  background: #2d2d2d;
+}
+
+.sidebar-section {
+  margin-top: 8px;
+}
+
+.sidebar-title {
+  color: #888;
+  font-size: 12px;
+  padding: 7px 8px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.chat-history {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.history-item {
+  padding: 9px 10px;
+  border-radius: 8px;
+  color: #ddd;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.history-item:hover {
+  background: #292929;
+}
+
+.sidebar-bottom {
+  border-top: 1px solid #303030;
+  padding-top: 10px;
+}
+
+.small-status {
+  color: #777;
+  font-size: 11px;
+  padding: 6px 8px;
+}
+
+.main {
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  height: 58px;
+  border-bottom: 1px solid #303030;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  flex-shrink: 0;
+}
+
+.top-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mobile-menu {
+  display: none;
+  background: transparent;
+  color: white;
+  border: 0;
+  font-size: 22px;
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 650;
 }
 
 .model-select {
-  min-width: 220px;
+  min-width: 210px;
   max-width: 360px;
-  padding: 9px 34px 9px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--panel);
-  color: var(--text);
+  background: #292929;
+  color: white;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 8px 10px;
   outline: none;
 }
 
-.model-select:focus {
-  border-color: rgba(139,124,255,.7);
-}
-
 .top-actions {
-  margin-left: auto;
   display: flex;
-  align-items: center;
   gap: 8px;
 }
 
 .icon-btn {
-  width: 38px;
-  height: 38px;
-  border: 1px solid var(--border);
-  background: var(--panel);
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: transparent;
   color: #ddd;
-  border-radius: 9px;
+  border: 1px solid transparent;
 }
 
 .icon-btn:hover {
-  background: var(--panel2);
+  background: #2b2b2b;
+  border-color: #3a3a3a;
 }
 
-.search-active {
-  border-color: var(--accent);
-  color: #bcb4ff;
-}
-
-/* ================= CHAT ================= */
-
-.chat {
+.messages {
   flex: 1;
   overflow-y: auto;
   scroll-behavior: smooth;
 }
 
-.chat-inner {
-  width: min(900px, calc(100% - 30px));
+.messages-inner {
+  width: min(900px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 30px 0 170px;
+  padding: 30px 0 160px;
 }
 
 .welcome {
-  min-height: calc(100dvh - 250px);
+  min-height: calc(100vh - 260px);
   display: flex;
   align-items: center;
   justify-content: center;
-  text-align: center;
 }
 
 .welcome-box {
+  text-align: center;
   max-width: 650px;
 }
 
-.welcome h1 {
-  font-size: clamp(32px, 5vw, 52px);
-  margin: 0 0 12px;
-  letter-spacing: -1.8px;
+.welcome-box h1 {
+  font-size: 32px;
+  margin: 0 0 10px;
 }
 
-.welcome p {
-  color: var(--muted);
-  font-size: 16px;
+.welcome-box p {
+  color: #999;
   line-height: 1.6;
 }
 
-/* ================= MESSAGE ================= */
-
 .message {
   display: flex;
-  gap: 13px;
-  margin: 0 0 28px;
-  animation: appear .18s ease;
-}
-
-@keyframes appear {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
+  gap: 14px;
+  margin: 26px 0;
 }
 
 .avatar {
-  flex: 0 0 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 9px;
-  display: grid;
-  place-items: center;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 13px;
-  font-weight: 750;
-  background: var(--panel2);
-  border: 1px solid var(--border);
+  font-weight: 800;
 }
 
-.message.user .avatar {
-  background: #25252d;
+.user-avatar {
+  background: #444;
 }
 
-.message-body {
+.ai-avatar {
+  background: linear-gradient(135deg,#10a37f,#2563eb);
+}
+
+.message-main {
   min-width: 0;
   flex: 1;
 }
 
-.message-role {
-  font-size: 12px;
-  color: var(--muted);
-  margin: 0 0 5px;
+.message-header {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 7px;
 }
 
 .message-content {
-  line-height: 1.65;
   font-size: 15px;
+  line-height: 1.7;
   overflow-wrap: anywhere;
 }
 
-.message.user .message-content {
-  display: inline-block;
-  background: var(--user);
-  padding: 10px 13px;
-  border-radius: 12px;
+.message-content p {
+  margin: 0 0 12px;
 }
 
-.message-actions {
-  display: flex;
-  gap: 5px;
-  margin-top: 8px;
-  opacity: .72;
+.message-content p:last-child {
+  margin-bottom: 0;
 }
 
-.message-actions button {
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  padding: 5px 7px;
-  border-radius: 7px;
-  font-size: 12px;
-}
-
-.message-actions button:hover {
-  background: var(--panel2);
-  color: white;
-}
-
-.copy-ok {
-  color: #75e09b !important;
-}
-
-pre {
-  background: #08080b;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+.message-content pre {
+  background: #111;
+  border: 1px solid #333;
   padding: 14px;
+  border-radius: 9px;
   overflow-x: auto;
-  position: relative;
+  margin: 12px 0;
 }
 
-code {
+.message-content code {
   font-family:
     ui-monospace,
     SFMono-Regular,
@@ -433,285 +323,198 @@ code {
     monospace;
 }
 
-p {
-  margin: 0 0 12px;
-}
-
-p:last-child {
-  margin-bottom: 0;
-}
-
-strong {
-  color: white;
-}
-
-a {
-  color: #a99fff;
-}
-
-.generated-image {
-  max-width: min(100%, 760px);
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  display: block;
+.message-actions {
+  display: flex;
+  gap: 5px;
   margin-top: 8px;
 }
 
+.message-action {
+  border: 0;
+  background: transparent;
+  color: #888;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.message-action:hover {
+  color: #eee;
+  background: #2b2b2b;
+}
+
+.generated-image {
+  max-width: min(700px, 100%);
+  border-radius: 12px;
+  display: block;
+  margin-top: 8px;
+  border: 1px solid #444;
+}
+
 .image-loading {
-  width: min(100%, 500px);
-  height: 300px;
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  display: grid;
-  place-items: center;
-  background:
-    linear-gradient(
-      110deg,
-      #111116 25%,
-      #1b1b22 37%,
-      #111116 63%
-    );
-  background-size: 400% 100%;
-  animation: shimmer 1.4s infinite;
-  color: var(--muted);
+  border: 1px solid #3b3b3b;
+  background: #1c1c1c;
+  border-radius: 12px;
+  padding: 20px;
+  color: #aaa;
 }
-
-@keyframes shimmer {
-  0% { background-position: 100% 0; }
-  100% { background-position: -100% 0; }
-}
-
-/* ================= COMPOSER ================= */
 
 .composer-area {
-  position: absolute;
-  bottom: 0;
-  left: 0;
+  position: fixed;
+  left: 270px;
   right: 0;
-  padding: 18px 15px 14px;
+  bottom: 0;
+  padding: 12px 20px 20px;
   background:
     linear-gradient(
+      to bottom,
       transparent,
-      rgba(11,11,15,.95) 35%
+      rgba(33,33,33,.94) 20%
     );
-  z-index: 15;
 }
 
 .composer {
-  width: min(900px, 100%);
+  width: min(900px, calc(100% - 10px));
   margin: 0 auto;
-  border: 1px solid var(--border);
-  background: #15151b;
-  border-radius: 17px;
-  box-shadow: 0 10px 50px rgba(0,0,0,.3);
-  overflow: hidden;
+  border: 1px solid #444;
+  background: #2a2a2a;
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(0,0,0,.25);
+}
+
+.composer textarea {
+  width: 100%;
+  resize: none;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: white;
+  padding: 15px 16px 8px;
+  min-height: 58px;
+  max-height: 180px;
+  line-height: 1.5;
+}
+
+.composer-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 9px 9px;
 }
 
 .composer-tools {
   display: flex;
+  gap: 5px;
   align-items: center;
-  gap: 7px;
-  padding: 8px 9px 0;
 }
 
-.tool {
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--muted);
-  padding: 6px 8px;
-  border-radius: 8px;
-  font-size: 12px;
-}
-
-.tool:hover,
-.tool.active {
-  background: rgba(255,255,255,.07);
-  color: white;
-}
-
-.composer-main {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  padding: 8px;
-}
-
-.prompt {
-  flex: 1;
-  resize: none;
-  min-height: 48px;
-  max-height: 180px;
+.tool-btn {
   border: 0;
-  outline: 0;
   background: transparent;
+  color: #aaa;
+  padding: 7px 9px;
+  border-radius: 7px;
+  font-size: 13px;
+}
+
+.tool-btn:hover {
+  background: #363636;
   color: white;
-  padding: 11px;
-  line-height: 1.5;
 }
 
-.prompt::placeholder {
-  color: #777780;
+.tool-btn.active {
+  color: #10a37f;
+  background: rgba(16,163,127,.12);
 }
 
-.send {
-  width: 42px;
-  height: 42px;
+.send-btn {
+  width: 38px;
+  height: 38px;
   border: 0;
-  border-radius: 11px;
-  background: var(--accent);
-  color: white;
-  font-weight: 700;
+  border-radius: 9px;
+  background: white;
+  color: black;
+  font-weight: 800;
 }
 
-.send:hover {
-  background: var(--accent2);
+.send-btn:hover {
+  opacity: .9;
 }
 
-.send:disabled {
-  opacity: .4;
+.send-btn:disabled {
+  opacity: .35;
   cursor: not-allowed;
 }
 
-.composer-status {
-  padding: 0 12px 8px;
+.notice {
+  text-align: center;
+  color: #666;
   font-size: 11px;
-  color: var(--muted);
+  padding-top: 7px;
 }
 
-/* ================= MODALS / MENUS ================= */
-
-.model-panel {
-  position: absolute;
-  top: 54px;
-  left: 0;
-  width: min(400px, calc(100vw - 30px));
-  max-height: 550px;
-  overflow: hidden;
-  background: #141419;
-  border: 1px solid var(--border);
-  border-radius: 13px;
-  box-shadow: 0 20px 60px rgba(0,0,0,.5);
-  display: none;
-  z-index: 100;
+.typing {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
 }
 
-.model-panel.open {
-  display: block;
+.typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #999;
+  animation: pulse 1s infinite;
 }
 
-.model-search {
-  width: 100%;
-  border: 0;
-  border-bottom: 1px solid var(--border);
-  outline: 0;
-  padding: 12px;
-  background: transparent;
-  color: white;
+.typing span:nth-child(2) {
+  animation-delay: .15s;
 }
 
-.model-filters {
-  display: flex;
-  gap: 6px;
-  padding: 9px;
-  border-bottom: 1px solid var(--border);
+.typing span:nth-child(3) {
+  animation-delay: .3s;
 }
 
-.filter-btn {
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--muted);
-  border-radius: 8px;
-  padding: 6px 9px;
-  font-size: 11px;
+@keyframes pulse {
+  0%,100% { opacity: .3; }
+  50% { opacity: 1; }
 }
 
-.filter-btn.active {
-  color: white;
-  background: rgba(139,124,255,.16);
-  border-color: rgba(139,124,255,.4);
-}
-
-.model-list {
-  max-height: 440px;
-  overflow-y: auto;
-  padding: 7px;
-}
-
-.model-option {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  color: white;
-  padding: 10px;
-  border-radius: 9px;
-  text-align: left;
-}
-
-.model-option:hover,
-.model-option.selected {
-  background: rgba(255,255,255,.07);
-}
-
-.model-name {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.model-id {
-  color: var(--muted);
-  font-size: 10px;
-  margin-top: 3px;
-}
-
-.tier {
-  float: right;
-  font-size: 9px;
-  padding: 3px 5px;
-  border-radius: 5px;
-  background: rgba(117,224,155,.12);
-  color: #75e09b;
-}
-
-/* ================= RESPONSIVE ================= */
-
-@media (max-width: 760px) {
+@media(max-width:800px) {
   .sidebar {
     position: fixed;
-    inset: 0 auto 0 0;
-    transform: translateX(-100%);
-    box-shadow: 20px 0 60px rgba(0,0,0,.4);
+    z-index: 20;
+    left: -280px;
+    top: 0;
+    bottom: 0;
+    transition: left .2s;
   }
 
   .sidebar.open {
-    transform: translateX(0);
+    left: 0;
   }
 
-  .menu-btn {
+  .mobile-menu {
     display: block;
   }
 
+  .composer-area {
+    left: 0;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
   .model-select {
-    min-width: 0;
-    width: 165px;
-    max-width: 165px;
+    min-width: 150px;
+    max-width: 210px;
   }
 
-  .chat-inner {
-    width: calc(100% - 22px);
-    padding-top: 22px;
+  .messages-inner {
+    width: calc(100% - 20px);
   }
 
-  .topbar {
-    padding: 0 9px;
-  }
-
-  .top-actions {
-    gap: 4px;
-  }
-
-  .icon-btn {
-    width: 35px;
-    height: 35px;
+  .welcome-box h1 {
+    font-size: 25px;
   }
 }
 </style>
@@ -722,649 +525,175 @@ a {
 <div class="app">
 
   <aside class="sidebar" id="sidebar">
-    <div class="brand">Aether<span>AI</span></div>
+
+    <div class="brand">
+      <div class="logo">A</div>
+      <div>AetherAI Studio</div>
+    </div>
 
     <button class="new-chat" id="newChat">
-      ＋ New chat
+      + New chat
     </button>
 
-    <div class="history">
-      <div class="history-title">Recent chats</div>
-      <div id="historyList"></div>
+    <div class="sidebar-section">
+      <div class="sidebar-title">Chats</div>
+      <div class="chat-history" id="chatHistory"></div>
     </div>
 
-    <div class="sidebar-footer">
-      Powered by xKiro
+    <div class="sidebar-bottom">
+      <div class="small-status" id="statusText">
+        Connecting to xKiro...
+      </div>
     </div>
+
   </aside>
 
   <main class="main">
 
     <header class="topbar">
 
-      <button class="menu-btn" id="menuBtn">☰</button>
+      <div class="top-left">
 
-      <div class="model-wrap">
-
-        <button class="model-select" id="modelButton">
-          Loading models...
+        <button
+          class="mobile-menu"
+          id="mobileMenu"
+          aria-label="Menu"
+        >
+          ☰
         </button>
 
-        <div class="model-panel" id="modelPanel">
-
-          <input
-            class="model-search"
-            id="modelSearch"
-            placeholder="Search models..."
-          >
-
-          <div class="model-filters">
-            <button class="filter-btn active" data-filter="free">
-              Free
-            </button>
-
-            <button class="filter-btn" data-filter="all">
-              All
-            </button>
-          </div>
-
-          <div class="model-list" id="modelList"></div>
-
+        <div class="title">
+          AetherAI
         </div>
+
+        <select
+          class="model-select"
+          id="modelSelect"
+        >
+          <option>Loading models...</option>
+        </select>
+
       </div>
 
       <div class="top-actions">
 
         <button
           class="icon-btn"
-          id="webSearchBtn"
-          title="Web search"
+          id="refreshModels"
+          title="Refresh models"
         >
-          ◉
-        </button>
-
-        <button
-          class="icon-btn"
-          id="clearBtn"
-          title="Clear current chat"
-        >
-          ×
+          ↻
         </button>
 
       </div>
 
     </header>
 
-    <section class="chat" id="chat">
-      <div class="chat-inner" id="chatInner"></div>
-    </section>
+    <section class="messages" id="messages">
 
-    <div class="composer-area">
+      <div class="messages-inner" id="messagesInner">
 
-      <div class="composer">
+        <div class="welcome" id="welcome">
 
-        <div class="composer-tools">
+          <div class="welcome-box">
 
-          <button class="tool" id="imageBtn">
-            ✦ Image
-          </button>
+            <h1>How can I help?</h1>
 
-          <button class="tool" id="normalBtn">
-            Text
-          </button>
+            <p>
+              Chat with AI, generate images, search the web,
+              and switch between available xKiro models.
+            </p>
 
-          <span
-            id="modeStatus"
-            style="font-size:11px;color:#777;margin-left:auto;padding:6px"
-          >
-            Text mode
-          </span>
+          </div>
 
-        </div>
-
-        <div class="composer-main">
-
-          <textarea
-            id="prompt"
-            class="prompt"
-            rows="1"
-            placeholder="Message AetherAI..."
-          ></textarea>
-
-          <button
-            class="send"
-            id="send"
-            title="Send"
-          >
-            ↑
-          </button>
-
-        </div>
-
-        <div class="composer-status" id="composerStatus">
-          Select a model and start chatting.
         </div>
 
       </div>
 
-    </div>
+    </section>
 
   </main>
 
 </div>
 
+<div class="composer-area">
+
+  <div class="composer">
+
+    <textarea
+      id="input"
+      rows="1"
+      placeholder="Message AetherAI..."
+    ></textarea>
+
+    <div class="composer-bottom">
+
+      <div class="composer-tools">
+
+        <button
+          class="tool-btn"
+          id="webSearch"
+          title="Enable web search"
+        >
+          🌐 Web
+        </button>
+
+        <button
+          class="tool-btn"
+          id="imageMode"
+          title="Generate an image"
+        >
+          ✦ Image
+        </button>
+
+      </div>
+
+      <button
+        class="send-btn"
+        id="send"
+        title="Send"
+      >
+        ↑
+      </button>
+
+    </div>
+
+  </div>
+
+  <div class="notice">
+    AetherAI Studio · Powered by xKiro
+  </div>
+
+</div>
+
+
 <script>
-(() => {
+(function () {
+
   "use strict";
 
-  /* =======================================================
-     STATE
-  ======================================================= */
-
-  const STORAGE_CHATS = "aetherai_chats_v3";
-  const STORAGE_ACTIVE = "aetherai_active_v3";
-  const STORAGE_MODEL = "aetherai_model_v3";
-
-  let models = [];
-  let imageModels = [];
-
-  let selectedModel =
-    localStorage.getItem(STORAGE_MODEL) || "";
-
-  let activeChatId =
-    localStorage.getItem(STORAGE_ACTIVE) || "";
-
-  let chats = loadChats();
-
-  let webSearch = false;
-  let imageMode = false;
-  let generating = false;
-  let modelFilter = "free";
-
-  const $ = (id) => document.getElementById(id);
-
-  /* =======================================================
-     STORAGE
-  ======================================================= */
-
-  function loadChats() {
-    try {
-      const raw = localStorage.getItem(STORAGE_CHATS);
-      if (!raw) return [];
-
-      const parsed = JSON.parse(raw);
-
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }
-
-  function saveChats() {
-    localStorage.setItem(
-      STORAGE_CHATS,
-      JSON.stringify(chats)
-    );
-
-    localStorage.setItem(
-      STORAGE_ACTIVE,
-      activeChatId
-    );
-  }
-
-  function newChatObject() {
-    return {
-      id:
-        crypto.randomUUID
-          ? crypto.randomUUID()
-          : Date.now().toString(),
-
-      title: "New chat",
-
-      messages: [],
-
-      createdAt: Date.now(),
-
-      updatedAt: Date.now()
-    };
-  }
-
-  function ensureChat() {
-    if (activeChatId) {
-      const existing = chats.find(
-        (c) => c.id === activeChatId
-      );
-
-      if (existing) return existing;
-    }
-
-    const chat = newChatObject();
-
-    chats.unshift(chat);
-
-    activeChatId = chat.id;
-
-    saveChats();
-
-    return chat;
-  }
-
-  function activeChat() {
-    return chats.find(
-      (c) => c.id === activeChatId
-    );
-  }
-
-  /* =======================================================
-     MODEL LOADING
-  ======================================================= */
-
-  async function loadModels() {
-    try {
-      const [chatResponse, imageResponse] =
-        await Promise.all([
-          fetch("/api/models?modality=chat"),
-          fetch("/api/models?modality=image")
-        ]);
-
-      if (!chatResponse.ok) {
-        throw new Error("Unable to load chat models");
-      }
-
-      const chatData = await chatResponse.json();
-
-      models = Array.isArray(chatData.data)
-        ? chatData.data
-        : [];
-
-      if (imageResponse.ok) {
-        const imageData =
-          await imageResponse.json();
-
-        imageModels =
-          Array.isArray(imageData.data)
-            ? imageData.data
-            : [];
-      }
-
-      if (!selectedModel) {
-        const free =
-          models.find(
-            (m) => m.access_tier === "free"
-          );
-
-        selectedModel =
-          free?.id ||
-          models[0]?.id ||
-          "";
-      }
-
-      if (
-        selectedModel &&
-        !models.some(
-          (m) => m.id === selectedModel
-        )
-      ) {
-        selectedModel =
-          models.find(
-            (m) => m.access_tier === "free"
-          )?.id ||
-          models[0]?.id ||
-          "";
-      }
-
-      localStorage.setItem(
-        STORAGE_MODEL,
-        selectedModel
-      );
-
-      renderModels();
-      updateModelButton();
-
-      composerStatus(
-        models.length
-          ? models.length +
-            " chat models available."
-          : "No models found."
-      );
-
-    } catch (err) {
-      console.error(err);
-
-      $("modelButton").textContent =
-        "Models unavailable";
-
-      composerStatus(
-        "Could not load xKiro models."
-      );
-    }
-  }
-
-  function modelDisplayName(model) {
-    if (!model) return "Unknown model";
-
-    return (
-      model.name ||
-      model.display_name ||
-      model.id
-    );
-  }
-
-  function renderModels() {
-    const list = $("modelList");
-
-    const query =
-      $("modelSearch").value
-        .trim()
-        .toLowerCase();
-
-    let visible =
-      models.filter((m) => {
-        if (
-          modelFilter === "free" &&
-          m.access_tier !== "free"
-        ) {
-          return false;
-        }
-
-        const haystack =
-          (
-            m.id +
-            " " +
-            modelDisplayName(m)
-          ).toLowerCase();
-
-        return haystack.includes(query);
-      });
-
-    list.innerHTML = "";
-
-    if (!visible.length) {
-      list.innerHTML =
-        '<div style="padding:15px;color:#888;font-size:12px">No matching models.</div>';
-
-      return;
-    }
-
-    for (const model of visible) {
-
-      const button =
-        document.createElement("button");
-
-      button.className =
-        "model-option" +
-        (
-          model.id === selectedModel
-            ? " selected"
-            : ""
-        );
-
-      const tier =
-        model.access_tier || "unknown";
-
-      button.innerHTML = \`
-        <span class="tier">\${escapeHtml(tier)}</span>
-        <div class="model-name">
-          \${escapeHtml(modelDisplayName(model))}
-        </div>
-        <div class="model-id">
-          \${escapeHtml(model.id)}
-        </div>
-      \`;
-
-      button.onclick = () => {
-
-        selectedModel = model.id;
-
-        localStorage.setItem(
-          STORAGE_MODEL,
-          selectedModel
-        );
-
-        updateModelButton();
-        renderModels();
-
-        $("modelPanel")
-          .classList.remove("open");
-
-        composerStatus(
-          "Using " +
-          modelDisplayName(model)
-        );
-      };
-
-      list.appendChild(button);
-    }
-  }
-
-  function updateModelButton() {
-    const model =
-      models.find(
-        (m) => m.id === selectedModel
-      );
-
-    $("modelButton").textContent =
-      model
-        ? modelDisplayName(model)
-        : selectedModel || "Select model";
-  }
-
-  /* =======================================================
-     CHAT RENDERING
-  ======================================================= */
-
-  function renderHistory() {
-    const list = $("historyList");
-
-    list.innerHTML = "";
-
-    const sorted =
-      [...chats].sort(
-        (a, b) =>
-          b.updatedAt - a.updatedAt
-      );
-
-    for (const chat of sorted.slice(0, 50)) {
-
-      const button =
-        document.createElement("button");
-
-      button.className =
-        "chat-item" +
-        (
-          chat.id === activeChatId
-            ? " active"
-            : ""
-        );
-
-      button.textContent =
-        chat.title || "New chat";
-
-      button.onclick = () => {
-
-        activeChatId = chat.id;
-
-        saveChats();
-
-        renderHistory();
-        renderChat();
-
-        $("sidebar")
-          .classList.remove("open");
-      };
-
-      list.appendChild(button);
-    }
-  }
-
-  function renderChat() {
-    const container = $("chatInner");
-
-    container.innerHTML = "";
-
-    const chat = activeChat();
-
-    if (!chat || !chat.messages.length) {
-
-      container.innerHTML = \`
-        <div class="welcome">
-          <div class="welcome-box">
-            <h1>What can I help with?</h1>
-            <p>
-              Ask questions, research topics,
-              write code, or generate images.
-              Choose any available xKiro model above.
-            </p>
-          </div>
-        </div>
-      \`;
-
-      return;
-    }
-
-    for (const message of chat.messages) {
-      appendMessage(message);
-    }
-
-    scrollBottom(false);
-  }
-
-  function appendMessage(message) {
-
-    const container = $("chatInner");
-
-    const wrapper =
-      document.createElement("div");
-
-    wrapper.className =
-      "message " + message.role;
-
-    const avatar =
-      message.role === "user"
-        ? "You"
-        : "AI";
-
-    const body =
-      document.createElement("div");
-
-    body.className =
-      "message-body";
-
-    const content =
-      document.createElement("div");
-
-    content.className =
-      "message-content";
-
-    if (
-      message.type === "image" &&
-      message.imageUrl
-    ) {
-
-      content.innerHTML = \`
-        <img
-          class="generated-image"
-          src="\${escapeAttribute(message.imageUrl)}"
-          alt="Generated image"
-          loading="lazy"
-        >
-      \`;
-
-    } else if (message.streaming) {
-
-      content.innerHTML =
-        renderMarkdown(
-          message.content || "Thinking..."
-        );
-
-    } else {
-
-      content.innerHTML =
-        renderMarkdown(
-          message.content || ""
-        );
-    }
-
-    const role =
-      document.createElement("div");
-
-    role.className =
-      "message-role";
-
-    role.textContent =
-      message.role === "user"
-        ? "You"
-        : (
-          message.model
-            ? "AetherAI · " + message.model
-            : "AetherAI"
-        );
-
-    const actions =
-      document.createElement("div");
-
-    actions.className =
-      "message-actions";
-
-    if (message.role === "assistant") {
-
-      const copy =
-        document.createElement("button");
-
-      copy.innerHTML = "⧉ Copy";
-
-      copy.onclick = async () => {
-
-        const text =
-          message.content || "";
-
-        try {
-
-          await navigator.clipboard.writeText(
-            text
-          );
-
-          copy.textContent =
-            "✓ Copied";
-
-          copy.classList.add(
-            "copy-ok"
-          );
-
-          setTimeout(() => {
-            copy.textContent =
-              "⧉ Copy";
-
-            copy.classList.remove(
-              "copy-ok"
-            );
-          }, 1200);
-
-        } catch {
-
-          copy.textContent =
-            "Copy failed";
-        }
-      };
-
-      actions.appendChild(copy);
-    }
-
-    body.appendChild(role);
-    body.appendChild(content);
-    body.appendChild(actions);
-
-    wrapper.innerHTML =
-      \`<div class="avatar">\${avatar}</div>\`;
-
-    wrapper.appendChild(body);
-
-    container.appendChild(wrapper);
-  }
-
-  /* =======================================================
-     MARKDOWN
-  ======================================================= */
+  var state = {
+    messages: [],
+    histories: [],
+    models: [],
+    imageModels: [],
+    currentChatId: null,
+    webSearch: false,
+    imageMode: false,
+    streaming: false
+  };
+
+  var messagesInner = document.getElementById("messagesInner");
+  var messagesBox = document.getElementById("messages");
+  var input = document.getElementById("input");
+  var sendButton = document.getElementById("send");
+  var modelSelect = document.getElementById("modelSelect");
+  var webSearchButton = document.getElementById("webSearch");
+  var imageModeButton = document.getElementById("imageMode");
+  var historyBox = document.getElementById("chatHistory");
+  var welcome = document.getElementById("welcome");
+  var statusText = document.getElementById("statusText");
+  var sidebar = document.getElementById("sidebar");
 
   function escapeHtml(value) {
     return String(value)
@@ -1376,834 +705,1274 @@ a {
   }
 
   function escapeAttribute(value) {
-    return escapeHtml(value)
-      .replaceAll("`", "&#096;");
+    return escapeHtml(value);
   }
 
-  function renderMarkdown(text) {
+  function markdownToHtml(text) {
 
-    let value =
-      escapeHtml(text || "");
+    var safe = escapeHtml(text);
 
-    const codeBlocks = [];
+    safe = safe.replace(
+      /```([\\s\\S]*?)```/g,
+      function (match, code) {
+        return "<pre><code>" + code + "</code></pre>";
+      }
+    );
 
-    value =
-      value.replace(
-        /```([a-zA-Z0-9_-]*)\n?([\s\S]*?)```/g,
-        (_, lang, code) => {
+    safe = safe.replace(
+      /`([^`]+)`/g,
+      "<code>$1</code>"
+    );
 
-          const index =
-            codeBlocks.length;
+    safe = safe.replace(
+      /^### (.*)$/gm,
+      "<h3>$1</h3>"
+    );
 
-          codeBlocks.push({
-            lang,
-            code
-          });
+    safe = safe.replace(
+      /^## (.*)$/gm,
+      "<h2>$1</h2>"
+    );
 
-          return (
-            "@@CODE" +
-            index +
-            "@@"
-          );
-        }
-      );
+    safe = safe.replace(
+      /^# (.*)$/gm,
+      "<h1>$1</h1>"
+    );
 
-    value =
-      value.replace(
-        /\*\*(.+?)\*\*/g,
-        "<strong>$1</strong>"
-      );
+    safe = safe.replace(
+      /\\*\\*(.*?)\\*\\*/g,
+      "<strong>$1</strong>"
+    );
 
-    value =
-      value.replace(
-        /`([^`]+)`/g,
-        "<code>$1</code>"
-      );
+    safe = safe.replace(
+      /\\*(.*?)\\*/g,
+      "<em>$1</em>"
+    );
 
-    value =
-      value.replace(
-        /$begin:math:display$\(\[\^$end:math:display$]+)\]$begin:math:text$\(https\?\:\\\/\\\/\[\^\)\\s\]\+\)$end:math:text$/g,
-        '<a href="$2" target="_blank" rel="noopener">$1</a>'
-      );
+    safe = safe.replace(
+      /^- (.*)$/gm,
+      "• $1"
+    );
 
-    value =
-      value.replace(
-        /\n\n+/g,
-        "</p><p>"
-      );
+    safe = safe.replace(
+      /\\n\\n+/g,
+      "</p><p>"
+    );
 
-    value =
-      value.replace(
-        /\n/g,
-        "<br>"
-      );
+    safe = safe.replace(
+      /\\n/g,
+      "<br>"
+    );
 
-    value =
-      "<p>" + value + "</p>";
-
-    value =
-      value.replace(
-        /@@CODE(\d+)@@/g,
-        (_, index) => {
-
-          const item =
-            codeBlocks[
-              Number(index)
-            ];
-
-          return (
-            "<pre><code>" +
-            item.code +
-            "</code></pre>"
-          );
-        }
-      );
-
-    return value;
+    return "<p>" + safe + "</p>";
   }
 
-  /* =======================================================
-     SEND TEXT
-  ======================================================= */
-
-  async function sendText(promptText) {
-
-    if (generating) return;
-
-    if (!promptText.trim()) return;
-
-    if (!selectedModel) {
-
-      alert(
-        "Please select an AI model first."
-      );
-
-      return;
-    }
-
-    const chat = ensureChat();
-
-    const userMessage = {
-      role: "user",
-      content: promptText,
-      timestamp: Date.now()
-    };
-
-    chat.messages.push(userMessage);
-
-    if (
-      chat.title === "New chat"
-    ) {
-
-      chat.title =
-        promptText
-          .replace(/\s+/g, " ")
-          .slice(0, 60);
-    }
-
-    chat.updatedAt = Date.now();
-
-    saveChats();
-    renderHistory();
-    renderChat();
-
-    generating = true;
-
-    $("send").disabled = true;
-
-    composerStatus(
-      "Generating with " +
-      selectedModel +
-      "..."
-    );
-
-    const assistantMessage = {
-      role: "assistant",
-      content: "",
-      model: selectedModel,
-      streaming: true,
-      timestamp: Date.now()
-    };
-
-    chat.messages.push(
-      assistantMessage
-    );
-
-    appendMessage(
-      assistantMessage
-    );
-
-    scrollBottom(true);
+  function saveState() {
 
     try {
 
-      const response =
+      localStorage.setItem(
+        "aether_messages",
+        JSON.stringify(state.messages)
+      );
+
+      localStorage.setItem(
+        "aether_histories",
+        JSON.stringify(state.histories)
+      );
+
+    } catch (error) {
+
+      console.warn("Could not save state", error);
+
+    }
+  }
+
+  function loadState() {
+
+    try {
+
+      var messages =
+        localStorage.getItem("aether_messages");
+
+      var histories =
+        localStorage.getItem("aether_histories");
+
+      if (messages) {
+        state.messages = JSON.parse(messages);
+      }
+
+      if (histories) {
+        state.histories = JSON.parse(histories);
+      }
+
+    } catch (error) {
+
+      console.warn("Could not load state", error);
+
+    }
+  }
+
+  function createId() {
+
+    return (
+      Date.now().toString(36) +
+      Math.random().toString(36).slice(2)
+    );
+
+  }
+
+  function scrollBottom() {
+
+    messagesBox.scrollTop =
+      messagesBox.scrollHeight;
+
+  }
+
+  function clearWelcome() {
+
+    if (welcome) {
+      welcome.remove();
+      welcome = null;
+    }
+
+  }
+
+  function addUserMessage(text) {
+
+    clearWelcome();
+
+    var wrapper =
+      document.createElement("div");
+
+    wrapper.className =
+      "message";
+
+    wrapper.innerHTML =
+      '<div class="avatar user-avatar">U</div>' +
+      '<div class="message-main">' +
+      '<div class="message-header">You</div>' +
+      '<div class="message-content">' +
+      markdownToHtml(text) +
+      '</div>' +
+      '</div>';
+
+    messagesInner.appendChild(wrapper);
+
+    scrollBottom();
+
+  }
+
+  function addAssistantMessage(initialText) {
+
+    clearWelcome();
+
+    var wrapper =
+      document.createElement("div");
+
+    wrapper.className =
+      "message";
+
+    var content =
+      document.createElement("div");
+
+    content.className =
+      "message-content";
+
+    content.innerHTML =
+      initialText
+        ? markdownToHtml(initialText)
+        : '<div class="typing">' +
+          '<span></span><span></span><span></span>' +
+          '</div>';
+
+    var actions =
+      document.createElement("div");
+
+    actions.className =
+      "message-actions";
+
+    var copy =
+      document.createElement("button");
+
+    copy.className =
+      "message-action";
+
+    copy.textContent =
+      "Copy";
+
+    copy.addEventListener(
+      "click",
+      function () {
+
+        var text =
+          content.innerText || "";
+
+        navigator.clipboard
+          .writeText(text)
+          .then(function () {
+
+            copy.textContent =
+              "Copied";
+
+            setTimeout(
+              function () {
+                copy.textContent =
+                  "Copy";
+              },
+              1200
+            );
+
+          });
+
+      }
+    );
+
+    actions.appendChild(copy);
+
+    wrapper.innerHTML =
+      '<div class="avatar ai-avatar">A</div>' +
+      '<div class="message-main">' +
+      '<div class="message-header">AetherAI</div>' +
+      '</div>';
+
+    var main =
+      wrapper.querySelector(".message-main");
+
+    main.appendChild(content);
+    main.appendChild(actions);
+
+    messagesInner.appendChild(wrapper);
+
+    scrollBottom();
+
+    return {
+      wrapper: wrapper,
+      content: content,
+      actions: actions
+    };
+
+  }
+
+  function addImageMessage(url) {
+
+    clearWelcome();
+
+    var wrapper =
+      document.createElement("div");
+
+    wrapper.className =
+      "message";
+
+    wrapper.innerHTML =
+      '<div class="avatar ai-avatar">A</div>' +
+      '<div class="message-main">' +
+      '<div class="message-header">AetherAI</div>' +
+      '<div class="message-content"></div>' +
+      '</div>';
+
+    var content =
+      wrapper.querySelector(".message-content");
+
+    var image =
+      document.createElement("img");
+
+    image.className =
+      "generated-image";
+
+    image.src =
+      url;
+
+    image.alt =
+      "Generated image";
+
+    content.appendChild(image);
+
+    var actions =
+      document.createElement("div");
+
+    actions.className =
+      "message-actions";
+
+    var copy =
+      document.createElement("button");
+
+    copy.className =
+      "message-action";
+
+    copy.textContent =
+      "Copy image URL";
+
+    copy.addEventListener(
+      "click",
+      function () {
+
+        navigator.clipboard
+          .writeText(url)
+          .then(function () {
+
+            copy.textContent =
+              "Copied";
+
+            setTimeout(
+              function () {
+                copy.textContent =
+                  "Copy image URL";
+              },
+              1200
+            );
+
+          });
+
+      }
+    );
+
+    actions.appendChild(copy);
+
+    wrapper
+      .querySelector(".message-main")
+      .appendChild(actions);
+
+    messagesInner.appendChild(wrapper);
+
+    scrollBottom();
+
+  }
+
+  function addImageLoading() {
+
+    clearWelcome();
+
+    var wrapper =
+      document.createElement("div");
+
+    wrapper.className =
+      "message";
+
+    wrapper.innerHTML =
+      '<div class="avatar ai-avatar">A</div>' +
+      '<div class="message-main">' +
+      '<div class="message-header">AetherAI</div>' +
+      '<div class="message-content">' +
+      '<div class="image-loading">' +
+      'Generating image...' +
+      '</div>' +
+      '</div>' +
+      '</div>';
+
+    messagesInner.appendChild(wrapper);
+
+    scrollBottom();
+
+    return wrapper;
+
+  }
+
+  function renderHistory() {
+
+    historyBox.innerHTML = "";
+
+    state.histories
+      .slice()
+      .reverse()
+      .forEach(function (item) {
+
+        var div =
+          document.createElement("div");
+
+        div.className =
+          "history-item";
+
+        div.textContent =
+          item.title || "New chat";
+
+        div.addEventListener(
+          "click",
+          function () {
+
+            loadConversation(item.id);
+
+          }
+        );
+
+        historyBox.appendChild(div);
+
+      });
+
+  }
+
+  function loadConversation(id) {
+
+    var found =
+      state.histories.find(
+        function (item) {
+          return item.id === id;
+        }
+      );
+
+    if (!found) {
+      return;
+    }
+
+    state.currentChatId =
+      found.id;
+
+    state.messages =
+      found.messages || [];
+
+    messagesInner.innerHTML = "";
+
+    if (!state.messages.length) {
+
+      messagesInner.innerHTML =
+        '<div class="welcome" id="welcome">' +
+        '<div class="welcome-box">' +
+        '<h1>How can I help?</h1>' +
+        '<p>' +
+        'Chat with AI, generate images, search the web, ' +
+        'and switch between available xKiro models.' +
+        '</p>' +
+        '</div>' +
+        '</div>';
+
+      welcome =
+        document.getElementById("welcome");
+
+    } else {
+
+      state.messages.forEach(
+        function (message) {
+
+          if (message.role === "user") {
+            addUserMessage(
+              message.content
+            );
+          }
+
+          if (message.role === "assistant") {
+            addAssistantMessage(
+              message.content
+            );
+          }
+
+          if (message.role === "image") {
+            addImageMessage(
+              message.url
+            );
+          }
+
+        }
+      );
+
+    }
+
+    renderHistory();
+
+  }
+
+  function saveCurrentConversation() {
+
+    if (!state.currentChatId) {
+
+      state.currentChatId =
+        createId();
+
+      state.histories.push({
+        id: state.currentChatId,
+        title: "New chat",
+        messages: []
+      });
+
+    }
+
+    var current =
+      state.histories.find(
+        function (item) {
+          return item.id === state.currentChatId;
+        }
+      );
+
+    if (!current) {
+      return;
+    }
+
+    current.messages =
+      state.messages;
+
+    var firstUser =
+      state.messages.find(
+        function (item) {
+          return item.role === "user";
+        }
+      );
+
+    if (firstUser) {
+
+      current.title =
+        String(firstUser.content)
+          .slice(0, 45);
+
+    }
+
+    saveState();
+    renderHistory();
+
+  }
+
+  function newChat() {
+
+    state.currentChatId =
+      createId();
+
+    state.messages = [];
+
+    messagesInner.innerHTML =
+      '<div class="welcome" id="welcome">' +
+      '<div class="welcome-box">' +
+      '<h1>How can I help?</h1>' +
+      '<p>' +
+      'Chat with AI, generate images, search the web, ' +
+      'and switch between available xKiro models.' +
+      '</p>' +
+      '</div>' +
+      '</div>';
+
+    welcome =
+      document.getElementById("welcome");
+
+    saveCurrentConversation();
+
+  }
+
+  async function loadModels() {
+
+    statusText.textContent =
+      "Loading xKiro models...";
+
+    try {
+
+      var response =
+        await fetch("/api/models?modality=chat");
+
+      if (!response.ok) {
+        throw new Error(
+          "Model request failed"
+        );
+      }
+
+      var data =
+        await response.json();
+
+      state.models =
+        Array.isArray(data.data)
+          ? data.data
+          : [];
+
+      modelSelect.innerHTML = "";
+
+      var freeModels =
+        state.models.filter(
+          function (model) {
+            return (
+              String(model.access_tier || "")
+                .toLowerCase() === "free"
+            );
+          }
+        );
+
+      var allModels =
+        state.models;
+
+      var groups = [
+        {
+          label: "Free models",
+          models: freeModels
+        },
+        {
+          label: "All models",
+          models: allModels
+        }
+      ];
+
+      var added =
+        {};
+
+      groups.forEach(
+        function (group) {
+
+          if (!group.models.length) {
+            return;
+          }
+
+          var optgroup =
+            document.createElement("optgroup");
+
+          optgroup.label =
+            group.label;
+
+          group.models.forEach(
+            function (model) {
+
+              var id =
+                model.id;
+
+              if (!id || added[id]) {
+                return;
+              }
+
+              added[id] =
+                true;
+
+              var option =
+                document.createElement("option");
+
+              option.value =
+                id;
+
+              option.textContent =
+                id +
+                (
+                  model.access_tier
+                    ? " · " +
+                      model.access_tier
+                    : ""
+                );
+
+              optgroup.appendChild(
+                option
+              );
+
+            }
+          );
+
+          modelSelect.appendChild(
+            optgroup
+          );
+
+        }
+      );
+
+      if (!modelSelect.options.length) {
+
+        var fallback =
+          document.createElement("option");
+
+        fallback.value =
+          "openai/gpt-5.6-sol";
+
+        fallback.textContent =
+          "openai/gpt-5.6-sol";
+
+        modelSelect.appendChild(
+          fallback
+        );
+
+      }
+
+      statusText.textContent =
+        freeModels.length +
+        " free · " +
+        allModels.length +
+        " total models";
+
+    } catch (error) {
+
+      console.error(error);
+
+      statusText.textContent =
+        "Could not load models";
+
+      modelSelect.innerHTML =
+        '<option value="openai/gpt-5.6-sol">' +
+        'openai/gpt-5.6-sol' +
+        '</option>';
+
+    }
+
+  }
+
+  async function loadImageModels() {
+
+    try {
+
+      var response =
+        await fetch("/api/models?modality=image");
+
+      if (!response.ok) {
+        return;
+      }
+
+      var data =
+        await response.json();
+
+      state.imageModels =
+        Array.isArray(data.data)
+          ? data.data
+          : [];
+
+    } catch (error) {
+
+      console.warn(
+        "Image models unavailable",
+        error
+      );
+
+    }
+
+  }
+
+  async function sendText() {
+
+    var text =
+      input.value.trim();
+
+    if (!text || state.streaming) {
+      return;
+    }
+
+    var selectedModel =
+      modelSelect.value;
+
+    input.value = "";
+    resizeTextarea();
+
+    state.streaming =
+      true;
+
+    sendButton.disabled =
+      true;
+
+    addUserMessage(text);
+
+    state.messages.push({
+      role: "user",
+      content: text
+    });
+
+    saveCurrentConversation();
+
+    if (state.imageMode) {
+
+      await generateImage(text);
+
+      state.streaming =
+        false;
+
+      sendButton.disabled =
+        false;
+
+      return;
+
+    }
+
+    var assistant =
+      addAssistantMessage("");
+
+    var accumulated =
+      "";
+
+    try {
+
+      var response =
         await fetch("/api/chat", {
           method: "POST",
-
           headers: {
-            "Content-Type":
-              "application/json"
+            "Content-Type": "application/json"
           },
-
           body: JSON.stringify({
             model: selectedModel,
-            messages:
-              chat.messages
-                .filter(
-                  (m) =>
-                    m.role === "user" ||
-                    m.role === "assistant"
-                )
-                .filter(
-                  (m) =>
-                    m.type !== "image"
-                )
-                .map((m) => ({
-                  role: m.role,
-                  content: m.content
-                })),
-
-            webSearch
+            messages: state.messages
+              .filter(function (message) {
+                return (
+                  message.role === "user" ||
+                  message.role === "assistant"
+                );
+              }),
+            web_search: state.webSearch
           })
         });
 
       if (!response.ok) {
 
-        let errorText =
-          "Request failed.";
-
-        try {
-
-          const data =
-            await response.json();
-
-          errorText =
-            data.error ||
-            errorText;
-
-        } catch {}
+        var errorText =
+          await response.text();
 
         throw new Error(
-          errorText
+          errorText ||
+          "Chat request failed"
         );
+
       }
 
       if (!response.body) {
         throw new Error(
-          "No streaming response."
+          "Streaming is not supported by this response"
         );
       }
 
-      const reader =
+      var reader =
         response.body.getReader();
 
-      const decoder =
+      var decoder =
         new TextDecoder();
 
-      let buffer = "";
+      var buffer =
+        "";
 
       while (true) {
 
-        const {
-          value,
-          done
-        } = await reader.read();
+        var result =
+          await reader.read();
 
-        if (done) break;
+        if (result.done) {
+          break;
+        }
 
         buffer +=
           decoder.decode(
-            value,
-            {
-              stream: true
-            }
+            result.value,
+            { stream: true }
           );
 
-        const parts =
-          buffer.split("\n");
+        var lines =
+          buffer.split("\\n");
 
         buffer =
-          parts.pop() || "";
+          lines.pop() || "";
 
-        for (const line of parts) {
+        for (
+          var i = 0;
+          i < lines.length;
+          i++
+        ) {
 
-          if (
-            !line.startsWith(
-              "data:"
-            )
-          ) continue;
+          var line =
+            lines[i].trim();
 
-          const data =
-            line.slice(5).trim();
+          if (!line) {
+            continue;
+          }
 
-          if (
-            !data ||
-            data === "[DONE]"
-          ) continue;
+          if (line.indexOf("data:") === 0) {
 
-          try {
+            var payload =
+              line.slice(5).trim();
 
-            const parsed =
-              JSON.parse(data);
-
-            const delta =
-              parsed?.choices?.[0]
-                ?.delta?.content;
-
-            if (delta) {
-
-              assistantMessage.content +=
-                delta;
-
-              refreshLastAssistant(
-                assistantMessage
-              );
-
-              scrollBottom(true);
+            if (payload === "[DONE]") {
+              continue;
             }
 
-          } catch {
-            // Ignore malformed SSE chunks.
+            try {
+
+              var json =
+                JSON.parse(payload);
+
+              var delta =
+                extractDelta(json);
+
+              if (delta) {
+
+                accumulated +=
+                  delta;
+
+                assistant.content.innerHTML =
+                  markdownToHtml(
+                    accumulated
+                  );
+
+                scrollBottom();
+
+              }
+
+            } catch (parseError) {
+
+              console.warn(
+                "SSE parse error",
+                parseError
+              );
+
+            }
+
           }
+
         }
+
       }
 
-      assistantMessage.streaming =
-        false;
+      if (!accumulated) {
 
-      chat.updatedAt =
-        Date.now();
+        accumulated =
+          "The model returned an empty response.";
 
-      saveChats();
+        assistant.content.innerHTML =
+          markdownToHtml(
+            accumulated
+          );
 
-      refreshLastAssistant(
-        assistantMessage
-      );
+      }
 
-      renderHistory();
+      state.messages.push({
+        role: "assistant",
+        content: accumulated
+      });
 
-      composerStatus(
-        "Ready"
-      );
+      saveCurrentConversation();
 
     } catch (error) {
 
-      assistantMessage.streaming =
-        false;
+      console.error(error);
 
-      assistantMessage.content =
+      var errorMessage =
         "Error: " +
-        error.message;
+        (
+          error.message ||
+          "Unknown error"
+        );
 
-      refreshLastAssistant(
-        assistantMessage
-      );
-
-      saveChats();
-
-      composerStatus(
-        "Request failed."
-      );
+      assistant.content.innerHTML =
+        markdownToHtml(
+          errorMessage
+        );
 
     } finally {
 
-      generating = false;
-
-      $("send").disabled =
+      state.streaming =
         false;
+
+      sendButton.disabled =
+        false;
+
+      scrollBottom();
+
     }
+
   }
 
-  function refreshLastAssistant(
-    message
-  ) {
-
-    const messages =
-      $("chatInner")
-        .querySelectorAll(
-          ".message.assistant"
-        );
-
-    const last =
-      messages[messages.length - 1];
-
-    if (!last) return;
-
-    const content =
-      last.querySelector(
-        ".message-content"
-      );
-
-    if (!content) return;
-
-    content.innerHTML =
-      renderMarkdown(
-        message.content
-      );
-  }
-
-  /* =======================================================
-     IMAGE GENERATION
-  ======================================================= */
-
-  async function generateImage(
-    promptText
-  ) {
-
-    if (generating) return;
-
-    const chat = ensureChat();
-
-    chat.messages.push({
-      role: "user",
-      content: promptText,
-      timestamp: Date.now()
-    });
+  function extractDelta(data) {
 
     if (
-      chat.title === "New chat"
+      data &&
+      data.choices &&
+      data.choices[0]
     ) {
 
-      chat.title =
-        promptText
-          .replace(/\s+/g, " ")
-          .slice(0, 60);
+      var choice =
+        data.choices[0];
+
+      if (
+        choice.delta &&
+        typeof choice.delta.content ===
+        "string"
+      ) {
+        return choice.delta.content;
+      }
+
+      if (
+        typeof choice.text ===
+        "string"
+      ) {
+        return choice.text;
+      }
+
     }
 
-    saveChats();
-    renderHistory();
-    renderChat();
+    if (
+      data &&
+      typeof data.content ===
+      "string"
+    ) {
+      return data.content;
+    }
 
-    generating = true;
+    return "";
 
-    $("send").disabled = true;
+  }
 
-    composerStatus(
-      "Creating image..."
-    );
+  async function generateImage(prompt) {
 
-    const placeholder = {
-      role: "assistant",
-      content: "Generating image...",
-      type: "image-loading",
-      streaming: true,
-      timestamp: Date.now()
-    };
+    var loading =
+      addImageLoading();
 
-    chat.messages.push(
-      placeholder
-    );
+    var model =
+      "";
 
-    appendMessage(
-      placeholder
-    );
+    if (state.imageModels.length) {
+
+      var freeImage =
+        state.imageModels.find(
+          function (item) {
+            return (
+              String(item.access_tier || "")
+                .toLowerCase() === "free"
+            );
+          }
+        );
+
+      model =
+        freeImage
+          ? freeImage.id
+          : state.imageModels[0].id;
+
+    }
 
     try {
 
-      const model =
-        imageModels.find(
-          (m) =>
-            m.access_tier === "free"
-        ) ||
-        imageModels[0];
+      var response =
+        await fetch("/api/images", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            prompt: prompt,
+            model: model
+          })
+        });
 
-      if (!model) {
+      if (!response.ok) {
+
+        var errorText =
+          await response.text();
+
         throw new Error(
-          "No image model is available."
+          errorText ||
+          "Image generation request failed"
         );
+
       }
 
-      const createResponse =
-        await fetch(
-          "/api/images",
-          {
-            method: "POST",
+      var data =
+        await response.json();
 
-            headers: {
-              "Content-Type":
-                "application/json"
-            },
-
-            body: JSON.stringify({
-              prompt: promptText,
-              model: model.id,
-              size: "1024x1024"
-            })
-          }
+      var jobId =
+        data.id ||
+        data.job_id ||
+        (
+          data.data &&
+          data.data.id
         );
-
-      const createData =
-        await createResponse.json();
-
-      if (!createResponse.ok) {
-        throw new Error(
-          errorText(createData)
-        );
-      }
-
-      const jobId =
-        createData.id;
 
       if (!jobId) {
-        throw new Error(
-          "Image job ID was not returned."
-        );
-      }
 
-      let job = null;
+        var directUrl =
+          findImageUrl(data);
 
-      const deadline =
-        Date.now() + 5 * 60 * 1000;
+        if (directUrl) {
 
-      let waitMs = 2000;
+          loading.remove();
 
-      while (
-        Date.now() < deadline
-      ) {
-
-        await sleep(waitMs);
-
-        waitMs =
-          Math.min(
-            Math.round(
-              waitMs * 1.5
-            ),
-            10000
+          addImageMessage(
+            directUrl
           );
 
-        const poll =
-          await fetch(
-            "/api/images/" +
-            encodeURIComponent(
-              jobId
-            )
-          );
+          state.messages.push({
+            role: "image",
+            url: directUrl
+          });
 
-        const data =
-          await poll.json();
+          saveCurrentConversation();
 
-        if (!poll.ok) {
-          throw new Error(
-            errorText(data)
-          );
+          return;
+
         }
 
-        job = data;
-
-        if (
-          job.status ===
-          "succeeded"
-        ) break;
-
-        if (
-          job.status === "failed" ||
-          job.status === "blocked"
-        ) {
-
-          throw new Error(
-            errorText(job) ||
-            job.status
-          );
-        }
-      }
-
-      if (
-        !job ||
-        job.status !== "succeeded"
-      ) {
-
         throw new Error(
-          "Image generation timed out."
-        );
-      }
-
-      const imageUrl =
-        job.data?.[0]?.url;
-
-      if (!imageUrl) {
-        throw new Error(
-          "No image URL returned."
-        );
-      }
-
-      const index =
-        chat.messages.indexOf(
-          placeholder
+          "No image job ID was returned"
         );
 
-      if (index !== -1) {
-
-        chat.messages[index] = {
-          role: "assistant",
-          content: "",
-          type: "image",
-          imageUrl,
-          model: model.id,
-          timestamp: Date.now()
-        };
       }
 
-      chat.updatedAt =
-        Date.now();
+      var imageUrl =
+        await pollImage(jobId);
 
-      saveChats();
+      loading.remove();
 
-      renderChat();
-
-      composerStatus(
-        "Image generated."
+      addImageMessage(
+        imageUrl
       );
+
+      state.messages.push({
+        role: "image",
+        url: imageUrl
+      });
+
+      saveCurrentConversation();
 
     } catch (error) {
 
-      placeholder.type =
-        undefined;
+      loading.remove();
 
-      placeholder.streaming =
-        false;
+      var failed =
+        addAssistantMessage("");
 
-      placeholder.content =
-        "Image error: " +
-        error.message;
+      failed.content.innerHTML =
+        markdownToHtml(
+          "Image generation error: " +
+          (
+            error.message ||
+            "Unknown error"
+          )
+        );
 
-      saveChats();
-
-      renderChat();
-
-      composerStatus(
-        "Image generation failed."
-      );
-
-    } finally {
-
-      generating = false;
-
-      $("send").disabled =
-        false;
     }
+
   }
 
-  function errorText(data) {
+  function findImageUrl(data) {
 
-    return (
-      data?.error?.message ||
-      data?.error ||
-      data?.message ||
-      "Request failed."
+    if (!data) {
+      return "";
+    }
+
+    if (
+      typeof data.url ===
+      "string"
+    ) {
+      return data.url;
+    }
+
+    if (
+      typeof data.image_url ===
+      "string"
+    ) {
+      return data.image_url;
+    }
+
+    if (
+      Array.isArray(data.data)
+    ) {
+
+      for (
+        var i = 0;
+        i < data.data.length;
+        i++
+      ) {
+
+        var item =
+          data.data[i];
+
+        if (
+          item &&
+          typeof item.url ===
+          "string"
+        ) {
+          return item.url;
+        }
+
+      }
+
+    }
+
+    return "";
+
+  }
+
+  async function pollImage(jobId) {
+
+    var maxAttempts =
+      120;
+
+    for (
+      var attempt = 0;
+      attempt < maxAttempts;
+      attempt++
+    ) {
+
+      await sleep(2000);
+
+      var response =
+        await fetch(
+          "/api/images/" +
+          encodeURIComponent(jobId)
+        );
+
+      if (!response.ok) {
+
+        var text =
+          await response.text();
+
+        throw new Error(
+          text ||
+          "Image status request failed"
+        );
+
+      }
+
+      var data =
+        await response.json();
+
+      var url =
+        findImageUrl(data);
+
+      if (url) {
+        return url;
+      }
+
+      var status =
+        String(
+          data.status ||
+          (
+            data.data &&
+            data.data.status
+          ) ||
+          ""
+        ).toLowerCase();
+
+      if (
+        status === "failed" ||
+        status === "error" ||
+        status === "cancelled"
+      ) {
+
+        throw new Error(
+          data.error ||
+          "Image generation failed"
+        );
+
+      }
+
+    }
+
+    throw new Error(
+      "Image generation timed out"
     );
+
   }
 
   function sleep(ms) {
+
     return new Promise(
-      (resolve) =>
+      function (resolve) {
         setTimeout(
           resolve,
           ms
-        )
-    );
-  }
-
-  /* =======================================================
-     UI
-  ======================================================= */
-
-  function composerStatus(text) {
-    $("composerStatus")
-      .textContent = text;
-  }
-
-  function scrollBottom(force) {
-
-    const chat =
-      $("chat");
-
-    if (
-      force ||
-      chat.scrollHeight -
-        chat.scrollTop -
-        chat.clientHeight <
-        500
-    ) {
-
-      requestAnimationFrame(() => {
-        chat.scrollTop =
-          chat.scrollHeight;
-      });
-    }
-  }
-
-  $("newChat").onclick = () => {
-
-    const chat =
-      newChatObject();
-
-    chats.unshift(chat);
-
-    activeChatId =
-      chat.id;
-
-    saveChats();
-
-    renderHistory();
-    renderChat();
-  };
-
-  $("clearBtn").onclick = () => {
-
-    const chat =
-      activeChat();
-
-    if (!chat) return;
-
-    chat.messages = [];
-
-    chat.title = "New chat";
-
-    chat.updatedAt =
-      Date.now();
-
-    saveChats();
-
-    renderHistory();
-    renderChat();
-  };
-
-  $("modelButton").onclick =
-    (event) => {
-
-      event.stopPropagation();
-
-      $("modelPanel")
-        .classList.toggle(
-          "open"
         );
-    };
-
-  document.addEventListener(
-    "click",
-    (event) => {
-
-      if (
-        !$("modelPanel")
-          .contains(event.target) &&
-        event.target !==
-          $("modelButton")
-      ) {
-
-        $("modelPanel")
-          .classList.remove(
-            "open"
-          );
       }
-    }
+    );
+
+  }
+
+  function resizeTextarea() {
+
+    input.style.height =
+      "auto";
+
+    input.style.height =
+      Math.min(
+        input.scrollHeight,
+        180
+      ) + "px";
+
+  }
+
+  input.addEventListener(
+    "input",
+    resizeTextarea
   );
 
-  $("modelSearch").oninput =
-    renderModels;
-
-  document
-    .querySelectorAll(
-      ".filter-btn"
-    )
-    .forEach((button) => {
-
-      button.onclick = () => {
-
-        modelFilter =
-          button.dataset.filter;
-
-        document
-          .querySelectorAll(
-            ".filter-btn"
-          )
-          .forEach(
-            (b) =>
-              b.classList.remove(
-                "active"
-              )
-          );
-
-        button.classList.add(
-          "active"
-        );
-
-        renderModels();
-      };
-    });
-
-  $("webSearchBtn").onclick =
-    () => {
-
-      webSearch =
-        !webSearch;
-
-      $("webSearchBtn")
-        .classList.toggle(
-          "search-active",
-          webSearch
-        );
-
-      composerStatus(
-        webSearch
-          ? "Web search enabled."
-          : "Web search disabled."
-      );
-    };
-
-  $("imageBtn").onclick =
-    () => {
-
-      imageMode = true;
-
-      $("imageBtn")
-        .classList.add("active");
-
-      $("normalBtn")
-        .classList.remove("active");
-
-      $("modeStatus")
-        .textContent =
-        "Image mode";
-
-      $("prompt").placeholder =
-        "Describe the image you want...";
-    };
-
-  $("normalBtn").onclick =
-    () => {
-
-      imageMode = false;
-
-      $("normalBtn")
-        .classList.add("active");
-
-      $("imageBtn")
-        .classList.remove("active");
-
-      $("modeStatus")
-        .textContent =
-        "Text mode";
-
-      $("prompt").placeholder =
-        "Message AetherAI...";
-    };
-
-  $("menuBtn").onclick =
-    () => {
-
-      $("sidebar")
-        .classList.toggle(
-          "open"
-        );
-    };
-
-  $("send").onclick =
-    submitPrompt;
-
-  $("prompt").addEventListener(
+  input.addEventListener(
     "keydown",
-    (event) => {
+    function (event) {
 
       if (
         event.key === "Enter" &&
@@ -2212,525 +1981,698 @@ a {
 
         event.preventDefault();
 
-        submitPrompt();
+        sendText();
+
       }
+
     }
   );
 
-  $("prompt").addEventListener(
-    "input",
-    () => {
+  sendButton.addEventListener(
+    "click",
+    sendText
+  );
 
-      const textarea =
-        $("prompt");
+  document
+    .getElementById("newChat")
+    .addEventListener(
+      "click",
+      newChat
+    );
 
-      textarea.style.height =
-        "auto";
+  document
+    .getElementById("refreshModels")
+    .addEventListener(
+      "click",
+      function () {
+        loadModels();
+        loadImageModels();
+      }
+    );
 
-      textarea.style.height =
-        Math.min(
-          textarea.scrollHeight,
-          180
-        ) + "px";
+  document
+    .getElementById("mobileMenu")
+    .addEventListener(
+      "click",
+      function () {
+        sidebar.classList.toggle(
+          "open"
+        );
+      }
+    );
+
+  webSearchButton.addEventListener(
+    "click",
+    function () {
+
+      state.webSearch =
+        !state.webSearch;
+
+      webSearchButton.classList.toggle(
+        "active",
+        state.webSearch
+      );
+
     }
   );
 
-  function submitPrompt() {
+  imageModeButton.addEventListener(
+    "click",
+    function () {
 
-    if (generating) return;
+      state.imageMode =
+        !state.imageMode;
 
-    const prompt =
-      $("prompt").value.trim();
+      imageModeButton.classList.toggle(
+        "active",
+        state.imageMode
+      );
 
-    if (!prompt) return;
+      if (state.imageMode) {
 
-    $("prompt").value = "";
+        input.placeholder =
+          "Describe the image you want...";
 
-    $("prompt").style.height =
-      "auto";
+      } else {
 
-    if (imageMode) {
-      generateImage(prompt);
-    } else {
-      sendText(prompt);
+        input.placeholder =
+          "Message AetherAI...";
+
+      }
+
     }
-  }
+  );
 
-  /* =======================================================
-     INIT
-  ======================================================= */
-
-  ensureChat();
+  loadState();
 
   renderHistory();
-  renderChat();
 
   loadModels();
+
+  loadImageModels();
 
 })();
 </script>
 
 </body>
-</html>`;
+</html>
+`;
 
-/* =========================================================
-   API ROUTES
-========================================================= */
 
-async function handleModels(request, env, url) {
+// ============================================================
+// Helpers
+// ============================================================
 
-  const apiKey = getApiKey(env);
+function json(data, status = 200) {
 
-  /*
-   xKiro's model catalog is public, but using the same
-   gateway here keeps the frontend simple.
-  */
+  return new Response(
+    JSON.stringify(data),
+    {
+      status,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store"
+      }
+    }
+  );
 
-  const modality =
-    url.searchParams.get("modality") ||
-    "chat";
+}
 
-  const target =
-    getBaseUrl(env) +
-    "/models?modality=" +
-    encodeURIComponent(modality);
+function errorResponse(message, status = 500) {
 
-  const headers = {};
+  return json(
+    {
+      error: message
+    },
+    status
+  );
 
-  if (apiKey) {
-    headers.Authorization =
-      "Bearer " + apiKey;
+}
+
+function getBaseUrl(env) {
+
+  return (
+    env.XKIRO_BASE_URL ||
+    "https://api.xkiro.com/v1"
+  ).replace(/\/+$/, "");
+
+}
+
+function getApiKey(env) {
+
+  return (
+    env.XKIRO_API_KEY ||
+    ""
+  ).trim();
+
+}
+
+function requireApiKey(env) {
+
+  var key =
+    getApiKey(env);
+
+  if (!key) {
+
+    throw new Error(
+      "XKIRO_API_KEY is not configured."
+    );
+
   }
 
-  const response =
-    await fetch(target, {
-      headers
-    });
+  return key;
 
-  const text =
+}
+
+async function xkiroFetch(
+  env,
+  path,
+  options = {}
+) {
+
+  var apiKey =
+    requireApiKey(env);
+
+  var base =
+    getBaseUrl(env);
+
+  var headers =
+    new Headers(
+      options.headers || {}
+    );
+
+  headers.set(
+    "Authorization",
+    "Bearer " + apiKey
+  );
+
+  headers.set(
+    "x-api-key",
+    apiKey
+  );
+
+  if (!headers.has("Accept")) {
+
+    headers.set(
+      "Accept",
+      "application/json"
+    );
+
+  }
+
+  return fetch(
+    base + path,
+    {
+      ...options,
+      headers
+    }
+  );
+
+}
+
+
+// ============================================================
+// Models
+// ============================================================
+
+async function handleModels(
+  request,
+  env
+) {
+
+  var url =
+    new URL(request.url);
+
+  var modality =
+    url.searchParams.get(
+      "modality"
+    );
+
+  var endpoint =
+    "/models";
+
+  if (modality) {
+
+    endpoint +=
+      "?modality=" +
+      encodeURIComponent(
+        modality
+      );
+
+  }
+
+  var response =
+    await xkiroFetch(
+      env,
+      endpoint
+    );
+
+  var body =
     await response.text();
 
-  return withCors(
-    new Response(text, {
+  return new Response(
+    body,
+    {
       status: response.status,
       headers: {
         "Content-Type":
           response.headers.get(
             "Content-Type"
           ) ||
-          "application/json"
+          "application/json",
+        "Cache-Control":
+          "no-store"
       }
-    })
+    }
   );
+
 }
+
+
+// ============================================================
+// Chat
+// ============================================================
 
 async function handleChat(
   request,
   env
 ) {
 
-  const apiKey =
-    getApiKey(env);
-
-  if (!apiKey) {
-
-    return withCors(
-      json({
-        error:
-          "XKIRO_API_KEY is not configured."
-      }, 500)
-    );
-  }
-
-  let body;
+  var body;
 
   try {
-    body = await request.json();
-  } catch {
 
-    return withCors(
-      json({
-        error:
-          "Invalid JSON request."
-      }, 400)
+    body =
+      await request.json();
+
+  } catch (error) {
+
+    return errorResponse(
+      "Invalid JSON request.",
+      400
     );
+
   }
 
-  const model =
+  var model =
     body.model ||
-    getDefaultModel(env);
+    env.DEFAULT_CHAT_MODEL ||
+    "openai/gpt-5.6-sol";
 
-  const messages =
-    sanitizeMessages(
-      body.messages
-    );
+  var messages =
+    Array.isArray(body.messages)
+      ? body.messages
+      : [];
 
   if (!messages.length) {
 
-    return withCors(
-      json({
-        error:
-          "At least one message is required."
-      }, 400)
+    return errorResponse(
+      "Messages are required.",
+      400
     );
+
   }
 
-  const payload = {
-    model,
-    messages,
+  var payload = {
+    model: model,
+    messages: messages,
     stream: true
   };
 
-  if (body.webSearch) {
-    payload.web_search = {
-      enable: true,
-      count: 5
-    };
+  if (body.web_search) {
+
+    payload.web_search =
+      true;
+
   }
 
-  if (body.reasoning_effort) {
-    payload.reasoning_effort =
-      body.reasoning_effort;
-  }
-
-  const upstream =
-    await fetch(
-      getBaseUrl(env) +
+  var upstream =
+    await xkiroFetch(
+      env,
       "/chat/completions",
       {
         method: "POST",
-
         headers: {
-          Authorization:
-            "Bearer " + apiKey,
-
           "Content-Type":
             "application/json"
         },
-
-        body: JSON.stringify(
-          payload
-        )
+        body:
+          JSON.stringify(payload)
       }
     );
 
   if (!upstream.ok) {
 
-    const text =
+    var errorText =
       await upstream.text();
 
-    return withCors(
-      new Response(text, {
-        status: upstream.status,
+    return new Response(
+      errorText ||
+      "xKiro chat request failed.",
+      {
+        status:
+          upstream.status,
         headers: {
           "Content-Type":
             "application/json"
         }
-      })
+      }
     );
+
   }
 
-  return withCors(
-    new Response(
-      upstream.body,
-      {
-        status: upstream.status,
-
-        headers: {
-          "Content-Type":
-            "text/event-stream; charset=utf-8",
-
-          "Cache-Control":
-            "no-cache, no-transform",
-
-          "Connection":
-            "keep-alive"
-        }
+  return new Response(
+    upstream.body,
+    {
+      status: 200,
+      headers: {
+        "Content-Type":
+          "text/event-stream; charset=utf-8",
+        "Cache-Control":
+          "no-cache, no-transform",
+        "Connection":
+          "keep-alive",
+        "X-Accel-Buffering":
+          "no"
       }
-    )
+    }
   );
+
 }
+
+
+// ============================================================
+// Image generation
+// ============================================================
 
 async function handleImageCreate(
   request,
   env
 ) {
 
-  const apiKey =
-    getApiKey(env);
-
-  if (!apiKey) {
-
-    return withCors(
-      json({
-        error:
-          "XKIRO_API_KEY is not configured."
-      }, 500)
-    );
-  }
-
-  let body;
+  var body;
 
   try {
-    body = await request.json();
-  } catch {
 
-    return withCors(
-      json({
-        error:
-          "Invalid JSON request."
-      }, 400)
+    body =
+      await request.json();
+
+  } catch (error) {
+
+    return errorResponse(
+      "Invalid JSON request.",
+      400
     );
+
   }
 
-  if (
-    !body.prompt ||
-    typeof body.prompt !== "string"
-  ) {
+  var prompt =
+    String(
+      body.prompt ||
+      ""
+    ).trim();
 
-    return withCors(
-      json({
-        error:
-          "Image prompt is required."
-      }, 400)
+  if (!prompt) {
+
+    return errorResponse(
+      "Image prompt is required.",
+      400
     );
+
   }
 
-  const payload = {
-    model:
-      body.model ||
-      DEFAULT_IMAGE_MODEL,
-
-    prompt:
-      body.prompt,
-
-    n: 1,
-
-    size:
-      body.size ||
-      "1024x1024"
+  var payload = {
+    prompt: prompt
   };
 
-  const response =
-    await fetch(
-      getBaseUrl(env) +
+  if (body.model) {
+
+    payload.model =
+      body.model;
+
+  }
+
+  var response =
+    await xkiroFetch(
+      env,
       "/images/generations",
       {
         method: "POST",
-
         headers: {
-          Authorization:
-            "Bearer " + apiKey,
-
           "Content-Type":
             "application/json"
         },
-
-        body: JSON.stringify(
-          payload
-        )
+        body:
+          JSON.stringify(payload)
       }
     );
 
-  const text =
+  var text =
     await response.text();
 
-  return withCors(
-    new Response(text, {
-      status: response.status,
+  return new Response(
+    text,
+    {
+      status:
+        response.status,
       headers: {
         "Content-Type":
           response.headers.get(
             "Content-Type"
           ) ||
-          "application/json"
+          "application/json",
+        "Cache-Control":
+          "no-store"
       }
-    })
+    }
   );
+
 }
 
-async function handleImagePoll(
-  request,
-  env,
-  jobId
+
+async function handleImageStatus(
+  jobId,
+  env
 ) {
 
-  const apiKey =
-    getApiKey(env);
-
-  if (!apiKey) {
-
-    return withCors(
-      json({
-        error:
-          "XKIRO_API_KEY is not configured."
-      }, 500)
-    );
-  }
-
-  const response =
-    await fetch(
-      getBaseUrl(env) +
+  var response =
+    await xkiroFetch(
+      env,
       "/images/generations/" +
-      encodeURIComponent(jobId),
-      {
-        headers: {
-          Authorization:
-            "Bearer " + apiKey
-        }
-      }
+      encodeURIComponent(
+        jobId
+      )
     );
 
-  const text =
+  var text =
     await response.text();
 
-  return withCors(
-    new Response(text, {
-      status: response.status,
+  return new Response(
+    text,
+    {
+      status:
+        response.status,
       headers: {
         "Content-Type":
           response.headers.get(
             "Content-Type"
           ) ||
-          "application/json"
+          "application/json",
+        "Cache-Control":
+          "no-store"
       }
-    })
+    }
   );
+
 }
 
-/* =========================================================
-   WORKER
-========================================================= */
+
+// ============================================================
+// Health
+// ============================================================
+
+function handleHealth(env) {
+
+  return json({
+    ok: true,
+    service: "AetherAI Studio",
+    xkiroConfigured:
+      Boolean(
+        getApiKey(env)
+      ),
+    baseUrl:
+      getBaseUrl(env),
+    defaultModel:
+      env.DEFAULT_CHAT_MODEL ||
+      "openai/gpt-5.6-sol"
+  });
+
+}
+
+
+// ============================================================
+// Main Worker
+// ============================================================
 
 export default {
-  async fetch(request, env) {
 
-    if (
-      request.method === "OPTIONS"
-    ) {
-      return new Response(null, {
-        status: 204,
-        headers: corsHeaders()
-      });
-    }
+  async fetch(
+    request,
+    env,
+    ctx
+  ) {
 
-    const url =
+    var url =
       new URL(request.url);
 
     try {
 
       if (
-        request.method === "GET" &&
-        url.pathname === "/"
+        request.method === "OPTIONS"
+      ) {
+
+        return new Response(
+          null,
+          {
+            status: 204,
+            headers: {
+              "Access-Control-Allow-Origin":
+                "*",
+              "Access-Control-Allow-Methods":
+                "GET,POST,OPTIONS",
+              "Access-Control-Allow-Headers":
+                "Content-Type,Authorization"
+            }
+          }
+        );
+
+      }
+
+      if (
+        url.pathname === "/" &&
+        request.method === "GET"
       ) {
 
         return new Response(
           HTML,
           {
+            status: 200,
             headers: {
               "Content-Type":
                 "text/html; charset=utf-8",
-
               "Cache-Control":
                 "no-store"
             }
           }
         );
+
       }
 
       if (
-        request.method === "GET" &&
-        url.pathname === "/health"
+        url.pathname === "/health" &&
+        request.method === "GET"
       ) {
 
-        return withCors(
-          json({
-            ok: true,
-
-            xkiroConfigured:
-              Boolean(
-                getApiKey(env)
-              ),
-
-            model:
-              getDefaultModel(env),
-
-            baseUrl:
-              getBaseUrl(env)
-          })
+        return handleHealth(
+          env
         );
+
       }
 
       if (
-        request.method === "GET" &&
-        url.pathname === "/api/models"
+        url.pathname === "/api/models" &&
+        request.method === "GET"
       ) {
 
-        return handleModels(
-          request,
-          env,
-          url
-        );
-      }
-
-      if (
-        request.method === "POST" &&
-        url.pathname === "/api/chat"
-      ) {
-
-        return handleChat(
+        return await handleModels(
           request,
           env
         );
+
       }
 
       if (
-        request.method === "POST" &&
-        url.pathname === "/api/images"
+        url.pathname === "/api/chat" &&
+        request.method === "POST"
       ) {
 
-        return handleImageCreate(
+        return await handleChat(
           request,
           env
         );
+
       }
 
       if (
-        request.method === "GET" &&
+        url.pathname === "/api/images" &&
+        request.method === "POST"
+      ) {
+
+        return await handleImageCreate(
+          request,
+          env
+        );
+
+      }
+
+      if (
         url.pathname.startsWith(
           "/api/images/"
-        )
+        ) &&
+        request.method === "GET"
       ) {
 
-        const jobId =
-          url.pathname.slice(
-            "/api/images/".length
+        var jobId =
+          decodeURIComponent(
+            url.pathname.slice(
+              "/api/images/".length
+            )
           );
 
-        return handleImagePoll(
-          request,
-          env,
-          jobId
+        if (!jobId) {
+
+          return errorResponse(
+            "Image job ID is required.",
+            400
+          );
+
+        }
+
+        return await handleImageStatus(
+          jobId,
+          env
         );
+
       }
 
-      return withCors(
-        json({
-          error: "Not found"
-        }, 404)
+      return new Response(
+        "Not Found",
+        {
+          status: 404,
+          headers: {
+            "Content-Type":
+              "text/plain; charset=utf-8"
+          }
+        }
       );
 
     } catch (error) {
 
-      console.error(error);
-
-      return withCors(
-        json({
-          error:
-            error?.message ||
-            "Internal server error."
-        }, 500)
+      console.error(
+        "Worker error:",
+        error
       );
+
+      return errorResponse(
+        error &&
+        error.message
+          ? error.message
+          : "Internal server error.",
+        500
+      );
+
     }
+
   }
+
 };
