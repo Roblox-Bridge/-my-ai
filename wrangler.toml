@@ -6,4 +6,4 @@ compatibility_date = "2024-09-01"
 binding = "AI"
 
 [vars]
-DEFAULT_MODEL = "@cf/meta/llama-3-8b-instruct"
+DEFAULT_MODEL = "@cf/meta/llama-3.1-8b-instruct"
