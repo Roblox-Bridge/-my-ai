@@ -1,4075 +1,2382 @@
 const HTML = `<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>AetherAI</title>
-
+<meta name="theme-color" content="#0b0b0d">
+<title>Aether AI</title>
 <style>
 *{box-sizing:border-box}
-
-html,body{
-  margin:0;
-  width:100%;
-  height:100%;
-  overflow:hidden;
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
-  background:#212121;
-  color:#ececec;
-}
-
-button,input,textarea,select{
-  font:inherit;
-}
-
-button{
-  cursor:pointer;
-}
-
-.app{
-  width:100%;
-  height:100%;
-  display:flex;
-}
-
-/* SIDEBAR */
-
+html,body{margin:0;padding:0;width:100%;height:100%;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0b0b0d;color:#f4f4f5}
+body{overflow:hidden}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer}
+.app{display:flex;width:100%;height:100vh;background:#0b0b0d}
 .sidebar{
-  width:280px;
-  height:100%;
-  background:#171717;
-  border-right:1px solid #303030;
-  display:flex;
-  flex-direction:column;
-  flex-shrink:0;
-  z-index:50;
+width:270px;flex:none;background:#111113;border-right:1px solid #242428;
+display:flex;flex-direction:column;height:100%;z-index:20
 }
-
-.sidebar-top{
-  display:flex;
-  gap:8px;
-  padding:12px;
+.side-top{padding:16px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;margin-bottom:16px}
+.brand-icon{
+width:34px;height:34px;border-radius:10px;background:#f4f4f5;color:#111;
+display:flex;align-items:center;justify-content:center;font-weight:800
 }
-
 .new-chat{
-  flex:1;
-  height:42px;
-  border:1px solid #3a3a3a;
-  background:#212121;
-  color:#eee;
-  border-radius:10px;
-  text-align:left;
-  padding:0 14px;
+width:100%;border:1px solid #303036;background:#19191d;color:#fff;
+padding:11px 13px;border-radius:10px;text-align:left
 }
-
-.close-sidebar{
-  width:42px;
-  height:42px;
-  border:1px solid #3a3a3a;
-  background:#212121;
-  color:#eee;
-  border-radius:10px;
-  display:none;
-}
-
-.history{
-  flex:1;
-  overflow-y:auto;
-  padding:5px 10px;
-}
-
+.new-chat:hover{background:#222228}
+.history{flex:1;overflow:auto;padding:8px}
+.history-title{font-size:12px;color:#85858d;padding:8px 10px}
 .history-item{
-  padding:11px 12px;
-  border-radius:9px;
-  color:#ddd;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  margin-bottom:3px;
-  cursor:pointer;
+padding:10px;border-radius:9px;color:#d8d8dc;font-size:13px;
+white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px
 }
-
-.history-item:hover,
-.history-item.active{
-  background:#2a2a2a;
-}
-
-.no-history{
-  color:#777;
-  padding:15px 10px;
-  font-size:13px;
-}
-
-.sidebar-bottom{
-  padding:13px;
-  color:#777;
-  font-size:11px;
-  border-top:1px solid #292929;
-}
-
-/* MAIN */
-
-.main{
-  min-width:0;
-  flex:1;
-  height:100%;
-  display:flex;
-  flex-direction:column;
-  background:#212121;
-}
-
+.history-item:hover{background:#1d1d21}
+.side-bottom{padding:12px;border-top:1px solid #242428;color:#85858d;font-size:12px}
+.main{flex:1;min-width:0;height:100%;display:flex;flex-direction:column}
 .topbar{
-  height:64px;
-  flex-shrink:0;
-  display:flex;
-  align-items:center;
-  gap:9px;
-  padding:0 18px;
-  border-bottom:1px solid #2d2d2d;
+height:60px;flex:none;border-bottom:1px solid #242428;
+display:flex;align-items:center;gap:10px;padding:0 16px;background:#0e0e10
 }
-
-.hamburger{
-  display:none;
-  width:40px;
-  height:40px;
-  border:0;
-  background:transparent;
-  color:#ddd;
-  font-size:23px;
-}
-
-.logo{
-  font-size:17px;
-  font-weight:650;
-  white-space:nowrap;
-}
-
+.menu-btn{display:none}
+.model-wrap{display:flex;align-items:center;gap:8px;min-width:0}
 .model-select{
-  max-width:350px;
-  min-width:120px;
-  padding:8px 10px;
-  border-radius:9px;
-  border:1px solid #3b3b3b;
-  background:#2a2a2a;
-  color:#eee;
-  outline:none;
+max-width:350px;background:#17171a;border:1px solid #303036;
+color:#eee;padding:8px 10px;border-radius:9px;outline:none
 }
-
-.council-button{
-  margin-left:auto;
-  padding:8px 12px;
-  border-radius:9px;
-  border:1px solid #414141;
-  background:#2a2a2a;
-  color:#eee;
+.status{font-size:12px;color:#777780;white-space:nowrap}
+.top-actions{margin-left:auto;display:flex;gap:8px}
+.council-btn{
+border:1px solid #39393f;background:#18181c;color:#eee;
+padding:8px 12px;border-radius:9px
 }
-
-.council-button.active{
-  background:#3a3a3a;
-  border-color:#777;
-}
-
-/* CHAT */
-
+.council-btn.active{background:#292932;border-color:#676773}
 .chat{
-  flex:1;
-  overflow-y:auto;
-  min-height:0;
+flex:1;overflow:auto;scroll-behavior:smooth
 }
-
-.welcome{
-  max-width:760px;
-  margin:16vh auto 0;
-  padding:20px;
+.empty{
+height:100%;display:flex;align-items:center;justify-content:center;
+padding:30px;text-align:center
 }
-
-.welcome h1{
-  margin:0 0 12px;
-  font-size:34px;
-}
-
-.welcome p{
-  color:#999;
-  line-height:1.6;
-}
-
-.messages{
-  max-width:850px;
-  margin:0 auto;
-  padding:28px 20px 170px;
-}
-
-.message{
-  display:flex;
-  gap:14px;
-  margin-bottom:30px;
-}
-
+.empty-inner{max-width:700px}
+.empty h1{font-size:34px;margin:0 0 10px}
+.empty p{color:#85858d;margin:0}
+.messages{max-width:900px;margin:0 auto;padding:30px 20px 170px}
+.msg{display:flex;gap:14px;margin:24px 0}
 .avatar{
-  width:31px;
-  height:31px;
-  border-radius:8px;
-  background:#303030;
-  flex-shrink:0;
-  display:grid;
-  place-items:center;
-  font-size:12px;
+width:34px;height:34px;flex:none;border-radius:10px;
+display:flex;align-items:center;justify-content:center;
+font-size:13px;font-weight:700
 }
-
-.message.user .avatar{
-  background:#414141;
+.msg.user .avatar{background:#34343a}
+.msg.assistant .avatar{background:#f4f4f5;color:#111}
+.msg-body{min-width:0;flex:1;line-height:1.65;font-size:15px}
+.msg.user .msg-body{white-space:pre-wrap}
+.msg-body p{margin:0 0 12px}
+.msg-body p:last-child{margin-bottom:0}
+.msg-body pre{
+background:#111114;border:1px solid #29292e;border-radius:10px;
+padding:14px;overflow:auto
 }
-
-.message-body{
-  min-width:0;
-  flex:1;
-  font-size:15.5px;
-  line-height:1.65;
-  overflow-wrap:anywhere;
+.msg-body code{
+background:#1b1b1f;border-radius:5px;padding:2px 5px;font-size:.92em
 }
-
-.message-body p{
-  margin:0 0 12px;
+.msg-body pre code{background:none;padding:0}
+.msg-body ul,.msg-body ol{padding-left:25px}
+.msg-body blockquote{
+border-left:3px solid #555;padding-left:14px;color:#b7b7bd
 }
-
-.message-body strong{
-  color:#fff;
+.attachments{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.attachment{
+border:1px solid #303036;background:#17171a;border-radius:9px;
+padding:7px 9px;font-size:12px;color:#bdbdc3
 }
-
-.message-body code{
-  background:#303030;
-  padding:2px 5px;
-  border-radius:5px;
+.image-result{
+margin-top:12px;border-radius:14px;overflow:hidden;
+border:1px solid #2c2c31;max-width:760px
 }
-
-.message-body pre{
-  background:#111;
-  border:1px solid #333;
-  border-radius:10px;
-  padding:14px;
-  overflow:auto;
+.image-result img{display:block;width:100%;height:auto}
+.image-link{display:block;padding:10px;background:#151519;color:#ddd;text-decoration:none;font-size:12px}
+.composer-wrap{
+position:fixed;left:270px;right:0;bottom:0;padding:14px 18px 18px;
+background:linear-gradient(transparent,#0b0b0d 30%)
 }
-
-.message-body pre code{
-  background:transparent;
-  padding:0;
-}
-
-.chat-image{
-  display:block;
-  max-width:min(100%,650px);
-  border-radius:12px;
-  margin-top:10px;
-}
-
-.message-actions{
-  display:flex;
-  gap:5px;
-  margin-top:7px;
-}
-
-.copy-button{
-  border:0;
-  background:transparent;
-  color:#888;
-  font-size:12px;
-  padding:4px 0;
-}
-
-.copy-button:hover{
-  color:#ddd;
-}
-
-.council-label{
-  display:inline-block;
-  border:1px solid #555;
-  border-radius:999px;
-  padding:3px 9px;
-  color:#bbb;
-  font-size:11px;
-  margin-bottom:8px;
-}
-
-.sources{
-  margin-top:13px;
-  border-top:1px solid #333;
-  padding-top:9px;
-}
-
-.sources-title{
-  color:#888;
-  font-size:12px;
-  margin-bottom:5px;
-}
-
-.sources a{
-  display:block;
-  color:#9ec5ff;
-  font-size:13px;
-  text-decoration:none;
-  margin:5px 0;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-
-/* COMPOSER */
-
-.composer-area{
-  position:fixed;
-  left:280px;
-  right:0;
-  bottom:0;
-  z-index:20;
-  padding:35px 20px 18px;
-  background:linear-gradient(transparent,#212121 27%);
-}
-
 .composer{
-  max-width:800px;
-  margin:auto;
-  background:#2f2f2f;
-  border:1px solid #484848;
-  border-radius:17px;
-  padding:8px 10px;
+max-width:900px;margin:auto;background:#17171a;
+border:1px solid #303036;border-radius:16px;padding:10px
 }
-
-.attachments{
-  display:flex;
-  gap:7px;
-  flex-wrap:wrap;
-  padding:2px 4px 7px;
+.input-row{display:flex;align-items:flex-end;gap:8px}
+textarea{
+flex:1;resize:none;background:transparent;border:0;outline:none;color:#fff;
+min-height:46px;max-height:180px;padding:10px;font-size:15px
 }
-
-.file-chip{
-  display:flex;
-  align-items:center;
-  gap:7px;
-  background:#222;
-  border:1px solid #444;
-  border-radius:8px;
-  padding:5px 7px;
-  font-size:12px;
+.icon-btn,.send-btn{
+width:40px;height:40px;border-radius:10px;border:1px solid #303036;
+background:#202025;color:#ddd;display:flex;align-items:center;justify-content:center
 }
-
-.file-chip img{
-  width:34px;
-  height:34px;
-  object-fit:cover;
-  border-radius:5px;
+.send-btn{background:#f4f4f5;color:#111;border-color:#f4f4f5}
+.send-btn:disabled{opacity:.4;cursor:not-allowed}
+.file-input{display:none}
+.attach-preview{display:flex;gap:7px;flex-wrap:wrap;padding:4px 8px 8px}
+.preview{
+background:#202024;border:1px solid #303036;border-radius:8px;
+padding:6px 8px;font-size:12px;color:#bbb
 }
-
-.file-chip button{
-  border:0;
-  background:transparent;
-  color:#aaa;
+.note{font-size:11px;color:#68686f;text-align:center;margin-top:7px}
+.typing{color:#8b8b93}
+.error{color:#ff8c8c}
+.council-panel{
+margin:15px 0;padding:14px;border:1px solid #303036;
+border-radius:12px;background:#141417
 }
-
-.composer-row{
-  display:flex;
-  align-items:flex-end;
-  gap:7px;
+.council-head{font-weight:700;margin-bottom:10px}
+.council-model{
+padding:8px 0;border-bottom:1px solid #252529;font-size:13px
 }
-
-.attach-button{
-  width:38px;
-  height:38px;
-  border:0;
-  background:transparent;
-  color:#ccc;
-  font-size:23px;
+.council-model:last-child{border-bottom:0}
+.drawer-overlay{
+display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30
 }
-
-.prompt{
-  flex:1;
-  min-height:40px;
-  max-height:180px;
-  resize:none;
-  outline:none;
-  border:0;
-  background:transparent;
-  color:#eee;
-  padding:9px 4px;
-  line-height:1.45;
-}
-
-.prompt::placeholder{
-  color:#888;
-}
-
-.send-button{
-  width:38px;
-  height:38px;
-  border:0;
-  border-radius:10px;
-  background:#eee;
-  color:#111;
-  font-weight:700;
-}
-
-.send-button:disabled{
-  opacity:.35;
-}
-
-.status{
-  min-height:16px;
-  color:#888;
-  font-size:11px;
-  margin-top:5px;
-}
-
-.hint{
-  max-width:800px;
-  margin:7px auto 0;
-  color:#666;
-  text-align:center;
-  font-size:10px;
-}
-
-/* MOBILE */
-
-.overlay{
-  display:none;
-}
-
 @media(max-width:760px){
-
-  .sidebar{
-    position:fixed;
-    top:0;
-    bottom:0;
-    left:0;
-    transform:translateX(-105%);
-    transition:transform .18s ease;
-    box-shadow:12px 0 35px rgba(0,0,0,.45);
-  }
-
-  .sidebar.open{
-    transform:translateX(0);
-  }
-
-  .overlay.open{
-    display:block;
-    position:fixed;
-    inset:0;
-    background:rgba(0,0,0,.5);
-    z-index:40;
-  }
-
-  .close-sidebar{
-    display:block;
-  }
-
-  .hamburger{
-    display:block;
-  }
-
-  .topbar{
-    padding:0 10px;
-  }
-
-  .model-select{
-    max-width:180px;
-  }
-
-  .council-button{
-    padding:8px;
-    font-size:12px;
-  }
-
-  .composer-area{
-    left:0;
-    padding:30px 10px 12px;
-  }
-
-  .messages{
-    padding-left:12px;
-    padding-right:12px;
-  }
-
-  .welcome{
-    margin-top:12vh;
-    padding:18px;
-  }
-
-  .welcome h1{
-    font-size:28px;
-  }
+.sidebar{
+position:fixed;left:-285px;top:0;bottom:0;transition:left .2s ease;
+box-shadow:10px 0 30px rgba(0,0,0,.3)
+}
+.sidebar.open{left:0}
+.drawer-overlay.open{display:block}
+.menu-btn{
+display:flex;width:38px;height:38px;border:0;background:transparent;
+color:#ddd;align-items:center;justify-content:center;font-size:22px
+}
+.topbar{padding:0 10px}
+.model-select{max-width:170px}
+.status{display:none}
+.council-btn{padding:8px 9px;font-size:12px}
+.composer-wrap{left:0;padding:9px 8px 10px}
+.messages{padding:20px 12px 155px}
+.empty h1{font-size:28px}
+.msg{gap:9px}
+.avatar{width:30px;height:30px;border-radius:8px}
+.msg-body{font-size:14px}
 }
 </style>
 </head>
-
 <body>
-
 <div class="app">
-
-<aside class="sidebar" id="sidebar">
-
-  <div class="sidebar-top">
-    <button class="new-chat" id="newChat">＋ New chat</button>
-    <button class="close-sidebar" id="closeSidebar">×</button>
-  </div>
-
-  <div class="history" id="history"></div>
-
-  <div class="sidebar-bottom">
-    Free models only · Web search always on
-  </div>
-
-</aside>
-
-<div class="overlay" id="overlay"></div>
-
-<main class="main">
-
-<header class="topbar">
-
-  <button class="hamburger" id="hamburger">☰</button>
-
-  <div class="logo">AetherAI</div>
-
-  <select class="model-select" id="modelSelect"></select>
-
-  <button class="council-button" id="councilButton">
-    AI Council
-  </button>
-
-</header>
-
-<section class="chat" id="chat">
-
-  <div class="welcome" id="welcome">
-    <h1>How can I help?</h1>
-    <p>
-      Ask anything. Web search is always available.
-      Ask for an image and AetherAI will automatically use
-      a free image model.
-    </p>
-  </div>
-
-  <div class="messages" id="messages"></div>
-
-</section>
-
-</main>
-
-<div class="composer-area">
-
-  <div class="composer">
-
-    <div class="attachments" id="attachments"></div>
-
-    <div class="composer-row">
-
-      <button
-        class="attach-button"
-        id="attachButton"
-        title="Attach files"
-      >＋</button>
-
-      <textarea
-        class="prompt"
-        id="prompt"
-        rows="1"
-        placeholder="Message AetherAI..."
-      ></textarea>
-
-      <button
-        class="send-button"
-        id="sendButton"
-      >↑</button>
-
+  <aside class="sidebar" id="sidebar">
+    <div class="side-top">
+      <div class="brand">
+        <div class="brand-icon">A</div>
+        <span>Aether AI</span>
+      </div>
+      <button class="new-chat" id="newChat">＋ New chat</button>
     </div>
+    <div class="history" id="history">
+      <div class="history-title">Recent chats</div>
+    </div>
+    <div class="side-bottom">
+      Free xKiro models · Live catalog
+    </div>
+  </aside>
 
-    <div class="status" id="status"></div>
+  <div class="drawer-overlay" id="overlay"></div>
 
-  </div>
+  <main class="main">
+    <header class="topbar">
+      <button class="menu-btn" id="menuBtn">☰</button>
 
-  <div class="hint">
-    AetherAI can make mistakes. Check important information.
-  </div>
+      <div class="model-wrap">
+        <select class="model-select" id="modelSelect">
+          <option>Loading models...</option>
+        </select>
+        <span class="status" id="status">Connecting...</span>
+      </div>
 
+      <div class="top-actions">
+        <button class="council-btn" id="councilBtn">AI Council</button>
+      </div>
+    </header>
+
+    <section class="chat" id="chat">
+      <div class="empty" id="empty">
+        <div class="empty-inner">
+          <h1>How can I help?</h1>
+          <p>Ask anything. Web research is automatically enabled.</p>
+        </div>
+      </div>
+      <div class="messages" id="messages"></div>
+    </section>
+
+    <div class="composer-wrap">
+      <div class="composer">
+        <div class="attach-preview" id="attachPreview"></div>
+
+        <div class="input-row">
+          <input class="file-input" id="fileInput" type="file"
+            multiple
+            accept="image/*,.txt,.md,.json,.js,.jsx,.ts,.tsx,.html,.css,.py,.java,.c,.cpp,.h,.hpp,.rs,.go,.php,.rb,.swift,.kt,.xml,.yaml,.yml,.csv">
+
+          <button class="icon-btn" id="fileBtn" title="Attach files">＋</button>
+
+          <textarea id="prompt"
+            rows="1"
+            placeholder="Message Aether AI..."></textarea>
+
+          <button class="send-btn" id="sendBtn" title="Send">↑</button>
+        </div>
+
+        <div class="note">
+          Web search is automatic. Image requests automatically use an available free image model.
+        </div>
+      </div>
+    </div>
+  </main>
 </div>
-
-</div>
-
-<input
-  id="fileInput"
-  type="file"
-  hidden
-  multiple
-  accept="image/*,.txt,.md,.json,.csv,.js,.ts,.py,.html,.css,.xml,.yaml,.yml"
-/>
 
 <script>
+(function(){
+  "use strict";
 
-const $ = id => document.getElementById(id);
+  var state = {
+    models: [],
+    imageModels: [],
+    selectedModel: "",
+    messages: [],
+    attachments: [],
+    council: false,
+    busy: false,
+    chatId: null
+  };
 
-const state = {
-  messages: [],
-  history: JSON.parse(
-    localStorage.getItem("aether_history") || "[]"
-  ),
-  currentId: null,
-  models: [],
-  selectedModel: "",
-  council: false,
-  attachments: []
-};
+  var el = {
+    sidebar: document.getElementById("sidebar"),
+    overlay: document.getElementById("overlay"),
+    menuBtn: document.getElementById("menuBtn"),
+    newChat: document.getElementById("newChat"),
+    history: document.getElementById("history"),
+    modelSelect: document.getElementById("modelSelect"),
+    status: document.getElementById("status"),
+    councilBtn: document.getElementById("councilBtn"),
+    chat: document.getElementById("chat"),
+    empty: document.getElementById("empty"),
+    messages: document.getElementById("messages"),
+    prompt: document.getElementById("prompt"),
+    sendBtn: document.getElementById("sendBtn"),
+    fileBtn: document.getElementById("fileBtn"),
+    fileInput: document.getElementById("fileInput"),
+    attachPreview: document.getElementById("attachPreview")
+  };
 
-
-/* =========================
-   HTML ESCAPE
-========================= */
-
-function escapeHtml(value){
-
-  return String(value ?? "")
-    .replace(/&/g,"&amp;")
-    .replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;")
-    .replace(/"/g,"&quot;")
-    .replace(/'/g,"&#39;");
-}
-
-
-/* =========================
-   MARKDOWN
-========================= */
-
-function markdownToHtml(value){
-
-  let text = escapeHtml(value);
-
-  text = text.replace(
-    /```([\\s\\S]*?)```/g,
-    function(_, code){
-      return "<pre><code>" +
-        code.replace(/^\\w+\\n/,"") +
-        "</code></pre>";
-    }
-  );
-
-  text = text.replace(
-    /\`([^\`]+)\`/g,
-    "<code>$1</code>"
-  );
-
-  text = text.replace(
-    /\\*\\*(.*?)\\*\\*/g,
-    "<strong>$1</strong>"
-  );
-
-  text = text.replace(
-    /\\*([^*]+)\\*/g,
-    "<em>$1</em>"
-  );
-
-  text = text.replace(
-    /\\n/g,
-    "<br>"
-  );
-
-  return text;
-}
-
-
-/* =========================
-   STATUS
-========================= */
-
-function setStatus(text){
-
-  $("status").textContent = text || "";
-}
-
-
-/* =========================
-   HISTORY
-========================= */
-
-function saveHistory(){
-
-  const clean = state.history
-    .slice(0,30)
-    .map(function(chat){
-
-      return {
-        id:chat.id,
-        title:chat.title,
-        messages:chat.messages
-          .slice(-40)
-          .map(function(message){
-
-            return {
-              role:message.role,
-              content:
-                typeof message.content === "string"
-                  ? message.content
-                  : "[attachment]"
-            };
-
-          })
-      };
-
-    });
-
-  localStorage.setItem(
-    "aether_history",
-    JSON.stringify(clean)
-  );
-}
-
-
-function renderHistory(){
-
-  const container = $("history");
-
-  container.innerHTML = "";
-
-  if(!state.history.length){
-
-    const empty = document.createElement("div");
-
-    empty.className = "no-history";
-
-    empty.textContent = "No previous chats";
-
-    container.appendChild(empty);
-
-    return;
+  function escapeHtml(value){
+    return String(value == null ? "" : value)
+      .replace(/&/g,"&amp;")
+      .replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;")
+      .replace(/'/g,"&#039;");
   }
 
-  state.history.forEach(function(chat){
-
-    const item = document.createElement("div");
-
-    item.className =
-      "history-item" +
-      (
-        chat.id === state.currentId
-          ? " active"
-          : ""
-      );
-
-    item.textContent =
-      chat.title || "New chat";
-
-    item.onclick = function(){
-
-      loadChat(chat.id);
-
-    };
-
-    container.appendChild(item);
-
-  });
-}
-
-
-function persistCurrent(title){
-
-  if(!state.currentId){
-
-    state.currentId =
-      crypto.randomUUID();
-
+  function sleep(ms){
+    return new Promise(function(resolve){
+      setTimeout(resolve,ms);
+    });
   }
 
-  const cleanMessages =
-    state.messages.map(function(message){
+  function errorText(data,status){
+    if(!data) return "Request failed (" + status + ")";
 
-      return {
-        role:message.role,
-        content:
-          typeof message.content === "string"
-            ? message.content
-            : "[attachment]"
-      };
-
-    });
-
-  const existing =
-    state.history.find(function(chat){
-      return chat.id === state.currentId;
-    });
-
-  if(existing){
-
-    existing.messages = cleanMessages;
-
-    if(
-      title &&
-      (
-        !existing.title ||
-        existing.title === "New chat"
-      )
-    ){
-
-      existing.title =
-        title.slice(0,60);
-
+    if(typeof data === "string"){
+      return data;
     }
 
-  }else{
-
-    state.history.unshift({
-
-      id:state.currentId,
-
-      title:
-        (title || "New chat")
-          .slice(0,60),
-
-      messages:cleanMessages
-
-    });
-
-  }
-
-  saveHistory();
-
-  renderHistory();
-}
-
-
-function loadChat(id){
-
-  const chat =
-    state.history.find(function(x){
-      return x.id === id;
-    });
-
-  if(!chat) return;
-
-  state.currentId = chat.id;
-
-  state.messages =
-    chat.messages.map(function(message){
-
-      return {
-        role:message.role,
-        content:message.content
-      };
-
-    });
-
-  state.attachments = [];
-
-  renderAttachments();
-
-  renderMessages();
-
-  renderHistory();
-
-  closeSidebar();
-}
-
-
-function newChat(){
-
-  state.currentId = null;
-
-  state.messages = [];
-
-  state.attachments = [];
-
-  state.council = false;
-
-  $("councilButton")
-    .classList
-    .remove("active");
-
-  renderAttachments();
-
-  renderMessages();
-
-  setStatus("");
-
-  closeSidebar();
-}
-
-
-/* =========================
-   MESSAGES
-========================= */
-
-function addMessage(message){
-
-  state.messages.push(message);
-
-  renderMessages();
-}
-
-
-function renderMessages(){
-
-  const container = $("messages");
-
-  container.innerHTML = "";
-
-  $("welcome").style.display =
-    state.messages.length
-      ? "none"
-      : "block";
-
-  state.messages.forEach(function(message){
-
-    const row =
-      document.createElement("div");
-
-    row.className =
-      "message " +
-      message.role;
-
-    const avatar =
-      document.createElement("div");
-
-    avatar.className = "avatar";
-
-    avatar.textContent =
-      message.role === "user"
-        ? "U"
-        : "AI";
-
-    const body =
-      document.createElement("div");
-
-    body.className =
-      "message-body";
-
-    if(
-      message.role === "assistant" &&
-      message.council
-    ){
-
-      const badge =
-        document.createElement("div");
-
-      badge.className =
-        "council-label";
-
-      badge.textContent =
-        "AI Council";
-
-      body.appendChild(badge);
-
+    if(data.error){
+      if(typeof data.error === "string") return data.error;
+      if(data.error.message) return data.error.message;
+      if(data.error.code) return String(data.error.code);
     }
 
-    const content =
-      document.createElement("div");
-
-    content.innerHTML =
-      markdownToHtml(
-        message.content || ""
-      );
-
-    body.appendChild(content);
-
-
-    if(message.image){
-
-      const image =
-        document.createElement("img");
-
-      image.className =
-        "chat-image";
-
-      image.src =
-        message.image;
-
-      image.alt =
-        "Generated image";
-
-      body.appendChild(image);
-
-    }
-
-
-    if(message.files){
-
-      const note =
-        document.createElement("div");
-
-      note.style =
-        "color:#888;font-size:12px;margin-top:7px";
-
-      note.textContent =
-        "📎 " +
-        message.files.join(", ");
-
-      body.appendChild(note);
-
-    }
-
-
-    if(
-      message.sources &&
-      message.sources.length
-    ){
-
-      const sourceBox =
-        document.createElement("div");
-
-      sourceBox.className =
-        "sources";
-
-      const title =
-        document.createElement("div");
-
-      title.className =
-        "sources-title";
-
-      title.textContent =
-        "Sources";
-
-      sourceBox.appendChild(title);
-
-
-      message.sources
-        .slice(0,8)
-        .forEach(function(source){
-
-          if(!source.url) return;
-
-          const link =
-            document.createElement("a");
-
-          link.href =
-            source.url;
-
-          link.target =
-            "_blank";
-
-          link.rel =
-            "noopener noreferrer";
-
-          link.textContent =
-            source.title ||
-            source.url;
-
-          sourceBox.appendChild(link);
-
-        });
-
-      body.appendChild(sourceBox);
-
-    }
-
-
-    if(message.role === "assistant"){
-
-      const actions =
-        document.createElement("div");
-
-      actions.className =
-        "message-actions";
-
-      const copy =
-        document.createElement("button");
-
-      copy.className =
-        "copy-button";
-
-      copy.textContent =
-        "Copy";
-
-      copy.onclick =
-        async function(){
-
-          try{
-
-            await navigator
-              .clipboard
-              .writeText(
-                message.content || ""
-              );
-
-            copy.textContent =
-              "Copied";
-
-            setTimeout(function(){
-
-              copy.textContent =
-                "Copy";
-
-            },1200);
-
-          }catch(e){}
-
-        };
-
-      actions.appendChild(copy);
-
-      body.appendChild(actions);
-
-    }
-
-
-    row.appendChild(avatar);
-
-    row.appendChild(body);
-
-    container.appendChild(row);
-
-  });
-
-  $("chat").scrollTop =
-    $("chat").scrollHeight;
-}
-
-
-/* =========================
-   ATTACHMENTS
-========================= */
-
-function renderAttachments(){
-
-  const container =
-    $("attachments");
-
-  container.innerHTML = "";
-
-  state.attachments
-    .forEach(function(file,index){
-
-      const chip =
-        document.createElement("div");
-
-      chip.className =
-        "file-chip";
-
-      if(
-        file.type &&
-        file.type.startsWith("image/")
-      ){
-
-        const image =
-          document.createElement("img");
-
-        image.src =
-          file.data;
-
-        chip.appendChild(image);
-
-      }
-
-      const name =
-        document.createElement("span");
-
-      name.textContent =
-        file.name;
-
-      chip.appendChild(name);
-
-      const remove =
-        document.createElement("button");
-
-      remove.textContent =
-        "×";
-
-      remove.onclick =
-        function(){
-
-          state.attachments
-            .splice(index,1);
-
-          renderAttachments();
-
-        };
-
-      chip.appendChild(remove);
-
-      container.appendChild(chip);
-
-    });
-}
-
-
-/* =========================
-   IMAGE RESIZE
-========================= */
-
-function resizeImage(file,maxSize){
-
-  return new Promise(function(resolve,reject){
-
-    const reader =
-      new FileReader();
-
-    reader.onload =
-      function(){
-
-        const image =
-          new Image();
-
-        image.onload =
-          function(){
-
-            const scale =
-              Math.min(
-                1,
-                maxSize /
-                Math.max(
-                  image.width,
-                  image.height
-                )
-              );
-
-            const canvas =
-              document.createElement("canvas");
-
-            canvas.width =
-              Math.round(
-                image.width * scale
-              );
-
-            canvas.height =
-              Math.round(
-                image.height * scale
-              );
-
-            const context =
-              canvas.getContext("2d");
-
-            context.drawImage(
-              image,
-              0,
-              0,
-              canvas.width,
-              canvas.height
-            );
-
-            resolve(
-              canvas.toDataURL(
-                "image/jpeg",
-                .82
-              )
-            );
-
-          };
-
-        image.onerror =
-          reject;
-
-        image.src =
-          reader.result;
-
-      };
-
-    reader.onerror =
-      reject;
-
-    reader.readAsDataURL(file);
-
-  });
-}
-
-
-/* =========================
-   FILE PICKER
-========================= */
-
-async function filesPicked(event){
-
-  const files =
-    Array.from(
-      event.target.files
-    );
-
-  for(const file of files){
-
-    if(
-      file.size >
-      8 * 1024 * 1024
-    ){
-
-      setStatus(
-        file.name +
-        " is too large. Maximum 8 MB."
-      );
-
-      continue;
-    }
-
-
-    if(
-      file.type &&
-      file.type.startsWith("image/")
-    ){
-
-      try{
-
-        const data =
-          await resizeImage(
-            file,
-            1600
-          );
-
-        state.attachments.push({
-
-          name:file.name,
-
-          type:"image/jpeg",
-
-          data:data
-
-        });
-
-      }catch(error){
-
-        setStatus(
-          "Could not read " +
-          file.name
-        );
-
-      }
-
-      continue;
-    }
-
-
-    const supported =
-      /\.(txt|md|json|csv|js|ts|py|html|css|xml|yaml|yml)$/i
-        .test(file.name);
-
-    if(!supported){
-
-      setStatus(
-        file.name +
-        " is not a supported text file."
-      );
-
-      continue;
-    }
-
+    if(data.message) return data.message;
 
     try{
-
-      const text =
-        await file.text();
-
-      state.attachments.push({
-
-        name:file.name,
-
-        type:
-          file.type ||
-          "text/plain",
-
-        text:
-          text.slice(0,60000)
-
-      });
-
-    }catch(error){
-
-      setStatus(
-        "Could not read " +
-        file.name
-      );
-
+      return JSON.stringify(data);
+    }catch(e){
+      return "Request failed (" + status + ")";
     }
-
   }
 
-  renderAttachments();
+  async function apiJson(url,options){
+    var response;
 
-  event.target.value = "";
-}
+    try{
+      response = await fetch(url,options || {});
+    }catch(err){
+      throw new Error("Network error: " + err.message);
+    }
 
+    var text = await response.text();
+    var data;
 
-/* =========================
-   IMAGE REQUEST DETECTION
-========================= */
-
-function isImageRequest(text){
-
-  const value =
-    String(text || "")
-      .toLowerCase()
-      .trim();
-
-  if(!value) return false;
-
-
-  const english =
-    /\b(generate|create|make|draw|render|design|produce|create)\b[\s\S]{0,100}\b(image|picture|photo|wallpaper|poster|logo|illustration|art|portrait)\b/i;
-
-  const imageFirst =
-    /\b(image|picture|photo|wallpaper|poster|logo|illustration)\b[\s\S]{0,70}\b(generate|create|make|draw|render|design)\b/i;
-
-  const romanUrdu =
-    /\b(image|tasveer|photo|wallpaper|poster|logo)\b[\s\S]{0,70}\b(banao|bnao|bana|banado|bna do|bana do|tayyar karo)\b/i;
-
-  return (
-    english.test(value) ||
-    imageFirst.test(value) ||
-    romanUrdu.test(value)
-  );
-}
-
-
-/* =========================
-   LOAD FREE MODELS
-========================= */
-
-async function loadModels(){
-
-  setStatus(
-    "Loading free models..."
-  );
-
-  try{
-
-    const response =
-      await fetch(
-        "/api/models",
-        {
-          cache:"no-store"
-        }
-      );
-
-    const data =
-      await response.json();
+    try{
+      data = text ? JSON.parse(text) : {};
+    }catch(e){
+      if(!response.ok){
+        throw new Error(text || ("Request failed (" + response.status + ")"));
+      }
+      return {};
+    }
 
     if(!response.ok){
-
-      throw new Error(
-        data.error ||
-        "Could not load models"
-      );
-
+      throw new Error(errorText(data,response.status));
     }
-
-    state.models =
-      Array.isArray(data.chat)
-        ? data.chat
-        : [];
-
-    const select =
-      $("modelSelect");
-
-    select.innerHTML = "";
-
-
-    state.models.forEach(function(model){
-
-      const option =
-        document.createElement("option");
-
-      option.value =
-        model.id;
-
-      option.textContent =
-        model.label ||
-        model.id;
-
-      select.appendChild(option);
-
-    });
-
-
-    if(state.models.length){
-
-      /*
-       * Backend already sorts free models
-       * by capability score.
-       * First model = default strongest
-       * free model according to catalog data.
-       */
-
-      state.selectedModel =
-        state.models[0].id;
-
-      select.value =
-        state.selectedModel;
-
-      setStatus("");
-
-    }else{
-
-      const option =
-        document.createElement("option");
-
-      option.textContent =
-        "No free models available";
-
-      select.appendChild(option);
-
-      setStatus(
-        "No free chat models are currently available."
-      );
-
-    }
-
-  }catch(error){
-
-    setStatus(
-      error.message ||
-      "Could not load models."
-    );
-
-  }
-}
-
-
-/* =========================
-   STREAM ERROR PARSER
-========================= */
-
-function extractApiError(data){
-
-  if(!data){
-
-    return "Unknown API error";
-
-  }
-
-
-  if(typeof data === "string"){
 
     return data;
-
   }
 
+  function capabilityScore(model){
+    var score = 0;
 
-  if(
-    data.error &&
-    typeof data.error === "object"
-  ){
+    if(model.reasoning) score += 40;
+    if(model.vision) score += 20;
+    if(model.tools) score += 10;
 
-    return (
-      data.error.message ||
-      data.error.code ||
-      data.error.type ||
-      JSON.stringify(data.error)
+    var context = Number(
+      model.context_window ||
+      model.context_length ||
+      model.max_context ||
+      0
     );
 
-  }
-
-
-  if(
-    typeof data.error === "string"
-  ){
-
-    return data.error;
-
-  }
-
-
-  if(data.message){
-
-    return data.message;
-
-  }
-
-
-  return JSON.stringify(data);
-}
-
-
-/* =========================
-   READ STREAM
-========================= */
-
-async function readStream(response,assistant){
-
-  if(!response.body){
-
-    throw new Error(
-      "The AI returned an empty response stream."
+    var output = Number(
+      model.max_output_tokens ||
+      model.max_tokens ||
+      0
     );
 
+    score += Math.min(context / 10000,30);
+    score += Math.min(output / 5000,20);
+
+    var id = String(model.id || "").toLowerCase();
+
+    if(id.indexOf("reason") >= 0) score += 5;
+    if(id.indexOf("thinking") >= 0) score += 5;
+    if(id.indexOf("pro") >= 0) score += 2;
+
+    return score;
   }
 
-
-  const reader =
-    response.body.getReader();
-
-  const decoder =
-    new TextDecoder();
-
-  let buffer = "";
-
-
-  while(true){
-
-    const chunk =
-      await reader.read();
-
-    if(chunk.done){
-
-      break;
-
-    }
-
-
-    buffer +=
-      decoder.decode(
-        chunk.value,
-        {stream:true}
-      );
-
-
-    const lines =
-      buffer.split("\\n");
-
-    buffer =
-      lines.pop() || "";
-
-
-    for(
-      const line of lines
-    ){
-
-      if(
-        !line.startsWith("data:")
-      ){
-
-        continue;
-
-      }
-
-
-      const raw =
-        line.slice(5).trim();
-
-
-      if(
-        !raw ||
-        raw === "[DONE]"
-      ){
-
-        continue;
-
-      }
-
-
-      let data;
-
-      try{
-
-        data =
-          JSON.parse(raw);
-
-      }catch(error){
-
-        continue;
-
-      }
-
-
-      /*
-       * IMPORTANT:
-       * xKiro can send an error inside
-       * an already-open SSE stream.
-       */
-
-      if(data.error){
-
-        throw new Error(
-          extractApiError(data)
-        );
-
-      }
-
-
-      const delta =
-        data
-          ?.choices
-          ?.0
-          ?.delta
-          ?.content;
-
-
-      if(delta){
-
-        assistant.content +=
-          delta;
-
-        renderMessages();
-
-      }
-
-
-      const searchResults =
-        data
-          ?.web_search
-          ?.results;
-
-
-      if(
-        Array.isArray(searchResults)
-      ){
-
-        assistant.sources =
-          searchResults.map(
-            function(source){
-
-              return {
-
-                title:
-                  source.title ||
-                  source.name ||
-                  source.url,
-
-                url:
-                  source.url
-
-              };
-
-            }
-          );
-
-      }
-
-    }
-
+  function modelLabel(model){
+    var id = String(model.id || "");
+    return id || "Unknown model";
   }
-}
 
+  async function loadModels(){
+    el.status.textContent = "Loading free models...";
 
-/* =========================
-   NORMAL CHAT
-========================= */
+    try{
+      var chatData = await apiJson("/api/models");
+      state.models = Array.isArray(chatData.models) ? chatData.models : [];
+      state.imageModels = Array.isArray(chatData.imageModels)
+        ? chatData.imageModels
+        : [];
 
-async function chatRequest(){
+      if(!state.models.length){
+        throw new Error("No free chat models are currently available.");
+      }
 
-  const userMessage =
-    state.messages[
-      state.messages.length - 1
-    ];
-
-  const assistant = {
-
-    role:"assistant",
-
-    content:"",
-
-    sources:[]
-
-  };
-
-  addMessage(assistant);
-
-  setStatus(
-    "Thinking..."
-  );
-
-
-  const payloadMessages =
-    state.messages
-      .slice(0,-1)
-      .concat([userMessage])
-      .slice(-20)
-      .map(function(message){
-
-        return {
-
-          role:message.role,
-
-          content:message.content
-
-        };
-
+      state.models.sort(function(a,b){
+        return capabilityScore(b) - capabilityScore(a);
       });
 
+      state.selectedModel = state.models[0].id;
 
-  const response =
-    await fetch(
-      "/api/chat",
-      {
-        method:"POST",
+      el.modelSelect.innerHTML = "";
 
-        headers:{
-          "content-type":
-            "application/json"
-        },
+      state.models.forEach(function(model){
+        var option = document.createElement("option");
+        option.value = model.id;
+        option.textContent = modelLabel(model);
+        el.modelSelect.appendChild(option);
+      });
 
-        body:JSON.stringify({
+      el.modelSelect.value = state.selectedModel;
+      el.status.textContent =
+        state.models.length + " free model" +
+        (state.models.length === 1 ? "" : "s");
 
-          model:
-            state.selectedModel,
+    }catch(err){
+      el.status.textContent = "Model loading failed";
+      el.modelSelect.innerHTML = "<option>No free models</option>";
+      showSystemError(err.message);
+    }
+  }
 
-          messages:
-            payloadMessages,
+  function closeDrawer(){
+    el.sidebar.classList.remove("open");
+    el.overlay.classList.remove("open");
+  }
 
-          stream:true
+  function openDrawer(){
+    el.sidebar.classList.add("open");
+    el.overlay.classList.add("open");
+  }
 
-        })
+  function markdownToHtml(text){
+    var value = String(text == null ? "" : text);
 
+    value = escapeHtml(value);
+
+    /*
+      We intentionally avoid literal backtick characters here.
+      This prevents the outer Worker HTML template from breaking.
+    */
+
+    var codeFence = String.fromCharCode(96) +
+      String.fromCharCode(96) +
+      String.fromCharCode(96);
+
+    var parts = value.split(codeFence);
+
+    if(parts.length > 1){
+      var rebuilt = "";
+
+      for(var i=0;i<parts.length;i++){
+        if(i % 2 === 1){
+          rebuilt += "<pre><code>" + parts[i].trim() + "</code></pre>";
+        }else{
+          rebuilt += parts[i];
+        }
       }
+
+      value = rebuilt;
+    }
+
+    value = value.replace(
+      /\\*\\*(.+?)\\*\\*/g,
+      "<strong>$1</strong>"
     );
 
+    value = value.replace(
+      /\\*([^*]+)\\*/g,
+      "<em>$1</em>"
+    );
 
-  /*
-   * Errors before streaming begins.
-   */
+    value = value.replace(
+      /^### (.+)$/gm,
+      "<h3>$1</h3>"
+    );
 
-  if(!response.ok){
+    value = value.replace(
+      /^## (.+)$/gm,
+      "<h2>$1</h2>"
+    );
 
-    const data =
-      await response
-        .json()
-        .catch(function(){
-          return {};
+    value = value.replace(
+      /^# (.+)$/gm,
+      "<h1>$1</h1>"
+    );
+
+    value = value.replace(
+      /^> (.+)$/gm,
+      "<blockquote>$1</blockquote>"
+    );
+
+    value = value.replace(
+      /^[-*] (.+)$/gm,
+      "<li>$1</li>"
+    );
+
+    value = value.replace(
+      /(<li>.*<\\/li>)/gs,
+      "<ul>$1</ul>"
+    );
+
+    value = value.replace(
+      /\$begin:math:display$\(\[\^\\$end:math:display$]+)\\]\$begin:math:text$\(https\?\:\\\\\/\\\\\/\[\^\\\\s\)\]\+\)\\$end:math:text$/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+    );
+
+    value = value.replace(
+      /\\n{2,}/g,
+      "</p><p>"
+    );
+
+    value = "<p>" + value + "</p>";
+
+    value = value.replace(
+      /<p>(<h[1-3]>)/g,
+      "$1"
+    );
+
+    value = value.replace(
+      /(<\\/h[1-3]>)<\\/p>/g,
+      "$1"
+    );
+
+    value = value.replace(
+      /<p>(<pre>)/g,
+      "$1"
+    );
+
+    value = value.replace(
+      /(<\\/pre>)<\\/p>/g,
+      "$1"
+    );
+
+    value = value.replace(
+      /<p>(<ul>)/g,
+      "$1"
+    );
+
+    value = value.replace(
+      /(<\\/ul>)<\\/p>/g,
+      "$1"
+    );
+
+    value = value.replace(
+      /<p>(<blockquote>)/g,
+      "$1"
+    );
+
+    value = value.replace(
+      /(<\\/blockquote>)<\\/p>/g,
+      "$1"
+    );
+
+    return value;
+  }
+
+  function addMessage(role,text,attachments){
+    var message = {
+      role: role,
+      content: text,
+      attachments: attachments || []
+    };
+
+    state.messages.push(message);
+    renderMessages();
+    saveCurrentChat();
+
+    return message;
+  }
+
+  function renderMessages(){
+    el.empty.style.display = state.messages.length ? "none" : "flex";
+
+    el.messages.innerHTML = "";
+
+    state.messages.forEach(function(message,index){
+      var row = document.createElement("div");
+      row.className = "msg " + message.role;
+
+      var avatar = document.createElement("div");
+      avatar.className = "avatar";
+      avatar.textContent = message.role === "user" ? "You" : "AI";
+
+      var body = document.createElement("div");
+      body.className = "msg-body";
+
+      if(message.role === "user"){
+        body.innerHTML = "<div>" + escapeHtml(message.content || "") + "</div>";
+      }else{
+        body.innerHTML = markdownToHtml(message.content || "");
+      }
+
+      if(message.attachments && message.attachments.length){
+        var attachments = document.createElement("div");
+        attachments.className = "attachments";
+
+        message.attachments.forEach(function(file){
+          var item = document.createElement("div");
+          item.className = "attachment";
+          item.textContent = file.name || "Attachment";
+          attachments.appendChild(item);
         });
 
-    throw new Error(
-      extractApiError(data) ||
-      (
-        "Chat request failed. HTTP " +
-        response.status
-      )
-    );
-
-  }
-
-
-  await readStream(
-    response,
-    assistant
-  );
-
-
-  setStatus("");
-
-  persistCurrent(
-    typeof userMessage.content === "string"
-      ? userMessage.content
-      : userMessage.displayText
-  );
-}
-
-
-/* =========================
-   COUNCIL
-========================= */
-
-async function councilRequest(){
-
-  const userMessage =
-    state.messages[
-      state.messages.length - 1
-    ];
-
-  const assistant = {
-
-    role:"assistant",
-
-    content:"",
-
-    council:true
-
-  };
-
-  addMessage(assistant);
-
-  setStatus(
-    "AI Council: models are analyzing..."
-  );
-
-
-  const response =
-    await fetch(
-      "/api/council",
-      {
-        method:"POST",
-
-        headers:{
-          "content-type":
-            "application/json"
-        },
-
-        body:JSON.stringify({
-
-          text:
-            userMessage.displayText ||
-            (
-              typeof userMessage.content === "string"
-                ? userMessage.content
-                : "Analyze the attachment."
-            ),
-
-          content:
-            userMessage.content
-
-        })
-
+        body.appendChild(attachments);
       }
-    );
 
-
-  const data =
-    await response
-      .json()
-      .catch(function(){
-        return {};
-      });
-
-
-  if(!response.ok){
-
-    throw new Error(
-      extractApiError(data) ||
-      (
-        "Council failed. HTTP " +
-        response.status
-      )
-    );
-
-  }
-
-
-  assistant.content =
-    data.answer ||
-    "The Council returned no final answer.";
-
-
-  renderMessages();
-
-  setStatus("");
-
-  persistCurrent(
-    userMessage.displayText ||
-    "Council conversation"
-  );
-}
-
-
-/* =========================
-   IMAGE GENERATION
-========================= */
-
-async function generateImage(prompt){
-
-  setStatus(
-    "Choosing a free image model..."
-  );
-
-
-  const response =
-    await fetch(
-      "/api/image",
-      {
-        method:"POST",
-
-        headers:{
-          "content-type":
-            "application/json"
-        },
-
-        body:JSON.stringify({
-
-          prompt:prompt
-
-        })
-
-      }
-    );
-
-
-  const data =
-    await response
-      .json()
-      .catch(function(){
-        return {};
-      });
-
-
-  if(!response.ok){
-
-    throw new Error(
-      extractApiError(data) ||
-      (
-        "Image generation failed. HTTP " +
-        response.status
-      )
-    );
-
-  }
-
-
-  if(!data.url){
-
-    throw new Error(
-      "Image model returned no image URL."
-    );
-
-  }
-
-
-  addMessage({
-
-    role:"assistant",
-
-    content:
-      "Generated with a free image model.",
-
-    image:data.url
-
-  });
-
-
-  setStatus("");
-
-  persistCurrent(prompt);
-}
-
-
-/* =========================
-   SEND
-========================= */
-
-async function sendMessage(){
-
-  const prompt =
-    $("prompt");
-
-  const text =
-    prompt.value.trim();
-
-
-  if(
-    !text &&
-    !state.attachments.length
-  ){
-
-    return;
-
-  }
-
-
-  if(
-    $("sendButton").disabled
-  ){
-
-    return;
-
-  }
-
-
-  $("sendButton").disabled =
-    true;
-
-
-  const attachments =
-    state.attachments.slice();
-
-  state.attachments = [];
-
-  renderAttachments();
-
-
-  const parts = [];
-
-
-  for(
-    const file of attachments
-  ){
-
-    if(
-      file.type &&
-      file.type.startsWith("image/")
-    ){
-
-      parts.push({
-
-        type:"image_url",
-
-        image_url:{
-          url:file.data
-        }
-
-      });
-
-    }else{
-
-      parts.push({
-
-        type:"text",
-
-        text:
-          "\\n\\n[File: " +
-          file.name +
-          "]\\n" +
-          file.text
-
-      });
-
-    }
-
-  }
-
-
-  if(parts.length){
-
-    parts.push({
-
-      type:"text",
-
-      text:
-        text ||
-        "Analyze the attached file(s)."
-
+      row.appendChild(avatar);
+      row.appendChild(body);
+      el.messages.appendChild(row);
     });
 
+    requestAnimationFrame(function(){
+      el.chat.scrollTop = el.chat.scrollHeight;
+    });
   }
 
+  function showSystemError(message){
+    var row = document.createElement("div");
+    row.className = "msg assistant";
 
-  const userMessage = {
+    var avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.textContent = "AI";
 
-    role:"user",
+    var body = document.createElement("div");
+    body.className = "msg-body error";
+    body.textContent = message;
 
-    content:
-      parts.length
-        ? parts
-        : text,
+    row.appendChild(avatar);
+    row.appendChild(body);
+    el.messages.appendChild(row);
 
-    displayText:
-      text ||
-      "Analyze the attached file(s).",
+    el.empty.style.display = "none";
 
-    files:
-      attachments.map(
-        function(file){
-          return file.name;
-        }
-      )
+    requestAnimationFrame(function(){
+      el.chat.scrollTop = el.chat.scrollHeight;
+    });
+  }
 
-  };
+  function showAssistantPlaceholder(){
+    var row = document.createElement("div");
+    row.className = "msg assistant";
+    row.id = "streamingMessage";
 
+    var avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.textContent = "AI";
 
-  addMessage(
-    userMessage
-  );
+    var body = document.createElement("div");
+    body.className = "msg-body typing";
+    body.innerHTML = "Thinking...";
 
+    row.appendChild(avatar);
+    row.appendChild(body);
+    el.messages.appendChild(row);
 
-  prompt.value = "";
+    el.empty.style.display = "none";
 
-  autoGrow();
+    requestAnimationFrame(function(){
+      el.chat.scrollTop = el.chat.scrollHeight;
+    });
 
+    return body;
+  }
 
-  try{
+  function removeStreamingMessage(){
+    var old = document.getElementById("streamingMessage");
+    if(old) old.remove();
+  }
 
-    /*
-     * Image request automatically switches
-     * to the free image generation workflow.
-     */
+  function setBusy(value){
+    state.busy = value;
+    el.sendBtn.disabled = value;
+    el.councilBtn.disabled = value;
+    el.fileBtn.disabled = value;
+    el.prompt.disabled = value;
 
-    if(
-      isImageRequest(text) &&
-      !attachments.some(
-        function(file){
-          return (
-            file.type &&
-            file.type.startsWith("image/")
+    if(value){
+      el.status.textContent = "Working...";
+    }else{
+      el.status.textContent =
+        state.models.length + " free model" +
+        (state.models.length === 1 ? "" : "s");
+    }
+  }
+
+  function parseSSEBlock(block){
+    var lines = block.split("\\n");
+    var dataLines = [];
+
+    for(var i=0;i<lines.length;i++){
+      var line = lines[i];
+
+      if(line.indexOf("data:") === 0){
+        dataLines.push(line.slice(5).trim());
+      }
+    }
+
+    if(!dataLines.length) return null;
+
+    var raw = dataLines.join("\\n");
+
+    if(raw === "[DONE]"){
+      return {done:true};
+    }
+
+    try{
+      return JSON.parse(raw);
+    }catch(e){
+      return null;
+    }
+  }
+
+  async function streamChat(payload,onText){
+    var response;
+
+    try{
+      response = await fetch("/api/chat",{
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json"
+        },
+        body:JSON.stringify(payload)
+      });
+    }catch(err){
+      throw new Error("Network error: " + err.message);
+    }
+
+    if(!response.ok){
+      var errorBody = await response.text();
+      var errorData;
+
+      try{
+        errorData = JSON.parse(errorBody);
+      }catch(e){
+        errorData = errorBody;
+      }
+
+      throw new Error(errorText(errorData,response.status));
+    }
+
+    if(!response.body){
+      throw new Error("Streaming is not supported by this response.");
+    }
+
+    var reader = response.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer = "";
+    var finalText = "";
+
+    while(true){
+      var result = await reader.read();
+
+      if(result.done) break;
+
+      buffer += decoder.decode(result.value,{stream:true});
+
+      var blocks = buffer.split("\\n\\n");
+      buffer = blocks.pop();
+
+      for(var i=0;i<blocks.length;i++){
+        var event = parseSSEBlock(blocks[i]);
+
+        if(!event) continue;
+
+        if(event.error){
+          throw new Error(
+            event.error.message ||
+            event.error.code ||
+            "Upstream model error"
           );
         }
-      )
-    ){
 
-      await generateImage(text);
+        if(event.done){
+          continue;
+        }
 
+        var choices = event.choices || [];
+
+        if(!choices.length) continue;
+
+        var delta = choices[0].delta || {};
+        var piece = delta.content || "";
+
+        if(piece){
+          finalText += piece;
+          onText(finalText);
+        }
+      }
     }
 
-    /*
-     * Council mode.
-     */
+    return finalText;
+  }
 
-    else if(
-      state.council
-    ){
-
-      await councilRequest();
-
+  function buildUserContent(text){
+    if(!state.attachments.length){
+      return text;
     }
 
-    /*
-     * Normal chat.
-     */
+    var parts = [
+      {
+        type:"text",
+        text:text
+      }
+    ];
 
-    else{
-
-      await chatRequest();
-
-    }
-
-  }catch(error){
-
-    addMessage({
-
-      role:"assistant",
-
-      content:
-        "Error: " +
-        (
-          error?.message ||
-          String(error)
-        )
-
+    state.attachments.forEach(function(file){
+      if(file.kind === "image"){
+        parts.push({
+          type:"image_url",
+          image_url:{
+            url:file.data
+          }
+        });
+      }else{
+        parts.push({
+          type:"text",
+          text:
+            "\\n\\n--- FILE: " +
+            file.name +
+            " ---\\n" +
+            file.data +
+            "\\n--- END FILE ---\\n"
+        });
+      }
     });
 
-    setStatus("");
-
-  }finally{
-
-    $("sendButton").disabled =
-      false;
-
+    return parts;
   }
-}
 
+  function isImageRequest(text){
+    var t = String(text || "").toLowerCase();
 
-/* =========================
-   TEXTAREA
-========================= */
+    var patterns = [
+      "generate an image",
+      "generate image",
+      "create an image",
+      "create image",
+      "make an image",
+      "make image",
+      "draw an image",
+      "draw image",
+      "draw me",
+      "render an image",
+      "render image",
+      "design an image",
+      "design image",
+      "generate a picture",
+      "create a picture",
+      "make a picture",
+      "draw a picture",
+      "image generation",
+      "image of",
+      "picture of",
+      "wallpaper of",
+      "poster of",
+      "logo of"
+    ];
 
-function autoGrow(){
-
-  const textarea =
-    $("prompt");
-
-  textarea.style.height =
-    "auto";
-
-  textarea.style.height =
-    Math.min(
-      textarea.scrollHeight,
-      180
-    ) +
-    "px";
-}
-
-
-/* =========================
-   SIDEBAR
-========================= */
-
-function openSidebar(){
-
-  $("sidebar")
-    .classList
-    .add("open");
-
-  $("overlay")
-    .classList
-    .add("open");
-}
-
-
-function closeSidebar(){
-
-  $("sidebar")
-    .classList
-    .remove("open");
-
-  $("overlay")
-    .classList
-    .remove("open");
-}
-
-
-/* =========================
-   EVENTS
-========================= */
-
-$("sendButton").onclick =
-  sendMessage;
-
-
-$("prompt").addEventListener(
-  "input",
-  autoGrow
-);
-
-
-$("prompt").addEventListener(
-  "keydown",
-  function(event){
-
-    if(
-      event.key === "Enter" &&
-      !event.shiftKey
-    ){
-
-      event.preventDefault();
-
-      sendMessage();
-
+    for(var i=0;i<patterns.length;i++){
+      if(t.indexOf(patterns[i]) >= 0){
+        return true;
+      }
     }
 
+    return false;
   }
-);
 
+  async function generateImage(prompt){
+    var response = await apiJson("/api/image",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json"
+      },
+      body:JSON.stringify({
+        prompt:prompt
+      })
+    });
 
-$("attachButton").onclick =
-  function(){
+    return response;
+  }
 
-    $("fileInput").click();
+  function addImageMessage(result){
+    var row = document.createElement("div");
+    row.className = "msg assistant";
 
-  };
+    var avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.textContent = "AI";
 
+    var body = document.createElement("div");
+    body.className = "msg-body";
 
-$("fileInput").addEventListener(
-  "change",
-  filesPicked
-);
+    var title = document.createElement("div");
+    title.textContent = "Generated image";
+    title.style.marginBottom = "10px";
+    title.style.fontWeight = "700";
 
+    body.appendChild(title);
 
-$("hamburger").onclick =
-  openSidebar;
+    var imageBox = document.createElement("div");
+    imageBox.className = "image-result";
 
+    var img = document.createElement("img");
+    img.src = result.url;
+    img.alt = "Generated image";
 
-$("closeSidebar").onclick =
-  closeSidebar;
+    var link = document.createElement("a");
+    link.className = "image-link";
+    link.href = result.url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = "Open image";
 
+    imageBox.appendChild(img);
+    imageBox.appendChild(link);
+    body.appendChild(imageBox);
 
-$("overlay").onclick =
-  closeSidebar;
+    row.appendChild(avatar);
+    row.appendChild(body);
 
+    el.messages.appendChild(row);
 
-$("newChat").onclick =
-  newChat;
+    state.messages.push({
+      role:"assistant",
+      content:"Generated an image.",
+      attachments:[]
+    });
 
+    saveCurrentChat();
 
-$("modelSelect").onchange =
-  function(event){
+    requestAnimationFrame(function(){
+      el.chat.scrollTop = el.chat.scrollHeight;
+    });
+  }
 
-    state.selectedModel =
-      event.target.value;
+  async function sendNormal(){
+    var text = el.prompt.value.trim();
 
-  };
+    if(!text && !state.attachments.length) return;
+    if(state.busy) return;
 
+    var attachmentsForHistory = state.attachments.map(function(file){
+      return {
+        name:file.name,
+        kind:file.kind
+      };
+    });
 
-$("councilButton").onclick =
-  function(){
+    addMessage("user",text || "Please analyze the attached files.",attachmentsForHistory);
 
-    state.council =
-      !state.council;
-
-    $("councilButton")
-      .classList
-      .toggle(
-        "active",
-        state.council
-      );
-
-    setStatus(
-      state.council
-        ? "AI Council enabled"
-        : ""
+    var content = buildUserContent(
+      text || "Please analyze the attached files."
     );
 
-  };
+    el.prompt.value = "";
+    autoResize();
+    renderAttachments();
 
+    var filesBeforeClear = state.attachments;
+    state.attachments = [];
 
-document.addEventListener(
-  "keydown",
-  function(event){
+    setBusy(true);
 
-    if(
-      event.key === "Escape"
-    ){
+    try{
+      if(isImageRequest(text) && !filesBeforeClear.some(function(f){
+        return f.kind === "image";
+      })){
+        var imageResult = await generateImage(text);
 
-      closeSidebar();
+        addImageMessage(imageResult);
+        return;
+      }
 
+      var body = showAssistantPlaceholder();
+
+      var payloadMessages = state.messages
+        .filter(function(m){
+          return m.role === "user" || m.role === "assistant";
+        })
+        .slice(-20)
+        .map(function(m,index,array){
+          if(index === array.length - 1 && m.role === "user"){
+            return {
+              role:"user",
+              content:content
+            };
+          }
+
+          return {
+            role:m.role,
+            content:m.content
+          };
+        });
+
+      var finalText = await streamChat({
+        model:state.selectedModel,
+        messages:payloadMessages
+      },function(current){
+        body.className = "msg-body";
+        body.innerHTML = markdownToHtml(current);
+
+        requestAnimationFrame(function(){
+          el.chat.scrollTop = el.chat.scrollHeight;
+        });
+      });
+
+      removeStreamingMessage();
+
+      if(!finalText){
+        throw new Error("The model returned an empty answer.");
+      }
+
+      addMessage("assistant",finalText,[]);
+
+    }catch(err){
+      removeStreamingMessage();
+      showSystemError(err.message);
+    }finally{
+      setBusy(false);
+    }
+  }
+
+  async function sendCouncil(){
+    var text = el.prompt.value.trim();
+
+    if(!text && !state.attachments.length) return;
+    if(state.busy) return;
+
+    var attachmentsForHistory = state.attachments.map(function(file){
+      return {
+        name:file.name,
+        kind:file.kind
+      };
+    });
+
+    addMessage(
+      "user",
+      text || "Please analyze the attached files.",
+      attachmentsForHistory
+    );
+
+    var content = buildUserContent(
+      text || "Please analyze the attached files."
+    );
+
+    el.prompt.value = "";
+    autoResize();
+    renderAttachments();
+
+    state.attachments = [];
+
+    setBusy(true);
+
+    try{
+      var panel = document.createElement("div");
+      panel.className = "council-panel";
+      panel.innerHTML =
+        "<div class='council-head'>AI Council meeting</div>" +
+        "<div id='councilStatus'>The council is analyzing...</div>";
+
+      var row = document.createElement("div");
+      row.className = "msg assistant";
+
+      var avatar = document.createElement("div");
+      avatar.className = "avatar";
+      avatar.textContent = "AI";
+
+      var body = document.createElement("div");
+      body.className = "msg-body";
+      body.appendChild(panel);
+
+      row.appendChild(avatar);
+      row.appendChild(body);
+      el.messages.appendChild(row);
+
+      requestAnimationFrame(function(){
+        el.chat.scrollTop = el.chat.scrollHeight;
+      });
+
+      var result = await apiJson("/api/council",{
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json"
+        },
+        body:JSON.stringify({
+          question:content,
+          model:state.selectedModel
+        })
+      });
+
+      panel.innerHTML =
+        "<div class='council-head'>AI Council final answer</div>" +
+        markdownToHtml(result.answer || "No final answer returned.");
+
+      if(result.participants && result.participants.length){
+        var info = document.createElement("div");
+        info.style.marginTop = "15px";
+        info.style.color = "#777780";
+        info.style.fontSize = "11px";
+
+        info.textContent =
+          "Participants: " +
+          result.participants.join(", ");
+
+        panel.appendChild(info);
+      }
+
+      state.messages.push({
+        role:"assistant",
+        content:result.answer || "No final answer returned.",
+        attachments:[]
+      });
+
+      saveCurrentChat();
+
+    }catch(err){
+      showSystemError(err.message);
+    }finally{
+      setBusy(false);
+    }
+  }
+
+  async function send(){
+    if(state.council){
+      await sendCouncil();
+    }else{
+      await sendNormal();
+    }
+  }
+
+  function autoResize(){
+    el.prompt.style.height = "auto";
+    el.prompt.style.height =
+      Math.min(el.prompt.scrollHeight,180) + "px";
+  }
+
+  async function readFile(file){
+    var maxTextSize = 1024 * 1024 * 2;
+
+    if(file.type.indexOf("image/") === 0){
+      return new Promise(function(resolve,reject){
+        var reader = new FileReader();
+
+        reader.onload = function(){
+          resolve({
+            name:file.name,
+            kind:"image",
+            data:reader.result
+          });
+        };
+
+        reader.onerror = function(){
+          reject(new Error("Could not read image: " + file.name));
+        };
+
+        reader.readAsDataURL(file);
+      });
     }
 
+    if(file.size > maxTextSize){
+      throw new Error(
+        file.name +
+        " is too large. Text/code files must be 2 MB or smaller."
+      );
+    }
+
+    return new Promise(function(resolve,reject){
+      var reader = new FileReader();
+
+      reader.onload = function(){
+        resolve({
+          name:file.name,
+          kind:"text",
+          data:String(reader.result || "")
+        });
+      };
+
+      reader.onerror = function(){
+        reject(new Error("Could not read file: " + file.name));
+      };
+
+      reader.readAsText(file);
+    });
   }
-);
 
+  async function handleFiles(files){
+    try{
+      for(var i=0;i<files.length;i++){
+        var parsed = await readFile(files[i]);
+        state.attachments.push(parsed);
+      }
 
-/* =========================
-   START
-========================= */
+      renderAttachments();
 
-renderHistory();
+    }catch(err){
+      showSystemError(err.message);
+    }
+  }
 
-renderMessages();
+  function renderAttachments(){
+    el.attachPreview.innerHTML = "";
 
-loadModels();
+    state.attachments.forEach(function(file,index){
+      var item = document.createElement("div");
+      item.className = "preview";
 
+      var label = document.createElement("span");
+      label.textContent =
+        (file.kind === "image" ? "🖼 " : "📄 ") +
+        file.name;
+
+      var remove = document.createElement("button");
+      remove.textContent = " ×";
+      remove.style.background = "none";
+      remove.style.border = "0";
+      remove.style.color = "#999";
+      remove.style.cursor = "pointer";
+
+      remove.onclick = function(){
+        state.attachments.splice(index,1);
+        renderAttachments();
+      };
+
+      item.appendChild(label);
+      item.appendChild(remove);
+      el.attachPreview.appendChild(item);
+    });
+  }
+
+  function newChat(){
+    state.messages = [];
+    state.attachments = [];
+    state.chatId = null;
+    el.messages.innerHTML = "";
+    el.empty.style.display = "flex";
+    renderAttachments();
+    closeDrawer();
+  }
+
+  function chatTitle(){
+    var first = state.messages.find(function(m){
+      return m.role === "user";
+    });
+
+    if(!first) return "New chat";
+
+    var title = String(first.content || "").replace(/\\s+/g," ").trim();
+
+    if(title.length > 45){
+      title = title.slice(0,45) + "...";
+    }
+
+    return title || "New chat";
+  }
+
+  function saveCurrentChat(){
+    if(!state.messages.length) return;
+
+    if(!state.chatId){
+      state.chatId =
+        Date.now().toString(36) +
+        Math.random().toString(36).slice(2,8);
+    }
+
+    var chats;
+
+    try{
+      chats = JSON.parse(
+        localStorage.getItem("aether_chats") || "[]"
+      );
+    }catch(e){
+      chats = [];
+    }
+
+    var item = {
+      id:state.chatId,
+      title:chatTitle(),
+      messages:state.messages,
+      updated:Date.now()
+    };
+
+    var found = false;
+
+    chats = chats.map(function(chat){
+      if(chat.id === item.id){
+        found = true;
+        return item;
+      }
+
+      return chat;
+    });
+
+    if(!found){
+      chats.unshift(item);
+    }
+
+    chats.sort(function(a,b){
+      return b.updated - a.updated;
+    });
+
+    chats = chats.slice(0,30);
+
+    try{
+      localStorage.setItem("aether_chats",JSON.stringify(chats));
+    }catch(e){}
+
+    renderHistory();
+  }
+
+  function renderHistory(){
+    var title = document.createElement("div");
+    title.className = "history-title";
+    title.textContent = "Recent chats";
+
+    el.history.innerHTML = "";
+    el.history.appendChild(title);
+
+    var chats;
+
+    try{
+      chats = JSON.parse(
+        localStorage.getItem("aether_chats") || "[]"
+      );
+    }catch(e){
+      chats = [];
+    }
+
+    chats.forEach(function(chat){
+      var item = document.createElement("div");
+      item.className = "history-item";
+      item.textContent = chat.title || "New chat";
+      item.title = chat.title || "New chat";
+
+      item.onclick = function(){
+        loadChat(chat.id);
+        closeDrawer();
+      };
+
+      el.history.appendChild(item);
+    });
+  }
+
+  function loadChat(id){
+    var chats;
+
+    try{
+      chats = JSON.parse(
+        localStorage.getItem("aether_chats") || "[]"
+      );
+    }catch(e){
+      return;
+    }
+
+    var chat = chats.find(function(item){
+      return item.id === id;
+    });
+
+    if(!chat) return;
+
+    state.chatId = chat.id;
+    state.messages = Array.isArray(chat.messages)
+      ? chat.messages
+      : [];
+
+    state.attachments = [];
+
+    renderMessages();
+    renderAttachments();
+  }
+
+  el.menuBtn.addEventListener("click",function(){
+    if(el.sidebar.classList.contains("open")){
+      closeDrawer();
+    }else{
+      openDrawer();
+    }
+  });
+
+  el.overlay.addEventListener("click",closeDrawer);
+
+  el.newChat.addEventListener("click",newChat);
+
+  el.modelSelect.addEventListener("change",function(){
+    state.selectedModel = el.modelSelect.value;
+  });
+
+  el.councilBtn.addEventListener("click",function(){
+    state.council = !state.council;
+    el.councilBtn.classList.toggle("active",state.council);
+
+    if(state.council){
+      el.councilBtn.textContent = "Council ON";
+    }else{
+      el.councilBtn.textContent = "AI Council";
+    }
+  });
+
+  el.sendBtn.addEventListener("click",send);
+
+  el.prompt.addEventListener("keydown",function(event){
+    if(event.key === "Enter" && !event.shiftKey){
+      event.preventDefault();
+      send();
+    }
+  });
+
+  el.prompt.addEventListener("input",autoResize);
+
+  el.fileBtn.addEventListener("click",function(){
+    el.fileInput.click();
+  });
+
+  el.fileInput.addEventListener("change",function(){
+    handleFiles(Array.from(el.fileInput.files || []));
+    el.fileInput.value = "";
+  });
+
+  renderHistory();
+  loadModels();
+
+})();
 </script>
 </body>
 </html>`;
 
+const DEFAULT_BASE_URL = "https://api.xkiro.com/v1";
 
-/* =========================================================
-   SERVER
-========================================================= */
-
-const JSON_HEADERS = {
-  "content-type":"application/json; charset=utf-8",
-  "cache-control":"no-store",
-  "access-control-allow-origin":"*"
-};
-
-
-const HTML_HEADERS = {
-  "content-type":"text/html; charset=utf-8",
-  "cache-control":"no-store"
-};
-
-
-function json(data,status=200){
-
-  return new Response(
-    JSON.stringify(data),
-    {
-      status,
-      headers:JSON_HEADERS
+function json(data, status = 200, extraHeaders = {}) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+      ...extraHeaders
     }
-  );
-
+  });
 }
 
-
-function apiBase(env){
-
-  return (
-    env.XKIRO_BASE_URL ||
-    "https://api.xkiro.com/v1"
-  ).replace(/\/$/,"");
-
+function getBaseUrl(env) {
+  return String(env.XKIRO_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, "");
 }
 
+function getApiKey(env) {
+  return env.XKIRO_API_KEY || env.XKIRO_API_TOKEN || env.API_KEY || "";
+}
 
-function apiHeaders(env){
+function authHeaders(env) {
+  const key = getApiKey(env);
 
-  const key =
-    env.XKIRO_API_KEY;
+  return {
+    "Authorization": "Bearer " + key,
+    "Content-Type": "application/json"
+  };
+}
 
-  if(!key){
+async function readJsonSafe(response) {
+  const text = await response.text();
 
-    throw new Error(
-      "XKIRO_API_KEY is missing from Worker environment."
-    );
+  if (!text) return {};
 
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      error: {
+        message: text
+      }
+    };
+  }
+}
+
+function upstreamError(data, status) {
+  let message = "xKiro request failed (" + status + ")";
+
+  if (data && data.error) {
+    if (typeof data.error === "string") {
+      message = data.error;
+    } else if (data.error.message) {
+      message = data.error.message;
+    } else if (data.error.code) {
+      message = data.error.code;
+    }
+  } else if (data && data.message) {
+    message = data.message;
   }
 
   return {
-
-    "Authorization":
-      "Bearer " + key,
-
-    "x-api-key":
-      key,
-
-    "Content-Type":
-      "application/json",
-
-    "Accept":
-      "application/json"
-
+    error: {
+      message,
+      status
+    }
   };
-
 }
 
+async function xkiroFetch(env, path, init = {}) {
+  const key = getApiKey(env);
 
-/* =========================================================
-   ERROR HANDLING
-========================================================= */
-
-function getXKiroError(data,fallback){
-
-  fallback =
-    fallback ||
-    "xKiro request failed";
-
-
-  if(!data){
-
-    return fallback;
-
-  }
-
-
-  if(typeof data === "string"){
-
-    return data;
-
-  }
-
-
-  if(
-    data.error &&
-    typeof data.error === "object"
-  ){
-
-    return (
-      data.error.message ||
-      data.error.code ||
-      data.error.type ||
-      fallback
+  if (!key) {
+    throw new Error(
+      "XKIRO_API_KEY is missing in Cloudflare Worker environment variables."
     );
-
   }
 
-
-  if(
-    typeof data.error === "string"
-  ){
-
-    return data.error;
-
-  }
-
-
-  if(data.message){
-
-    return String(
-      data.message
-    );
-
-  }
-
-
-  try{
-
-    return JSON.stringify(
-      data
-    );
-
-  }catch(error){
-
-    return fallback;
-
-  }
-
-}
-
-
-/* =========================================================
-   MODEL HELPERS
-========================================================= */
-
-function modelId(model){
-
-  return (
-    model.id ||
-    model.model ||
-    model.name ||
-    ""
+  const response = await fetch(
+    getBaseUrl(env) + path,
+    {
+      ...init,
+      headers: {
+        ...authHeaders(env),
+        ...(init.headers || {})
+      }
+    }
   );
 
+  return response;
 }
 
-
-function modelLabel(model){
-
-  return (
-    model.name ||
-    model.display_name ||
-    model.displayName ||
-    model.id ||
-    "Unknown model"
-  );
-
-}
-
-
-function isFree(model){
-
-  return (
-    String(
-      model.access_tier ||
-      model.accessTier ||
-      ""
-    ).toLowerCase()
-    ===
-    "free"
-  );
-
-}
-
-
-function capability(model,key){
-
-  const c =
-    model.capabilities ||
-    {};
-
-  return Boolean(
-    c[key] ??
-    model[key]
-  );
-
-}
-
-
-/*
- * This is NOT a claim that one vendor/model
- * is objectively "best".
- *
- * It simply selects the strongest capability
- * profile among the currently listed FREE models.
- */
-
-function capabilityScore(model){
-
-  const c =
-    model.capabilities ||
-    {};
-
-  const context =
-    Number(
-      model.context_length ||
-      model.context ||
-      c.context_length ||
-      c.context ||
-      0
-    );
-
-  const output =
-    Number(
-      model.max_output_tokens ||
-      model.max_output ||
-      c.max_output_tokens ||
-      0
-    );
-
+function modelScore(model) {
   let score = 0;
 
-  if(
-    c.reasoning ||
-    model.reasoning
-  ){
+  if (model.reasoning) score += 40;
+  if (model.vision) score += 20;
+  if (model.tools) score += 10;
 
-    score += 100000;
+  const context = Number(
+    model.context_window ||
+    model.context_length ||
+    model.max_context ||
+    0
+  );
 
-  }
+  const output = Number(
+    model.max_output_tokens ||
+    model.max_tokens ||
+    0
+  );
 
-  if(
-    c.tools ||
-    model.tools
-  ){
+  score += Math.min(context / 10000, 30);
+  score += Math.min(output / 5000, 20);
 
-    score += 40000;
+  const id = String(model.id || "").toLowerCase();
 
-  }
-
-  if(
-    c.vision ||
-    model.vision
-  ){
-
-    score += 20000;
-
-  }
-
-  score +=
-    Math.min(
-      context / 100000,
-      20
-    );
-
-  score +=
-    Math.min(
-      output / 20000,
-      10
-    );
+  if (id.includes("reason")) score += 5;
+  if (id.includes("thinking")) score += 5;
 
   return score;
-
 }
 
+async function listModels(env, modality = "chat") {
+  const suffix =
+    modality === "chat"
+      ? ""
+      : "?modality=" + encodeURIComponent(modality);
 
-/* =========================================================
-   MODEL CATALOG
-========================================================= */
+  const response = await xkiroFetch(env, "/models" + suffix, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json"
+    }
+  });
 
-async function listModels(
-  env,
-  modality
-){
+  const data = await readJsonSafe(response);
 
-  /*
-   * xKiro's normal /v1/models endpoint
-   * is the chat model catalog.
-   *
-   * Image models are queried separately.
-   */
-
-  let url;
-
-  if(
-    modality === "image"
-  ){
-
-    url =
-      apiBase(env) +
-      "/models?modality=image";
-
-  }else{
-
-    url =
-      apiBase(env) +
-      "/models";
-
-  }
-
-
-  const response =
-    await fetch(
-      url,
-      {
-        method:"GET",
-        headers:apiHeaders(env)
-      }
-    );
-
-
-  const data =
-    await response
-      .json()
-      .catch(function(){
-        return null;
-      });
-
-
-  if(!response.ok){
-
+  if (!response.ok) {
     throw new Error(
-      getXKiroError(
-        data,
-        "Could not load xKiro model catalog. HTTP " +
-        response.status
-      )
+      upstreamError(data, response.status).error.message
     );
-
   }
 
+  const models = Array.isArray(data.data)
+    ? data.data
+    : Array.isArray(data.models)
+      ? data.models
+      : [];
 
-  const models =
-    Array.isArray(data?.data)
-      ? data.data
-      : Array.isArray(data?.models)
-        ? data.models
-        : [];
+  return models;
+}
 
+function isFreeModel(model) {
+  return String(model.access_tier || "").toLowerCase() === "free";
+}
 
-  /*
-   * VERY IMPORTANT:
-   *
-   * We don't trust model names.
-   * We trust xKiro's live access_tier.
-   */
+function isChatModel(model) {
+  const modality = String(model.modality || "chat").toLowerCase();
+
+  return modality === "chat" || modality === "text";
+}
+
+async function getFreeModels(env) {
+  const models = await listModels(env, "chat");
 
   return models
+    .filter(isFreeModel)
+    .filter(isChatModel)
+    .sort((a, b) => modelScore(b) - modelScore(a));
+}
 
-    .filter(function(model){
+async function getFreeImageModels(env) {
+  const models = await listModels(env, "image");
 
-      return isFree(model);
-
-    })
-
-    .filter(function(model){
-
-      return Boolean(
-        modelId(model)
-      );
-
-    })
-
-    .sort(function(a,b){
-
-      return (
-        capabilityScore(b) -
-        capabilityScore(a)
-      );
-
+  return models
+    .filter(isFreeModel)
+    .filter((model) => {
+      const modality = String(model.modality || "image").toLowerCase();
+      return modality === "image";
     });
-
 }
 
+function sseHeaders() {
+  return {
+    "Content-Type": "text/event-stream; charset=utf-8",
+    "Cache-Control": "no-cache, no-transform",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no"
+  };
+}
 
-/* =========================================================
-   FREE CHAT MODEL
-========================================================= */
+function sseError(message, code = "upstream_error") {
+  return (
+    "data: " +
+    JSON.stringify({
+      error: {
+        message,
+        code
+      }
+    }) +
+    "\n\n"
+  );
+}
 
-async function getFreeChatModel(
-  env,
-  requestedId
-){
+function sseDone() {
+  return "data: [DONE]\n\n";
+}
 
-  const models =
-    await listModels(
-      env,
-      "chat"
-    );
+async function handleChat(request, env) {
+  let body;
 
-
-  if(!models.length){
-
-    return null;
-
-  }
-
-
-  /*
-   * If frontend requested a model,
-   * only accept it if it is actually
-   * present in the FREE live catalog.
-   */
-
-  if(requestedId){
-
-    const requested =
-      models.find(
-        function(model){
-
-          return (
-            modelId(model) ===
-            requestedId
-          );
-
+  try {
+    body = await request.json();
+  } catch {
+    return json(
+      {
+        error: {
+          message: "Invalid JSON request."
         }
-      );
-
-    if(requested){
-
-      return requested;
-
-    }
-
-  }
-
-
-  /*
-   * First item is the highest capability
-   * score among current FREE models.
-   */
-
-  return models[0];
-
-}
-
-
-/* =========================================================
-   FREE IMAGE MODEL
-========================================================= */
-
-async function getFreeImageModel(
-  env,
-  requestedId
-){
-
-  const models =
-    await listModels(
-      env,
-      "image"
+      },
+      400
     );
-
-
-  if(!models.length){
-
-    return null;
-
   }
 
+  const freeModels = await getFreeModels(env);
 
-  if(requestedId){
-
-    const requested =
-      models.find(
-        function(model){
-
-          return (
-            modelId(model) ===
-            requestedId
-          );
-
+  if (!freeModels.length) {
+    return json(
+      {
+        error: {
+          message: "No free xKiro chat models are currently available."
         }
-      );
+      },
+      503
+    );
+  }
 
-    if(requested){
+  const requestedModel = String(body.model || "");
 
-      return requested;
+  const allowed = freeModels.some(
+    (model) => model.id === requestedModel
+  );
 
+  const model = allowed
+    ? requestedModel
+    : freeModels[0].id;
+
+  const messages = Array.isArray(body.messages)
+    ? body.messages
+    : [];
+
+  const upstreamBody = {
+    model,
+    messages,
+    stream: true,
+
+    web_search: {
+      enable: true,
+      count: 5
     }
+  };
 
+  if (body.reasoning_effort) {
+    upstreamBody.reasoning_effort = body.reasoning_effort;
   }
 
+  let upstream;
 
-  return models[0];
-
-}
-
-
-/* =========================================================
-   CONTENT EXTRACTION
-========================================================= */
-
-function extractText(content){
-
-  if(
-    typeof content ===
-    "string"
-  ){
-
-    return content;
-
-  }
-
-
-  if(
-    Array.isArray(content)
-  ){
-
-    return content
-
-      .filter(function(part){
-
-        return (
-          part &&
-          part.type ===
-          "text"
-        );
-
-      })
-
-      .map(function(part){
-
-        return (
-          part.text ||
-          ""
-        );
-
-      })
-
-      .join("\n");
-
-  }
-
-
-  return "";
-
-}
-
-
-/* =========================================================
-   COUNCIL
-========================================================= */
-
-async function councilRun(
-  env,
-  body
-){
-
-  const models =
-    await listModels(
+  try {
+    upstream = await xkiroFetch(
       env,
-      "chat"
+      "/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(upstreamBody)
+      }
     );
-
-
-  if(!models.length){
-
-    throw new Error(
-      "No FREE chat models are currently available on xKiro."
+  } catch (error) {
+    return json(
+      {
+        error: {
+          message: error.message
+        }
+      },
+      502
     );
-
   }
 
+  if (!upstream.ok) {
+    const data = await readJsonSafe(upstream);
 
-  /*
-   * Three strongest capability-profile
-   * FREE models participate.
-   */
-
-  const participants =
-    models.slice(
-      0,
-      Math.min(
-        3,
-        models.length
-      )
+    return json(
+      upstreamError(data, upstream.status),
+      upstream.status
     );
+  }
 
+  if (!upstream.body) {
+    return json(
+      {
+        error: {
+          message: "xKiro returned no streaming body."
+        }
+      },
+      502
+    );
+  }
 
-  const content =
-    body.content ||
-    body.text ||
-    "";
+  const reader = upstream.body.getReader();
 
+  const stream = new ReadableStream({
+    async start(controller) {
+      const decoder = new TextDecoder();
 
-  const question =
-    extractText(content) ||
-    body.text ||
-    "Answer the user's request.";
+      let buffer = "";
 
+      try {
+        while (true) {
+          const result = await reader.read();
 
-  const results = [];
+          if (result.done) break;
 
-  const failures = [];
-
-
-  /*
-   * ROUND 1
-   *
-   * Independent analysis.
-   */
-
-  for(
-    const model of participants
-  ){
-
-    const id =
-      modelId(model);
-
-
-    try{
-
-      const response =
-        await fetch(
-          apiBase(env) +
-          "/chat/completions",
-          {
-            method:"POST",
-
-            headers:
-              apiHeaders(env),
-
-            body:
-              JSON.stringify({
-
-                model:id,
-
-                messages:[
-
-                  {
-                    role:"system",
-
-                    content:
-                      "You are one independent member " +
-                      "of a multi-model AI council. " +
-                      "Analyze the user's request carefully. " +
-                      "Give factual reasoning, identify uncertainty, " +
-                      "and consider alternative explanations. " +
-                      "Your analysis will be reviewed by a final judge."
-
-                  },
-
-                  {
-                    role:"user",
-
-                    content:content
-
-                  }
-
-                ],
-
-                stream:false,
-
-                web_search:{
-                  enable:true,
-                  count:5
-                }
-
-              })
-
-          }
-        );
-
-
-      const data =
-        await response
-          .json()
-          .catch(function(){
-            return null;
+          buffer += decoder.decode(result.value, {
+            stream: true
           });
 
+          const blocks = buffer.split("\n\n");
 
-      if(!response.ok){
+          buffer = blocks.pop() || "";
 
-        failures.push({
+          for (const block of blocks) {
+            const lines = block.split("\n");
 
-          model:id,
+            for (const line of lines) {
+              if (!line.startsWith("data:")) continue;
 
-          status:
-            response.status,
+              const raw = line.slice(5).trim();
 
-          error:
-            getXKiroError(
-              data,
-              "HTTP " +
-              response.status
-            )
+              if (!raw) continue;
 
-        });
+              if (raw === "[DONE]") {
+                controller.enqueue(
+                  new TextEncoder().encode(
+                    sseDone()
+                  )
+                );
 
-        continue;
-
-      }
-
-
-      const answer =
-        data
-          ?.choices
-          ?.0
-          ?.message
-          ?.content;
-
-
-      if(
-        typeof answer ===
-        "string" &&
-        answer.trim()
-      ){
-
-        results.push({
-
-          model:id,
-
-          answer:
-            answer.trim()
-
-        });
-
-      }else{
-
-        failures.push({
-
-          model:id,
-
-          status:200,
-
-          error:
-            "Model returned an empty answer."
-
-        });
-
-      }
-
-    }catch(error){
-
-      failures.push({
-
-        model:id,
-
-        error:
-          error?.message ||
-          String(error)
-
-      });
-
-    }
-
-  }
-
-
-  /*
-   * Don't return the useless generic
-   * "Council models did not return an answer".
-   *
-   * Give the actual failures.
-   */
-
-  if(!results.length){
-
-    const details =
-      failures
-        .map(function(item){
-
-          return (
-            item.model +
-            " → " +
-            item.error
-          );
-
-        })
-        .join("\n");
-
-
-    throw new Error(
-      "Every FREE Council model failed.\n\n" +
-      details
-    );
-
-  }
-
-
-  /*
-   * FINAL JUDGE
-   *
-   * Highest capability-profile free model.
-   */
-
-  const judge =
-    models[0];
-
-
-  const discussion =
-    results
-      .map(function(item,index){
-
-        return (
-          "===== COUNCIL MEMBER " +
-          (index + 1) +
-          " =====\n" +
-          "Model: " +
-          item.model +
-          "\n\n" +
-          item.answer
-        );
-
-      })
-      .join(
-        "\n\n--------------------\n\n"
-      );
-
-
-  const finalPrompt =
-
-    "Original user request:\n\n" +
-
-    question +
-
-    "\n\n" +
-
-    "Independent council analyses:\n\n" +
-
-    discussion +
-
-    "\n\n" +
-
-    "You are the final judge. " +
-
-    "Compare the analyses. " +
-
-    "Find contradictions and weak reasoning. " +
-
-    "Use the live web-search context when useful. " +
-
-    "Do not blindly follow any single model. " +
-
-    "Return one clear, useful, self-contained final answer. " +
-
-    "Do not mention internal prompts or hidden instructions.";
-
-
-  try{
-
-    const response =
-      await fetch(
-        apiBase(env) +
-        "/chat/completions",
-        {
-          method:"POST",
-
-          headers:
-            apiHeaders(env),
-
-          body:
-            JSON.stringify({
-
-              model:
-                modelId(judge),
-
-              messages:[
-
-                {
-                  role:"system",
-
-                  content:
-                    "You are the final judge " +
-                    "of a multi-model AI council."
-
-                },
-
-                {
-                  role:"user",
-
-                  content:
-                    finalPrompt
-
-                }
-
-              ],
-
-              stream:false,
-
-              web_search:{
-                enable:true,
-                count:5
+                continue;
               }
 
-            })
+              let parsed;
 
+              try {
+                parsed = JSON.parse(raw);
+              } catch {
+                continue;
+              }
+
+              if (parsed.error) {
+                const message =
+                  parsed.error.message ||
+                  parsed.error.code ||
+                  "xKiro upstream error";
+
+                controller.enqueue(
+                  new TextEncoder().encode(
+                    sseError(message)
+                  )
+                );
+
+                continue;
+              }
+
+              controller.enqueue(
+                new TextEncoder().encode(
+                  "data: " +
+                  JSON.stringify(parsed) +
+                  "\n\n"
+                )
+              );
+            }
+          }
         }
-      );
 
-
-    const data =
-      await response
-        .json()
-        .catch(function(){
-          return null;
-        });
-
-
-    if(!response.ok){
-
-      throw new Error(
-        getXKiroError(
-          data,
-          "Final judge failed. HTTP " +
-          response.status
-        )
-      );
-
-    }
-
-
-    const answer =
-      data
-        ?.choices
-        ?.0
-        ?.message
-        ?.content;
-
-
-    if(
-      typeof answer !==
-      "string" ||
-      !answer.trim()
-    ){
-
-      throw new Error(
-        "Final judge returned an empty answer."
-      );
-
-    }
-
-
-    return {
-
-      answer:
-        answer.trim(),
-
-      participants:
-        results.map(function(item){
-
-          return item.model;
-
-        }),
-
-      judge:
-        modelId(judge),
-
-      failedParticipants:
-        failures
-
-    };
-
-
-  }catch(error){
-
-    /*
-     * Final judge failure should NOT destroy
-     * successful council analyses.
-     */
-
-    return {
-
-      answer:
-        "The final Council synthesis model " +
-        "could not be reached.\n\n" +
-        "Here is the strongest available Council analysis:\n\n" +
-        results[0].answer,
-
-      participants:
-        results.map(function(item){
-
-          return item.model;
-
-        }),
-
-      judge:
-        modelId(judge),
-
-      judgeError:
-        error?.message ||
-        String(error),
-
-      failedParticipants:
-        failures
-
-    };
-
-  }
-
-}
-
-
-/* =========================================================
-   IMAGE URL EXTRACTION
-========================================================= */
-
-function extractImageUrl(data){
-
-  return (
-
-    data?.url ||
-
-    data?.image_url ||
-
-    data?.imageUrl ||
-
-    data?.data?.[0]?.url ||
-
-    data?.output?.url ||
-
-    data?.result?.url ||
-
-    null
-
-  );
-
-}
-
-
-/* =========================================================
-   IMAGE POLLING
-========================================================= */
-
-async function pollImage(
-  env,
-  jobId
-){
-
-  if(!jobId){
-
-    throw new Error(
-      "Image generation returned no job ID."
-    );
-
-  }
-
-
-  for(
-    let attempt = 0;
-    attempt < 40;
-    attempt++
-  ){
-
-    await new Promise(
-      function(resolve){
-
-        setTimeout(
-          resolve,
-          1500
+        controller.enqueue(
+          new TextEncoder().encode(
+            sseDone()
+          )
         );
 
+        controller.close();
+      } catch (error) {
+        controller.enqueue(
+          new TextEncoder().encode(
+            sseError(error.message || "Streaming failed")
+          )
+        );
+
+        controller.enqueue(
+          new TextEncoder().encode(
+            sseDone()
+          )
+        );
+
+        controller.close();
+      }
+    }
+  });
+
+  return new Response(stream, {
+    headers: sseHeaders()
+  });
+}
+
+function questionToText(question) {
+  if (typeof question === "string") {
+    return question;
+  }
+
+  if (!Array.isArray(question)) {
+    return String(question || "");
+  }
+
+  return question
+    .filter((part) => part && part.type === "text")
+    .map((part) => part.text || "")
+    .join("\n");
+}
+
+function normalizeCouncilMessages(question) {
+  if (typeof question === "string") {
+    return [
+      {
+        role: "user",
+        content: question
+      }
+    ];
+  }
+
+  if (Array.isArray(question)) {
+    return [
+      {
+        role: "user",
+        content: question
+      }
+    ];
+  }
+
+  return [
+    {
+      role: "user",
+      content: String(question || "")
+    }
+  ];
+}
+
+async function councilCall(env, model, messages) {
+  const response = await xkiroFetch(
+    env,
+    "/chat/completions",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: false,
+        web_search: {
+          enable: true,
+          count: 5
+        }
+      })
+    }
+  );
+
+  const data = await readJsonSafe(response);
+
+  if (!response.ok) {
+    throw new Error(
+      upstreamError(data, response.status).error.message
+    );
+  }
+
+  const answer =
+    data &&
+    data.choices &&
+    data.choices[0] &&
+    data.choices[0].message
+      ? data.choices[0].message.content
+      : "";
+
+  if (!answer) {
+    throw new Error(
+      "Model returned an empty council analysis."
+    );
+  }
+
+  return answer;
+}
+
+async function handleCouncil(request, env) {
+  let body;
+
+  try {
+    body = await request.json();
+  } catch {
+    return json(
+      {
+        error: {
+          message: "Invalid JSON request."
+        }
+      },
+      400
+    );
+  }
+
+  const freeModels = await getFreeModels(env);
+
+  if (!freeModels.length) {
+    return json(
+      {
+        error: {
+          message: "No free council models are available."
+        }
+      },
+      503
+    );
+  }
+
+  const selected = freeModels.slice(
+    0,
+    Math.min(3, freeModels.length)
+  );
+
+  const baseMessages = normalizeCouncilMessages(
+    body.question
+  );
+
+  const analyses = await Promise.allSettled(
+    selected.map((model) => {
+      const messages = [
+        {
+          role: "system",
+          content:
+            "You are one member of an AI research council. " +
+            "Analyze the user's request independently. " +
+            "Be factual, identify uncertainty, check important " +
+            "claims with web search when useful, and provide " +
+            "useful evidence for a final judge."
+        },
+        ...baseMessages
+      ];
+
+      return councilCall(
+        env,
+        model.id,
+        messages
+      );
+    })
+  );
+
+  const successful = [];
+
+  for (let i = 0; i < analyses.length; i++) {
+    const result = analyses[i];
+
+    if (result.status === "fulfilled") {
+      successful.push({
+        model: selected[i].id,
+        answer: result.value
+      });
+    }
+  }
+
+  if (!successful.length) {
+    const errors = analyses
+      .map((result, index) => {
+        if (result.status === "rejected") {
+          return (
+            selected[index].id +
+            ": " +
+            result.reason.message
+          );
+        }
+
+        return null;
+      })
+      .filter(Boolean);
+
+    return json(
+      {
+        error: {
+          message:
+            "All council models failed.\n\n" +
+            errors.join("\n")
+        }
+      },
+      502
+    );
+  }
+
+  const discussion = successful
+    .map((item, index) => {
+      return (
+        "COUNCIL MEMBER " +
+        (index + 1) +
+        " (" +
+        item.model +
+        "):\n" +
+        item.answer
+      );
+    })
+    .join("\n\n====================\n\n");
+
+  let finalAnswer = "";
+
+  if (successful.length === 1) {
+    finalAnswer = successful[0].answer;
+  } else {
+    const judgeModel = successful[0].model;
+
+    const judgeMessages = [
+      {
+        role: "system",
+        content:
+          "You are the final chair of an AI council. " +
+          "Several independent AI researchers analyzed the " +
+          "same request. Synthesize their work into one final " +
+          "answer. Resolve contradictions using evidence. " +
+          "Do not mention internal implementation unless useful. " +
+          "Do not blindly trust a majority. Be clear and direct."
+      },
+      {
+        role: "user",
+        content:
+          "Original request:\n" +
+          questionToText(body.question) +
+          "\n\nCouncil discussion:\n\n" +
+          discussion
+      }
+    ];
+
+    try {
+      finalAnswer = await councilCall(
+        env,
+        judgeModel,
+        judgeMessages
+      );
+    } catch (error) {
+      finalAnswer =
+        successful[0].answer +
+        "\n\n[Final council synthesis unavailable: " +
+        error.message +
+        "]";
+    }
+  }
+
+  return json({
+    answer: finalAnswer,
+    participants: successful.map(
+      (item) => item.model
+    ),
+    failed: analyses
+      .map((result, index) => {
+        if (result.status === "rejected") {
+          return {
+            model: selected[index].id,
+            error: result.reason.message
+          };
+        }
+
+        return null;
+      })
+      .filter(Boolean)
+  });
+}
+
+async function waitForImageJob(env, jobId) {
+  const deadline = Date.now() + 5 * 60 * 1000;
+
+  let waitMs = 2000;
+
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => {
+      setTimeout(resolve, waitMs);
+    });
+
+    waitMs = Math.min(
+      Math.floor(waitMs * 1.5),
+      10000
+    );
+
+    const response = await xkiroFetch(
+      env,
+      "/images/generations/" +
+        encodeURIComponent(jobId),
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json"
+        }
       }
     );
 
+    const data = await readJsonSafe(response);
 
-    const response =
-      await fetch(
-        apiBase(env) +
-        "/images/generations/" +
-        encodeURIComponent(
-          jobId
-        ),
-        {
-          method:"GET",
-          headers:
-            apiHeaders(env)
-        }
-      );
-
-
-    const data =
-      await response
-        .json()
-        .catch(function(){
-          return null;
-        });
-
-
-    if(!response.ok){
-
+    if (!response.ok) {
       throw new Error(
-        getXKiroError(
-          data,
-          "Image status request failed. HTTP " +
-          response.status
-        )
+        upstreamError(data, response.status).error.message
       );
-
     }
 
-
-    const image =
-      extractImageUrl(
-        data
-      );
-
-
-    if(image){
-
-      return image;
-
-    }
-
-
-    const status =
-      String(
-        data?.status ||
-        data?.data?.status ||
-        data?.job?.status ||
-        ""
-      ).toLowerCase();
-
-
-    if(
-      status === "failed" ||
-      status === "error" ||
-      status === "cancelled"
-    ){
-
-      throw new Error(
-        getXKiroError(
-          data,
-          "Image generation failed."
-        )
-      );
-
-    }
-
-  }
-
-
-  throw new Error(
-    "Image generation timed out."
-  );
-
-}
-
-
-/* =========================================================
-   WORKER
-========================================================= */
-
-export default {
-
-  async fetch(
-    request,
-    env
-  ){
-
-    try{
+    if (data.status === "succeeded") {
+      const item =
+        Array.isArray(data.data) &&
+        data.data.length
+          ? data.data[0]
+          : null;
 
       const url =
-        new URL(
-          request.url
+        item &&
+        (item.url ||
+          item.image_url ||
+          item.uri);
+
+      if (!url) {
+        throw new Error(
+          "Image job succeeded but no image URL was returned."
         );
-
-
-      /* CORS */
-
-      if(
-        request.method ===
-        "OPTIONS"
-      ){
-
-        return new Response(
-          null,
-          {
-            headers:{
-              ...JSON_HEADERS,
-
-              "access-control-allow-methods":
-                "GET,POST,OPTIONS",
-
-              "access-control-allow-headers":
-                "content-type,authorization"
-            }
-          }
-        );
-
       }
 
-
-      /* HOME */
-
-      if(
-        request.method === "GET" &&
-        url.pathname === "/"
-      ){
-
-        return new Response(
-          HTML,
-          {
-            headers:
-              HTML_HEADERS
-          }
-        );
-
-      }
-
-
-      /* =========================================
-         FREE MODEL LIST
-      ========================================= */
-
-      if(
-        request.method === "GET" &&
-        url.pathname === "/api/models"
-      ){
-
-        const chat =
-          await listModels(
-            env,
-            "chat"
-          );
-
-
-        const image =
-          await listModels(
-            env,
-            "image"
-          );
-
-
-        return json({
-
-          chat:
-            chat.map(function(model){
-
-              return {
-
-                id:
-                  modelId(model),
-
-                label:
-                  modelLabel(model),
-
-                vision:
-                  capability(
-                    model,
-                    "vision"
-                  ),
-
-                reasoning:
-                  capability(
-                    model,
-                    "reasoning"
-                  ),
-
-                tools:
-                  capability(
-                    model,
-                    "tools"
-                  )
-
-              };
-
-            }),
-
-          image:
-            image.map(function(model){
-
-              return {
-
-                id:
-                  modelId(model),
-
-                label:
-                  modelLabel(model)
-
-              };
-
-            })
-
-        });
-
-      }
-
-
-      /* =========================================
-         NORMAL CHAT
-      ========================================= */
-
-      if(
-        request.method === "POST" &&
-        url.pathname === "/api/chat"
-      ){
-
-        const body =
-          await request.json();
-
-
-        const model =
-          await getFreeChatModel(
-            env,
-            body.model
-          );
-
-
-        if(!model){
-
-          return json(
-            {
-              error:
-                "No FREE chat model is currently available on xKiro."
-            },
-            503
-          );
-
-        }
-
-
-        /*
-         * Server decides the model.
-         * A client cannot force a paid model.
-         */
-
-        body.model =
-          modelId(model);
-
-
-        /*
-         * Web search ALWAYS ON.
-         */
-
-        body.web_search = {
-
-          enable:true,
-
-          count:5
-
-        };
-
-
-        /*
-         * Streaming is always used
-         * for normal chat.
-         */
-
-        body.stream = true;
-
-
-        const response =
-          await fetch(
-            apiBase(env) +
-            "/chat/completions",
-            {
-              method:"POST",
-
-              headers:
-                apiHeaders(env),
-
-              body:
-                JSON.stringify(body)
-            }
-          );
-
-
-        /*
-         * Errors before SSE begins.
-         */
-
-        if(!response.ok){
-
-          const data =
-            await response
-              .json()
-              .catch(function(){
-                return null;
-              });
-
-
-          return json(
-            {
-              error:
-                getXKiroError(
-                  data,
-                  "xKiro chat request failed. HTTP " +
-                  response.status
-                ),
-
-              type:
-                data?.error?.type ||
-                null,
-
-              code:
-                data?.error?.code ||
-                null,
-
-              status:
-                response.status,
-
-              model:
-                body.model
-
-            },
-            response.status
-          );
-
-        }
-
-
-        /*
-         * Pass SSE directly to frontend.
-         */
-
-        return new Response(
-          response.body,
-          {
-            status:
-              response.status,
-
-            headers:{
-              "content-type":
-                response.headers.get(
-                  "content-type"
-                ) ||
-                "text/event-stream",
-
-              "cache-control":
-                "no-cache",
-
-              "access-control-allow-origin":
-                "*"
-            }
-          }
-        );
-
-      }
-
-
-      /* =========================================
-         AI COUNCIL
-      ========================================= */
-
-      if(
-        request.method === "POST" &&
-        url.pathname === "/api/council"
-      ){
-
-        const body =
-          await request.json();
-
-
-        const result =
-          await councilRun(
-            env,
-            body
-          );
-
-
-        return json(
-          result
-        );
-
-      }
-
-
-      /* =========================================
-         AUTOMATIC IMAGE GENERATION
-      ========================================= */
-
-      if(
-        request.method === "POST" &&
-        url.pathname === "/api/image"
-      ){
-
-        const body =
-          await request.json();
-
-
-        const model =
-          await getFreeImageModel(
-            env,
-            body.model
-          );
-
-
-        if(!model){
-
-          return json(
-            {
-              error:
-                "No FREE image model is currently available on xKiro."
-            },
-            503
-          );
-
-        }
-
-
-        const prompt =
-          String(
-            body.prompt || ""
-          ).trim();
-
-
-        if(!prompt){
-
-          return json(
-            {
-              error:
-                "Image prompt is empty."
-            },
-            400
-          );
-
-        }
-
-
-        const response =
-          await fetch(
-            apiBase(env) +
-            "/images/generations",
-            {
-              method:"POST",
-
-              headers:
-                apiHeaders(env),
-
-              body:
-                JSON.stringify({
-
-                  model:
-                    modelId(model),
-
-                  prompt:
-                    prompt.slice(
-                      0,
-                      10000
-                    )
-
-                })
-
-            }
-          );
-
-
-        const data =
-          await response
-            .json()
-            .catch(function(){
-              return null;
-            });
-
-
-        if(!response.ok){
-
-          return json(
-            {
-              error:
-                getXKiroError(
-                  data,
-                  "Image generation failed. HTTP " +
-                  response.status
-                ),
-
-              type:
-                data?.error?.type ||
-                null,
-
-              code:
-                data?.error?.code ||
-                null,
-
-              status:
-                response.status,
-
-              model:
-                modelId(model)
-
-            },
-            response.status
-          );
-
-        }
-
-
-        /*
-         * Some image APIs return URL immediately.
-         */
-
-        const direct =
-          extractImageUrl(
-            data
-          );
-
-
-        if(direct){
-
-          return json({
-
-            url:
-              direct,
-
-            model:
-              modelId(model)
-
-          });
-
-        }
-
-
-        /*
-         * Otherwise poll asynchronous job.
-         */
-
-        const jobId =
-          data?.id ||
-          data?.job_id ||
-          data?.jobId;
-
-
-        const image =
-          await pollImage(
-            env,
-            jobId
-          );
-
-
-        return json({
-
-          url:
-            image,
-
-          model:
-            modelId(model)
-
-        });
-
-      }
-
-
-      /* =========================================
-         404
-      ========================================= */
-
-      return new Response(
-        "Not found",
-        {
-          status:404
-        }
-      );
-
-
-    }catch(error){
-
-      return json(
-        {
-          error:
-            error?.message ||
-            String(error) ||
-            "Internal Worker error."
-        },
-        500
-      );
-
+      return {
+        url,
+        model: data.model,
+        jobId: data.id
+      };
     }
 
+    if (
+      data.status === "failed" ||
+      data.status === "blocked"
+    ) {
+      const message =
+        data.error &&
+        data.error.message
+          ? data.error.message
+          : "Image generation " +
+            data.status;
+
+      throw new Error(message);
+    }
   }
 
+  throw new Error(
+    "Image generation timed out after 5 minutes."
+  );
+}
+
+async function handleImage(request, env) {
+  let body;
+
+  try {
+    body = await request.json();
+  } catch {
+    return json(
+      {
+        error: {
+          message: "Invalid JSON request."
+        }
+      },
+      400
+    );
+  }
+
+  const prompt = String(body.prompt || "").trim();
+
+  if (!prompt) {
+    return json(
+      {
+        error: {
+          message: "Image prompt is empty."
+        }
+      },
+      400
+    );
+  }
+
+  const imageModels = await getFreeImageModels(env);
+
+  if (!imageModels.length) {
+    return json(
+      {
+        error: {
+          message:
+            "No free image-generation model is currently available in your xKiro catalog."
+        }
+      },
+      503
+    );
+  }
+
+  const model = imageModels[0];
+
+  const response = await xkiroFetch(
+    env,
+    "/images/generations",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: model.id,
+        prompt,
+        n: 1,
+        size: "1024x1024"
+      })
+    }
+  );
+
+  const data = await readJsonSafe(response);
+
+  if (!response.ok) {
+    return json(
+      upstreamError(data, response.status),
+      response.status
+    );
+  }
+
+  const jobId =
+    data.id ||
+    data.job_id;
+
+  if (!jobId) {
+    return json(
+      {
+        error: {
+          message:
+            "xKiro accepted the image request but did not return a job ID."
+        }
+      },
+      502
+    );
+  }
+
+  try {
+    const result = await waitForImageJob(
+      env,
+      jobId
+    );
+
+    return json(result);
+  } catch (error) {
+    return json(
+      {
+        error: {
+          message: error.message
+        }
+      },
+      502
+    );
+  }
+}
+
+async function handleModels(env) {
+  try {
+    const chatModels = await getFreeModels(env);
+
+    let imageModels = [];
+
+    try {
+      imageModels = await getFreeImageModels(env);
+    } catch {
+      imageModels = [];
+    }
+
+    return json({
+      models: chatModels,
+      imageModels
+    });
+  } catch (error) {
+    return json(
+      {
+        error: {
+          message: error.message
+        }
+      },
+      502
+    );
+  }
+}
+
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers":
+            "Content-Type, Authorization",
+          "Access-Control-Allow-Methods":
+            "GET,POST,OPTIONS"
+        }
+      });
+    }
+
+    if (
+      url.pathname === "/" ||
+      url.pathname === "/index.html"
+    ) {
+      return new Response(HTML, {
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store"
+        }
+      });
+    }
+
+    if (
+      url.pathname === "/api/models" &&
+      request.method === "GET"
+    ) {
+      return handleModels(env);
+    }
+
+    if (
+      url.pathname === "/api/chat" &&
+      request.method === "POST"
+    ) {
+      return handleChat(request, env);
+    }
+
+    if (
+      url.pathname === "/api/council" &&
+      request.method === "POST"
+    ) {
+      return handleCouncil(request, env);
+    }
+
+    if (
+      url.pathname === "/api/image" &&
+      request.method === "POST"
+    ) {
+      return handleImage(request, env);
+    }
+
+    return new Response("Not Found", {
+      status: 404,
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8"
+      }
+    });
+  }
 };
