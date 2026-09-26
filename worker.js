@@ -14,12 +14,12 @@ const HTML = String.raw`<!DOCTYPE html>
   --border:#29292f;
   --text:#f4f4f5;
   --muted:#9b9ba3;
-  --accent:#ffffff;
   --danger:#ef4444;
-  --radius:14px;
 }
 
-*{box-sizing:border-box}
+*{
+  box-sizing:border-box;
+}
 
 html,body{
   margin:0;
@@ -34,7 +34,10 @@ body{
   overflow:hidden;
 }
 
-button,input,textarea,select{
+button,
+input,
+textarea,
+select{
   font:inherit;
 }
 
@@ -421,6 +424,7 @@ button{
   border-radius:7px;
   font-size:10px;
   color:#bbb;
+  cursor:pointer;
 }
 
 .composer-row{
@@ -582,6 +586,7 @@ textarea::placeholder{
 /* MOBILE */
 
 @media(max-width:760px){
+
   .sidebar{
     position:fixed;
     left:-290px;
@@ -646,22 +651,30 @@ textarea::placeholder{
 <div class="app">
 
   <aside class="sidebar" id="sidebar">
+
     <div class="brand">
       <div class="logo">A</div>
+
       <div>
         <div class="brand-title">AetherAI Studio</div>
         <div class="brand-sub">xKiro AI Gateway</div>
       </div>
     </div>
 
-    <button class="new-chat" id="newChat">＋ New chat</button>
+    <button class="new-chat" id="newChat">
+      ＋ New chat
+    </button>
 
-    <div class="history-label">History</div>
+    <div class="history-label">
+      History
+    </div>
+
     <div class="history" id="history"></div>
 
     <div class="sidebar-footer">
       API key stays server-side.
     </div>
+
   </aside>
 
   <div class="overlay" id="overlay"></div>
@@ -669,34 +682,61 @@ textarea::placeholder{
   <main class="main">
 
     <header class="topbar">
-      <button class="menu" id="menuBtn">☰</button>
+
+      <button class="menu" id="menuBtn">
+        ☰
+      </button>
 
       <div class="model-wrap">
+
         <select class="model-select" id="modelSelect">
           <option value="">Loading models...</option>
         </select>
+
         <div class="model-info" id="modelInfo"></div>
+
       </div>
 
       <div class="top-actions">
-        <button class="council-btn" id="councilBtn">AI Council</button>
-        <button class="icon-btn" id="imageBtn" title="Generate image">✦</button>
+
+        <button class="council-btn" id="councilBtn">
+          AI Council
+        </button>
+
+        <button class="icon-btn" id="imageBtn" title="Generate image">
+          ✦
+        </button>
+
       </div>
+
     </header>
 
     <section class="chat" id="chat">
+
       <div class="messages" id="messages">
 
         <div class="empty" id="empty">
-          <div class="empty-logo">A</div>
-          <h1>How can I help?</h1>
-          <p>Ask anything, research the web, analyze files, or generate an image.</p>
+
+          <div class="empty-logo">
+            A
+          </div>
+
+          <h1>
+            How can I help?
+          </h1>
+
+          <p>
+            Ask anything, research the web, analyze files, or generate an image.
+          </p>
+
         </div>
 
       </div>
+
     </section>
 
     <div class="composer-area">
+
       <div class="composer">
 
         <div class="attachments" id="attachments"></div>
@@ -711,7 +751,13 @@ textarea::placeholder{
             accept=".txt,.md,.json,.js,.ts,.jsx,.tsx,.html,.css,.py,.java,.c,.cpp,.h,.hpp,.csv,.xml,.yaml,.yml,.sql,.sh,.png,.jpg,.jpeg,.webp,.gif"
           >
 
-          <button class="attach-btn" id="attachBtn" title="Attach file">＋</button>
+          <button
+            class="attach-btn"
+            id="attachBtn"
+            title="Attach file"
+          >
+            ＋
+          </button>
 
           <textarea
             id="input"
@@ -719,25 +765,50 @@ textarea::placeholder{
             placeholder="Message AetherAI..."
           ></textarea>
 
-          <button class="stop-btn" id="stopBtn" title="Stop">■</button>
-          <button class="send-btn" id="sendBtn" title="Send">↑</button>
+          <button
+            class="stop-btn"
+            id="stopBtn"
+            title="Stop"
+          >
+            ■
+          </button>
+
+          <button
+            class="send-btn"
+            id="sendBtn"
+            title="Send"
+          >
+            ↑
+          </button>
 
         </div>
+
       </div>
 
       <div class="bottom-info">
         AetherAI can make mistakes. Verify important information.
       </div>
+
     </div>
 
   </main>
+
 </div>
 
 <div class="modal" id="imageModal">
+
   <div class="modal-box">
+
     <div class="modal-head">
-      <div class="modal-title">Generate image</div>
-      <button class="close" id="imageClose">×</button>
+
+      <div class="modal-title">
+        Generate image
+      </div>
+
+      <button class="close" id="imageClose">
+        ×
+      </button>
+
     </div>
 
     <div class="image-form">
@@ -749,23 +820,39 @@ textarea::placeholder{
       ></textarea>
 
       <select id="imageModel">
-        <option value="">Loading image models...</option>
+        <option value="">
+          Loading image models...
+        </option>
       </select>
 
       <select id="imageSize">
-        <option value="1024x1024">Square — 1024×1024</option>
-        <option value="1792x1024">Landscape — 1792×1024</option>
-        <option value="1024x1792">Portrait — 1024×1792</option>
+
+        <option value="1024x1024">
+          Square — 1024×1024
+        </option>
+
+        <option value="1792x1024">
+          Landscape — 1792×1024
+        </option>
+
+        <option value="1024x1792">
+          Portrait — 1024×1792
+        </option>
+
       </select>
 
-      <button class="generate" id="generateImage">Generate</button>
+      <button class="generate" id="generateImage">
+        Generate
+      </button>
 
       <div class="status" id="imageStatus"></div>
 
       <div class="image-result" id="imageResult"></div>
 
     </div>
+
   </div>
+
 </div>
 
 <script>
@@ -809,11 +896,12 @@ const el = {
   imageResult: document.getElementById("imageResult")
 };
 
-/* -----------------------------
-   UI helpers
------------------------------ */
+/* =========================================================
+   HTML / MARKDOWN
+========================================================= */
 
 function escapeHtml(value) {
+
   return String(value ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -823,12 +911,15 @@ function escapeHtml(value) {
 }
 
 function markdownToHtml(input) {
+
   let value = escapeHtml(input);
 
   value = value.replace(
-    /```([\\s\\S]*?)```/g,
+    /```([\s\S]*?)```/g,
     function(_, code) {
-      return "<pre><code>" + code.trim() + "</code></pre>";
+      return "<pre><code>" +
+        code.trim() +
+        "</code></pre>";
     }
   );
 
@@ -863,66 +954,94 @@ function markdownToHtml(input) {
   );
 
   value = value.replace(
-    /\\*\\*(.+?)\\*\\*/g,
+    /\*\*(.+?)\*\*/g,
     "<strong>$1</strong>"
   );
 
   value = value.replace(
-    /\\*(.+?)\\*/g,
+    /\*(.+?)\*/g,
     "<em>$1</em>"
   );
 
   value = value.replace(
-    /\\[([^\\]]+)\\]\\((https?:\\/\\/[^\\s)]+)\\)/g,
+    /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
     '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
   );
 
   value = value.replace(
-    /(^|\\n)(?!<h\\d|<pre|<blockquote|<li)([^\\n]+)(?=\\n|$)/g,
+    /(^|\n)(?!<h\d|<pre|<blockquote|<li)([^\n]+)(?=\n|$)/g,
     "$1<p>$2</p>"
   );
 
   value = value.replace(
-    /(<li>.*<\\/li>)(?:\\s*<li>.*<\\/li>)*/gs,
+    /(<li>.*<\/li>)(?:\s*<li>.*<\/li>)*/gs,
     function(block) {
       return "<ul>" + block + "</ul>";
     }
   );
 
-  value = value.replace(/<p><\\/p>/g, "");
+  value = value.replace(
+    /<p><\/p>/g,
+    ""
+  );
 
   return value;
 }
 
 function scrollBottom() {
+
   requestAnimationFrame(function() {
-    el.chat.scrollTop = el.chat.scrollHeight;
+    el.chat.scrollTop =
+      el.chat.scrollHeight;
   });
 }
 
-function showSystemError(message) {
-  addMessage("assistant", "⚠️ " + message);
-}
+/* =========================================================
+   MESSAGES
+========================================================= */
 
-function addMessage(role, content, extra) {
+function addMessage(
+  role,
+  content,
+  extra
+) {
+
   extra = extra || {};
 
   el.empty.style.display = "none";
 
-  const wrapper = document.createElement("div");
-  wrapper.className = "message " + role;
+  const wrapper =
+    document.createElement("div");
 
-  const avatar = document.createElement("div");
+  wrapper.className =
+    "message " + role;
+
+  const avatar =
+    document.createElement("div");
+
   avatar.className = "avatar";
-  avatar.textContent = role === "user" ? "U" : "A";
 
-  const body = document.createElement("div");
+  avatar.textContent =
+    role === "user"
+      ? "U"
+      : "A";
+
+  const body =
+    document.createElement("div");
+
   body.className = "content";
 
-  body.innerHTML = markdownToHtml(content || "");
+  body.innerHTML =
+    markdownToHtml(content || "");
 
-  if (extra.sources && extra.sources.length) {
-    body.appendChild(renderSources(extra.sources));
+  if (
+    extra.sources &&
+    extra.sources.length
+  ) {
+
+    body.appendChild(
+      renderSources(extra.sources)
+    );
   }
 
   wrapper.appendChild(avatar);
@@ -933,53 +1052,100 @@ function addMessage(role, content, extra) {
   scrollBottom();
 
   return {
-    wrapper,
-    body
+    wrapper: wrapper,
+    body: body
   };
 }
 
 function renderSources(sources) {
-  const box = document.createElement("div");
+
+  const box =
+    document.createElement("div");
+
   box.className = "sources";
 
-  sources.slice(0, 10).forEach(function(source, index) {
-    if (!source || !source.url) return;
+  sources
+    .slice(0, 10)
+    .forEach(function(source, index) {
 
-    const a = document.createElement("a");
-    a.className = "source";
-    a.href = source.url;
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
+      if (
+        !source ||
+        !source.url
+      ) {
+        return;
+      }
 
-    const title = document.createElement("div");
-    title.className = "source-title";
-    title.textContent = "[" + (index + 1) + "] " + (source.title || source.url);
+      const a =
+        document.createElement("a");
 
-    const url = document.createElement("div");
-    url.className = "source-url";
-    url.textContent = source.url;
+      a.className = "source";
+      a.href = source.url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
 
-    a.appendChild(title);
-    a.appendChild(url);
-    box.appendChild(a);
-  });
+      const title =
+        document.createElement("div");
+
+      title.className =
+        "source-title";
+
+      title.textContent =
+        "[" +
+        (index + 1) +
+        "] " +
+        (source.title || source.url);
+
+      const url =
+        document.createElement("div");
+
+      url.className =
+        "source-url";
+
+      url.textContent =
+        source.url;
+
+      a.appendChild(title);
+      a.appendChild(url);
+
+      box.appendChild(a);
+    });
 
   return box;
 }
 
-/* -----------------------------
-   History
------------------------------ */
+function showSystemError(message) {
+
+  addMessage(
+    "assistant",
+    "⚠️ " + message
+  );
+}
+
+/* =========================================================
+   HISTORY
+========================================================= */
 
 function saveHistory() {
+
   try {
-    const list = JSON.parse(localStorage.getItem("aether_history") || "[]");
 
-    const firstUser = state.messages.find(function(m) {
-      return m.role === "user";
-    });
+    const list =
+      JSON.parse(
+        localStorage.getItem(
+          "aether_history"
+        ) || "[]"
+      );
 
-    if (!firstUser) return;
+    const firstUser =
+      state.messages.find(
+        function(message) {
+          return message.role === "user";
+        }
+      );
+
+    if (!firstUser) {
+      return;
+    }
 
     const item = {
       id: state.conversationId,
@@ -988,211 +1154,394 @@ function saveHistory() {
       updated: Date.now()
     };
 
-    const filtered = list.filter(function(x) {
-      return x.id !== state.conversationId;
-    });
+    const filtered =
+      list.filter(
+        function(item) {
+          return item.id !==
+            state.conversationId;
+        }
+      );
 
     filtered.unshift(item);
 
     localStorage.setItem(
       "aether_history",
-      JSON.stringify(filtered.slice(0, 30))
+      JSON.stringify(
+        filtered.slice(0, 30)
+      )
     );
 
     renderHistory();
+
   } catch (_) {}
 }
 
 function renderHistory() {
+
   el.history.innerHTML = "";
 
   try {
-    const list = JSON.parse(localStorage.getItem("aether_history") || "[]");
+
+    const list =
+      JSON.parse(
+        localStorage.getItem(
+          "aether_history"
+        ) || "[]"
+      );
 
     list.forEach(function(item) {
-      const button = document.createElement("button");
-      button.className = "history-item";
-      button.textContent = item.title || "New chat";
 
-      button.onclick = function() {
-        loadHistory(item);
-        closeSidebar();
-      };
+      const button =
+        document.createElement("button");
+
+      button.className =
+        "history-item";
+
+      button.textContent =
+        item.title || "New chat";
+
+      button.onclick =
+        function() {
+          loadHistory(item);
+          closeSidebar();
+        };
 
       el.history.appendChild(button);
     });
+
   } catch (_) {}
 }
 
 function loadHistory(item) {
-  state.conversationId = item.id;
-  state.messages = Array.isArray(item.messages) ? item.messages : [];
+
+  state.conversationId =
+    item.id;
+
+  state.messages =
+    Array.isArray(item.messages)
+      ? item.messages
+      : [];
+
   state.files = [];
 
   el.messages.innerHTML = "";
 
   if (!state.messages.length) {
-    el.empty.style.display = "flex";
-    el.messages.appendChild(el.empty);
+
+    el.empty.style.display =
+      "flex";
+
+    el.messages.appendChild(
+      el.empty
+    );
+
     return;
   }
 
-  state.messages.forEach(function(message) {
-    addMessage(
-      message.role,
-      message.content,
-      message.sources ? { sources: message.sources } : {}
-    );
-  });
+  state.messages.forEach(
+    function(message) {
+
+      addMessage(
+        message.role,
+        message.content,
+        message.sources
+          ? {
+              sources:
+                message.sources
+            }
+          : {}
+      );
+    }
+  );
 }
 
 function newChat() {
-  if (state.busy) return;
 
-  state.conversationId = crypto.randomUUID();
+  if (state.busy) {
+    return;
+  }
+
+  state.conversationId =
+    crypto.randomUUID();
+
   state.messages = [];
   state.files = [];
 
   el.messages.innerHTML = "";
-  el.messages.appendChild(el.empty);
 
-  el.empty.style.display = "flex";
+  el.messages.appendChild(
+    el.empty
+  );
+
+  el.empty.style.display =
+    "flex";
 
   renderAttachments();
+
   el.input.value = "";
+
   autoResize();
 }
 
-el.newChat.addEventListener("click", newChat);
+el.newChat.addEventListener(
+  "click",
+  newChat
+);
 
-/* -----------------------------
-   Sidebar
------------------------------ */
+/* =========================================================
+   SIDEBAR
+========================================================= */
 
 function closeSidebar() {
-  el.sidebar.classList.remove("open");
-  el.overlay.classList.remove("show");
+
+  el.sidebar.classList.remove(
+    "open"
+  );
+
+  el.overlay.classList.remove(
+    "show"
+  );
 }
 
-el.menuBtn.addEventListener("click", function() {
-  el.sidebar.classList.add("open");
-  el.overlay.classList.add("show");
-});
+el.menuBtn.addEventListener(
+  "click",
+  function() {
 
-el.overlay.addEventListener("click", closeSidebar);
+    el.sidebar.classList.add(
+      "open"
+    );
 
-/* -----------------------------
-   Models
------------------------------ */
+    el.overlay.classList.add(
+      "show"
+    );
+
+  }
+);
+
+el.overlay.addEventListener(
+  "click",
+  closeSidebar
+);
+
+/* =========================================================
+   MODEL CATALOG
+========================================================= */
 
 function modelScore(model) {
+
   let score = 0;
 
-  const capabilities = model.capabilities || {};
+  const capabilities =
+    model.capabilities || {};
 
-  if (capabilities.reasoning) score += 40;
-  if (capabilities.vision) score += 20;
-  if (capabilities.tools) score += 10;
+  if (capabilities.reasoning) {
+    score += 40;
+  }
 
-  const context = Number(model.context_length || 0);
-  const output = Number(model.max_output_tokens || 0);
+  if (capabilities.vision) {
+    score += 20;
+  }
 
-  score += Math.min(context / 10000, 30);
-  score += Math.min(output / 5000, 20);
+  if (capabilities.tools) {
+    score += 10;
+  }
 
-  const id = String(model.id || "").toLowerCase();
+  const context =
+    Number(
+      model.context_length || 0
+    );
 
-  if (id.includes("reason")) score += 5;
-  if (id.includes("thinking")) score += 5;
+  const output =
+    Number(
+      model.max_output_tokens || 0
+    );
+
+  score += Math.min(
+    context / 10000,
+    30
+  );
+
+  score += Math.min(
+    output / 5000,
+    20
+  );
+
+  const id =
+    String(model.id || "")
+      .toLowerCase();
+
+  if (id.includes("reason")) {
+    score += 5;
+  }
+
+  if (id.includes("thinking")) {
+    score += 5;
+  }
 
   return score;
 }
 
 function populateModels(models) {
-  state.models = models || [];
 
-  el.modelSelect.innerHTML = "";
+  state.models =
+    models || [];
+
+  el.modelSelect.innerHTML =
+    "";
 
   if (!state.models.length) {
+
     el.modelSelect.innerHTML =
       '<option value="">No free models available</option>';
-    el.modelInfo.textContent = "";
+
+    el.modelInfo.textContent =
+      "";
+
     return;
   }
 
-  const sorted = state.models.slice().sort(function(a, b) {
-    return modelScore(b) - modelScore(a);
-  });
+  const sorted =
+    state.models
+      .slice()
+      .sort(function(a, b) {
+        return modelScore(b) -
+          modelScore(a);
+      });
 
   sorted.forEach(function(model) {
-    const option = document.createElement("option");
-    option.value = model.id;
-    option.textContent = model.id;
-    el.modelSelect.appendChild(option);
+
+    const option =
+      document.createElement(
+        "option"
+      );
+
+    option.value =
+      model.id;
+
+    option.textContent =
+      model.id;
+
+    el.modelSelect.appendChild(
+      option
+    );
   });
 
-  const saved = localStorage.getItem("aether_model");
+  const saved =
+    localStorage.getItem(
+      "aether_model"
+    );
 
-  if (saved && state.models.some(function(m) {
-    return m.id === saved;
-  })) {
-    el.modelSelect.value = saved;
+  if (
+    saved &&
+    state.models.some(
+      function(model) {
+        return model.id === saved;
+      }
+    )
+  ) {
+
+    el.modelSelect.value =
+      saved;
+
   } else {
-    el.modelSelect.value = sorted[0].id;
+
+    el.modelSelect.value =
+      sorted[0].id;
   }
 
   updateModelInfo();
 }
 
 function updateModelInfo() {
-  const model = state.models.find(function(m) {
-    return m.id === el.modelSelect.value;
-  });
+
+  const model =
+    state.models.find(
+      function(model) {
+        return model.id ===
+          el.modelSelect.value;
+      }
+    );
 
   if (!model) {
-    el.modelInfo.textContent = "";
+
+    el.modelInfo.textContent =
+      "";
+
     return;
   }
 
-  const caps = model.capabilities || {};
+  const capabilities =
+    model.capabilities || {};
+
   const features = [];
 
-  if (caps.reasoning) features.push("reasoning");
-  if (caps.vision) features.push("vision");
-  if (caps.tools) features.push("tools");
+  if (capabilities.reasoning) {
+    features.push("reasoning");
+  }
+
+  if (capabilities.vision) {
+    features.push("vision");
+  }
+
+  if (capabilities.tools) {
+    features.push("tools");
+  }
 
   el.modelInfo.textContent =
-    features.length ? features.join(" · ") : "free model";
+    features.length
+      ? features.join(" · ")
+      : "free model";
 }
 
-el.modelSelect.addEventListener("change", function() {
-  localStorage.setItem("aether_model", el.modelSelect.value);
-  updateModelInfo();
-});
+el.modelSelect.addEventListener(
+  "change",
+  function() {
+
+    localStorage.setItem(
+      "aether_model",
+      el.modelSelect.value
+    );
+
+    updateModelInfo();
+  }
+);
 
 async function loadModels() {
+
   el.modelSelect.innerHTML =
     '<option value="">Loading models...</option>';
 
   try {
-    const response = await fetch("/api/models", {
-      method: "GET",
-      headers: {
-        "Accept": "application/json"
-      }
-    });
 
-    const data = await response.json();
+    const response =
+      await fetch(
+        "/api/models",
+        {
+          method: "GET",
+          headers: {
+            "Accept":
+              "application/json"
+          }
+        }
+      );
+
+    const data =
+      await response.json();
 
     if (!response.ok) {
+
       throw new Error(
-        data && data.error
-          ? data.error.message || data.error
+        data &&
+        data.error
+          ? data.error.message ||
+            data.error
           : "Model catalog request failed"
       );
     }
 
-    populateModels(data.models || []);
+    populateModels(
+      data.models || []
+    );
 
   } catch (error) {
 
@@ -1201,159 +1550,256 @@ async function loadModels() {
     el.modelSelect.innerHTML =
       '<option value="">Retry model loading</option>';
 
-    el.modelInfo.textContent = "Loading failed";
+    el.modelInfo.textContent =
+      "Loading failed";
 
-    el.modelSelect.onclick = function() {
-      loadModels();
-    };
+    el.modelSelect.onclick =
+      function() {
+        loadModels();
+      };
   }
 }
 
-/* -----------------------------
-   File attachments
------------------------------ */
+/* =========================================================
+   FILES
+========================================================= */
 
-el.attachBtn.addEventListener("click", function() {
-  el.fileInput.click();
-});
+el.attachBtn.addEventListener(
+  "click",
+  function() {
+    el.fileInput.click();
+  }
+);
 
-el.fileInput.addEventListener("change", async function() {
+el.fileInput.addEventListener(
+  "change",
+  async function() {
 
-  const selected = Array.from(el.fileInput.files || []);
-
-  for (const file of selected) {
-
-    if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
-      showSystemError(
-        "PDF files are not supported by this version. Upload extracted text instead."
+    const selected =
+      Array.from(
+        el.fileInput.files || []
       );
-      continue;
-    }
 
-    if (file.size > 8 * 1024 * 1024) {
-      showSystemError(
-        file.name + " is too large. Maximum file size is 8 MB."
-      );
-      continue;
-    }
+    for (
+      const file of selected
+    ) {
 
-    try {
+      if (
+        file.type ===
+          "application/pdf" ||
+        file.name
+          .toLowerCase()
+          .endsWith(".pdf")
+      ) {
 
-      if (file.type.startsWith("image/")) {
+        showSystemError(
+          "PDF files are not supported by this version. Upload extracted text instead."
+        );
 
-        const dataUrl = await readFileAsDataURL(file);
-
-        state.files.push({
-          name: file.name,
-          type: "image",
-          mime: file.type,
-          dataUrl: dataUrl
-        });
-
-      } else {
-
-        const text = await file.text();
-
-        state.files.push({
-          name: file.name,
-          type: "text",
-          mime: file.type || "text/plain",
-          text: text.slice(0, 250000)
-        });
-
+        continue;
       }
 
-    } catch (error) {
-      showSystemError(
-        "Could not read " + file.name + ": " + error.message
-      );
-    }
-  }
+      if (
+        file.size >
+        8 * 1024 * 1024
+      ) {
 
-  renderAttachments();
-  el.fileInput.value = "";
-});
+        showSystemError(
+          file.name +
+          " is too large. Maximum file size is 8 MB."
+        );
+
+        continue;
+      }
+
+      try {
+
+        if (
+          file.type.startsWith(
+            "image/"
+          )
+        ) {
+
+          const dataUrl =
+            await readFileAsDataURL(
+              file
+            );
+
+          state.files.push({
+            name: file.name,
+            type: "image",
+            mime: file.type,
+            dataUrl: dataUrl
+          });
+
+        } else {
+
+          const text =
+            await file.text();
+
+          state.files.push({
+            name: file.name,
+            type: "text",
+            mime:
+              file.type ||
+              "text/plain",
+            text:
+              text.slice(
+                0,
+                250000
+              )
+          });
+        }
+
+      } catch (error) {
+
+        showSystemError(
+          "Could not read " +
+          file.name +
+          ": " +
+          error.message
+        );
+      }
+    }
+
+    renderAttachments();
+
+    el.fileInput.value = "";
+  }
+);
 
 function readFileAsDataURL(file) {
-  return new Promise(function(resolve, reject) {
 
-    const reader = new FileReader();
+  return new Promise(
+    function(resolve, reject) {
 
-    reader.onload = function() {
-      resolve(reader.result);
-    };
+      const reader =
+        new FileReader();
 
-    reader.onerror = function() {
-      reject(new Error("File read failed"));
-    };
+      reader.onload =
+        function() {
+          resolve(
+            reader.result
+          );
+        };
 
-    reader.readAsDataURL(file);
-  });
+      reader.onerror =
+        function() {
+          reject(
+            new Error(
+              "File read failed"
+            )
+          );
+        };
+
+      reader.readAsDataURL(
+        file
+      );
+    }
+  );
 }
 
 function renderAttachments() {
 
-  el.attachments.innerHTML = "";
+  el.attachments.innerHTML =
+    "";
 
   if (!state.files.length) {
-    el.attachments.style.display = "none";
+
+    el.attachments.style.display =
+      "none";
+
     return;
   }
 
-  el.attachments.style.display = "flex";
+  el.attachments.style.display =
+    "flex";
 
-  state.files.forEach(function(file, index) {
+  state.files.forEach(
+    function(file, index) {
 
-    const item = document.createElement("div");
-    item.className = "attachment";
+      const item =
+        document.createElement(
+          "div"
+        );
 
-    item.textContent = file.name + " ×";
+      item.className =
+        "attachment";
 
-    item.title = "Remove";
+      item.textContent =
+        file.name + " ×";
 
-    item.onclick = function() {
-      state.files.splice(index, 1);
-      renderAttachments();
-    };
+      item.title =
+        "Remove";
 
-    el.attachments.appendChild(item);
-  });
+      item.onclick =
+        function() {
+
+          state.files.splice(
+            index,
+            1
+          );
+
+          renderAttachments();
+        };
+
+      el.attachments.appendChild(
+        item
+      );
+    }
+  );
 }
 
-/* -----------------------------
-   Input
------------------------------ */
+/* =========================================================
+   INPUT
+========================================================= */
 
 function autoResize() {
-  el.input.style.height = "auto";
+
   el.input.style.height =
-    Math.min(el.input.scrollHeight, 180) + "px";
+    "auto";
+
+  el.input.style.height =
+    Math.min(
+      el.input.scrollHeight,
+      180
+    ) + "px";
 }
 
-el.input.addEventListener("input", autoResize);
+el.input.addEventListener(
+  "input",
+  autoResize
+);
 
-el.input.addEventListener("keydown", function(event) {
+el.input.addEventListener(
+  "keydown",
+  function(event) {
 
-  if (
-    event.key === "Enter" &&
-    !event.shiftKey &&
-    !event.isComposing
-  ) {
-    event.preventDefault();
-    sendMessage();
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey &&
+      !event.isComposing
+    ) {
+
+      event.preventDefault();
+
+      sendMessage();
+    }
   }
+);
 
-});
-
-/* -----------------------------
-   Image detection
------------------------------ */
+/* =========================================================
+   IMAGE DETECTION
+========================================================= */
 
 function looksLikeImageRequest(text) {
 
-  const value = text.toLowerCase().trim();
+  const value =
+    text.toLowerCase().trim();
 
-  if (!value) return false;
+  if (!value) {
+    return false;
+  }
 
   const patterns = [
     /^generate (an )?image/,
@@ -1369,14 +1815,16 @@ function looksLikeImageRequest(text) {
     /create.*wallpaper/
   ];
 
-  return patterns.some(function(pattern) {
-    return pattern.test(value);
-  });
+  return patterns.some(
+    function(pattern) {
+      return pattern.test(value);
+    }
+  );
 }
 
-/* -----------------------------
-   Chat
------------------------------ */
+/* =========================================================
+   USER CONTENT
+========================================================= */
 
 function buildUserContent(text) {
 
@@ -1388,65 +1836,83 @@ function buildUserContent(text) {
 
   let fileContext = "";
 
-  state.files.forEach(function(file) {
+  state.files.forEach(
+    function(file) {
 
-    if (file.type === "text") {
+      if (file.type === "text") {
 
-      fileContext +=
-        "\\n\\n--- FILE: " +
-        file.name +
-        " ---\\n" +
-        file.text +
-        "\\n--- END FILE ---\\n";
-
+        fileContext +=
+          "\n\n--- FILE: " +
+          file.name +
+          " ---\n" +
+          file.text +
+          "\n--- END FILE ---\n";
+      }
     }
-
-  });
+  );
 
   if (fileContext) {
+
     parts.push({
       type: "text",
       text:
         text +
-        "\\n\\nThe user attached these text/code files. Use their contents when relevant:" +
+        "\n\nThe user attached these text/code files. Use their contents when relevant:" +
         fileContext
     });
+
   } else {
+
     parts.push({
       type: "text",
       text: text
     });
   }
 
-  state.files.forEach(function(file) {
+  state.files.forEach(
+    function(file) {
 
-    if (file.type === "image") {
+      if (file.type === "image") {
 
-      parts.push({
-        type: "image_url",
-        image_url: {
-          url: file.dataUrl
-        }
-      });
-
+        parts.push({
+          type: "image_url",
+          image_url: {
+            url: file.dataUrl
+          }
+        });
+      }
     }
-
-  });
+  );
 
   return parts;
 }
+
+/* =========================================================
+   BUSY / STOP
+========================================================= */
 
 function setBusy(value) {
 
   state.busy = value;
 
-  el.sendBtn.style.display = value ? "none" : "grid";
-  el.stopBtn.style.display = value ? "grid" : "none";
+  el.sendBtn.style.display =
+    value
+      ? "none"
+      : "grid";
 
-  el.input.disabled = value;
+  el.stopBtn.style.display =
+    value
+      ? "grid"
+      : "none";
+
+  el.input.disabled =
+    value;
 
   if (!value) {
-    el.input.disabled = false;
+
+    el.input.disabled =
+      false;
+
     el.input.focus();
   }
 }
@@ -1454,32 +1920,58 @@ function setBusy(value) {
 function stopGeneration() {
 
   if (state.controller) {
+
     state.controller.abort();
-    state.controller = null;
+
+    state.controller =
+      null;
   }
 
   setBusy(false);
 }
 
-el.stopBtn.addEventListener("click", stopGeneration);
+el.stopBtn.addEventListener(
+  "click",
+  stopGeneration
+);
+
+/* =========================================================
+   CHAT
+========================================================= */
 
 async function sendMessage() {
 
-  if (state.busy) return;
-
-  const text = el.input.value.trim();
-
-  if (!text) return;
-
-  if (!el.modelSelect.value) {
-    showSystemError("No model is selected.");
+  if (state.busy) {
     return;
   }
 
-  if (looksLikeImageRequest(text) && !state.files.length) {
+  const text =
+    el.input.value.trim();
 
-    el.imageModal.classList.add("show");
-    el.imagePrompt.value = text;
+  if (!text) {
+    return;
+  }
+
+  if (!el.modelSelect.value) {
+
+    showSystemError(
+      "No model is selected."
+    );
+
+    return;
+  }
+
+  if (
+    looksLikeImageRequest(text) &&
+    !state.files.length
+  ) {
+
+    el.imageModal.classList.add(
+      "show"
+    );
+
+    el.imagePrompt.value =
+      text;
 
     await loadImageModels();
 
@@ -1491,65 +1983,92 @@ async function sendMessage() {
     content: text
   });
 
-  addMessage("user", text);
+  addMessage(
+    "user",
+    text
+  );
 
   el.input.value = "";
+
   autoResize();
 
   saveHistory();
 
-  const userContent = buildUserContent(text);
+  const userContent =
+    buildUserContent(text);
 
-  const payloadMessages = state.messages
-    .slice(-20)
-    .map(function(message, index, arr) {
+  const payloadMessages =
+    state.messages
+      .slice(-20)
+      .map(
+        function(message, index, arr) {
 
-      if (
-        index === arr.length - 1 &&
-        message.role === "user"
-      ) {
-        return {
-          role: "user",
-          content: userContent
-        };
-      }
+          if (
+            index ===
+              arr.length - 1 &&
+            message.role ===
+              "user"
+          ) {
 
-      return {
-        role: message.role,
-        content: message.content
-      };
-    });
+            return {
+              role: "user",
+              content:
+                userContent
+            };
+          }
 
-  const assistant = addMessage(
-    "assistant",
-    '<span class="typing">Thinking<span class="dot">...</span></span>'
-  );
+          return {
+            role:
+              message.role,
+            content:
+              message.content
+          };
+        }
+      );
+
+  const assistant =
+    addMessage(
+      "assistant",
+      '<span class="typing">Thinking<span class="dot">...</span></span>'
+    );
 
   setBusy(true);
 
-  state.controller = new AbortController();
+  state.controller =
+    new AbortController();
 
   try {
 
-    const response = await fetch("/api/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: el.modelSelect.value,
-        messages: payloadMessages,
-        webSearch: true
-      }),
-      signal: state.controller.signal
-    });
+    const response =
+      await fetch(
+        "/api/chat",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+          body:
+            JSON.stringify({
+              model:
+                el.modelSelect.value,
+              messages:
+                payloadMessages,
+              webSearch:
+                true
+            }),
+          signal:
+            state.controller.signal
+        }
+      );
 
     if (!response.ok) {
 
       let data = null;
 
       try {
-        data = await response.json();
+        data =
+          await response.json();
       } catch (_) {}
 
       throw new Error(
@@ -1557,72 +2076,126 @@ async function sendMessage() {
         data.error &&
         data.error.message
           ? data.error.message
-          : "Chat request failed with HTTP " + response.status
+          : "Chat request failed with HTTP " +
+            response.status
       );
     }
 
     if (!response.body) {
-      throw new Error("Streaming response is not available.");
+
+      throw new Error(
+        "Streaming response is not available."
+      );
     }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
+    const reader =
+      response.body.getReader();
+
+    const decoder =
+      new TextDecoder();
 
     let buffer = "";
     let fullText = "";
     let sources = [];
 
-    assistant.body.innerHTML = "";
+    assistant.body.innerHTML =
+      "";
 
     while (true) {
 
-      const result = await reader.read();
+      const result =
+        await reader.read();
 
-      if (result.done) break;
+      if (result.done) {
+        break;
+      }
 
-      buffer += decoder.decode(result.value, {
-        stream: true
-      });
+      buffer +=
+        decoder.decode(
+          result.value,
+          {
+            stream: true
+          }
+        );
 
-      const events = buffer.split("\\n\\n");
+      const events =
+        buffer.split(
+          "\n\n"
+        );
 
-      buffer = events.pop() || "";
+      buffer =
+        events.pop() || "";
 
-      for (const event of events) {
+      for (
+        const event of events
+      ) {
 
-        const lines = event.split("\\n");
+        const lines =
+          event.split("\n");
 
-        for (const line of lines) {
+        for (
+          const line of lines
+        ) {
 
-          if (!line.startsWith("data:")) continue;
+          if (
+            !line.startsWith(
+              "data:"
+            )
+          ) {
+            continue;
+          }
 
-          const data = line.slice(5).trim();
+          const data =
+            line.slice(5).trim();
 
-          if (!data) continue;
+          if (!data) {
+            continue;
+          }
 
-          if (data === "[DONE]") continue;
+          if (
+            data === "[DONE]"
+          ) {
+            continue;
+          }
 
           let chunk;
 
           try {
-            chunk = JSON.parse(data);
+
+            chunk =
+              JSON.parse(data);
+
           } catch (_) {
+
             continue;
           }
 
-          if (chunk.type === "meta") {
+          if (
+            chunk.type ===
+            "meta"
+          ) {
 
             if (
               chunk.web_search &&
-              Array.isArray(chunk.web_search.results)
+              Array.isArray(
+                chunk.web_search
+                  .results
+              )
             ) {
-              sources = chunk.web_search.results;
+
+              sources =
+                chunk.web_search
+                  .results;
             }
 
             continue;
           }
 
-          if (chunk.type === "error") {
+          if (
+            chunk.type ===
+            "error"
+          ) {
+
             throw new Error(
               chunk.error &&
               chunk.error.message
@@ -1635,30 +2208,44 @@ async function sendMessage() {
             chunk.choices &&
             chunk.choices[0] &&
             chunk.choices[0].delta
-              ? chunk.choices[0].delta.content
+              ? chunk.choices[0]
+                  .delta.content
               : "";
 
           if (delta) {
 
-            fullText += delta;
+            fullText +=
+              delta;
 
             assistant.body.innerHTML =
-              markdownToHtml(fullText);
+              markdownToHtml(
+                fullText
+              );
 
             scrollBottom();
           }
-
         }
       }
     }
 
     if (!fullText) {
-      fullText = "No response was returned.";
-      assistant.body.innerHTML = markdownToHtml(fullText);
+
+      fullText =
+        "No response was returned.";
+
+      assistant.body.innerHTML =
+        markdownToHtml(
+          fullText
+        );
     }
 
     if (sources.length) {
-      assistant.body.appendChild(renderSources(sources));
+
+      assistant.body.appendChild(
+        renderSources(
+          sources
+        )
+      );
     }
 
     state.messages.push({
@@ -1671,9 +2258,17 @@ async function sendMessage() {
 
   } catch (error) {
 
-    if (error.name === "AbortError") {
+    if (
+      error.name ===
+      "AbortError"
+    ) {
 
-      if (!assistant.body.textContent.trim()) {
+      if (
+        !assistant.body
+          .textContent
+          .trim()
+      ) {
+
         assistant.body.innerHTML =
           "<p>Generation stopped.</p>";
       }
@@ -1682,36 +2277,52 @@ async function sendMessage() {
 
       assistant.body.innerHTML =
         markdownToHtml(
-          "⚠️ " + (error.message || "Unknown error")
+          "⚠️ " +
+          (
+            error.message ||
+            "Unknown error"
+          )
         );
     }
 
   } finally {
 
-    state.controller = null;
-    setBusy(false);
+    state.controller =
+      null;
 
+    setBusy(false);
   }
 }
 
-/* -----------------------------
-   AI Council
------------------------------ */
+/* =========================================================
+   AI COUNCIL
+========================================================= */
 
-el.councilBtn.addEventListener("click", function() {
+el.councilBtn.addEventListener(
+  "click",
+  function() {
 
-  if (state.busy) return;
+    if (state.busy) {
+      return;
+    }
 
-  const text = el.input.value.trim();
+    const text =
+      el.input.value.trim();
 
-  if (!text) {
-    showSystemError("Enter a question first.");
-    el.input.focus();
-    return;
+    if (!text) {
+
+      showSystemError(
+        "Enter a question first."
+      );
+
+      el.input.focus();
+
+      return;
+    }
+
+    runCouncil(text);
   }
-
-  runCouncil(text);
-});
+);
 
 async function runCouncil(text) {
 
@@ -1720,34 +2331,47 @@ async function runCouncil(text) {
     content: text
   });
 
-  addMessage("user", text);
+  addMessage(
+    "user",
+    text
+  );
 
   el.input.value = "";
+
   autoResize();
 
-  const assistant = addMessage(
-    "assistant",
-    '<span class="typing">AI Council is consulting multiple models<span class="dot">...</span></span>'
-  );
+  const assistant =
+    addMessage(
+      "assistant",
+      '<span class="typing">AI Council is consulting multiple models<span class="dot">...</span></span>'
+    );
 
   setBusy(true);
 
   try {
 
-    const response = await fetch("/api/council", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        question: text,
-        webSearch: true
-      })
-    });
+    const response =
+      await fetch(
+        "/api/council",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+          body:
+            JSON.stringify({
+              question: text,
+              webSearch: true
+            })
+        }
+      );
 
-    const data = await response.json();
+    const data =
+      await response.json();
 
     if (!response.ok) {
+
       throw new Error(
         data &&
         data.error &&
@@ -1758,22 +2382,32 @@ async function runCouncil(text) {
     }
 
     assistant.body.innerHTML =
-      markdownToHtml(data.answer || "No council answer.");
+      markdownToHtml(
+        data.answer ||
+        "No council answer."
+      );
 
     if (
       data.sources &&
-      Array.isArray(data.sources) &&
+      Array.isArray(
+        data.sources
+      ) &&
       data.sources.length
     ) {
+
       assistant.body.appendChild(
-        renderSources(data.sources)
+        renderSources(
+          data.sources
+        )
       );
     }
 
     state.messages.push({
       role: "assistant",
-      content: data.answer || "",
-      sources: data.sources || []
+      content:
+        data.answer || "",
+      sources:
+        data.sources || []
     });
 
     saveHistory();
@@ -1782,41 +2416,64 @@ async function runCouncil(text) {
 
     assistant.body.innerHTML =
       markdownToHtml(
-        "⚠️ " + (error.message || "Council failed.")
+        "⚠️ " +
+        (
+          error.message ||
+          "Council failed."
+        )
       );
 
   } finally {
 
     setBusy(false);
-
   }
 }
 
-/* -----------------------------
-   Images
------------------------------ */
+/* =========================================================
+   IMAGE UI
+========================================================= */
 
-el.imageBtn.addEventListener("click", async function() {
+el.imageBtn.addEventListener(
+  "click",
+  async function() {
 
-  if (state.busy) return;
+    if (state.busy) {
+      return;
+    }
 
-  el.imageModal.classList.add("show");
+    el.imageModal.classList.add(
+      "show"
+    );
 
-  await loadImageModels();
-
-});
-
-el.imageClose.addEventListener("click", function() {
-  el.imageModal.classList.remove("show");
-});
-
-el.imageModal.addEventListener("click", function(event) {
-
-  if (event.target === el.imageModal) {
-    el.imageModal.classList.remove("show");
+    await loadImageModels();
   }
+);
 
-});
+el.imageClose.addEventListener(
+  "click",
+  function() {
+
+    el.imageModal.classList.remove(
+      "show"
+    );
+  }
+);
+
+el.imageModal.addEventListener(
+  "click",
+  function(event) {
+
+    if (
+      event.target ===
+      el.imageModal
+    ) {
+
+      el.imageModal.classList.remove(
+        "show"
+      );
+    }
+  }
+);
 
 async function loadImageModels() {
 
@@ -1825,22 +2482,30 @@ async function loadImageModels() {
 
   try {
 
-    const response = await fetch("/api/image-models");
+    const response =
+      await fetch(
+        "/api/image-models"
+      );
 
-    const data = await response.json();
+    const data =
+      await response.json();
 
     if (!response.ok) {
+
       throw new Error(
         data &&
         data.error
-          ? data.error.message || data.error
+          ? data.error.message ||
+            data.error
           : "Could not load image models"
       );
     }
 
-    state.imageModels = data.models || [];
+    state.imageModels =
+      data.models || [];
 
-    el.imageModel.innerHTML = "";
+    el.imageModel.innerHTML =
+      "";
 
     if (!state.imageModels.length) {
 
@@ -1850,73 +2515,111 @@ async function loadImageModels() {
       return;
     }
 
-    state.imageModels.forEach(function(model) {
+    state.imageModels.forEach(
+      function(model) {
 
-      const option = document.createElement("option");
+        const option =
+          document.createElement(
+            "option"
+          );
 
-      option.value = model.id;
-      option.textContent =
-        model.id +
-        (model.access_tier
-          ? " — " + model.access_tier
-          : "");
+        option.value =
+          model.id;
 
-      el.imageModel.appendChild(option);
+        option.textContent =
+          model.id +
+          (
+            model.access_tier
+              ? " — " +
+                model.access_tier
+              : ""
+          );
 
-    });
+        el.imageModel.appendChild(
+          option
+        );
+      }
+    );
 
   } catch (error) {
 
     el.imageModel.innerHTML =
       '<option value="">Image model loading failed</option>';
 
-    el.imageStatus.textContent = error.message;
-
+    el.imageStatus.textContent =
+      error.message;
   }
 }
 
-el.generateImage.addEventListener("click", generateImage);
+el.generateImage.addEventListener(
+  "click",
+  generateImage
+);
 
 async function generateImage() {
 
-  const prompt = el.imagePrompt.value.trim();
-  const model = el.imageModel.value;
-  const size = el.imageSize.value;
+  const prompt =
+    el.imagePrompt.value.trim();
+
+  const model =
+    el.imageModel.value;
+
+  const size =
+    el.imageSize.value;
 
   if (!prompt) {
+
     el.imageStatus.textContent =
       "Enter an image prompt.";
+
     return;
   }
 
   if (!model) {
+
     el.imageStatus.textContent =
       "No image model is available.";
+
     return;
   }
 
-  el.generateImage.disabled = true;
+  el.generateImage.disabled =
+    true;
+
   el.imageStatus.textContent =
     "Submitting image job...";
-  el.imageResult.innerHTML = "";
+
+  el.imageResult.innerHTML =
+    "";
 
   try {
 
-    const response = await fetch("/api/image", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        prompt: prompt,
-        model: model,
-        size: size
-      })
-    });
+    const response =
+      await fetch(
+        "/api/image",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+          body:
+            JSON.stringify({
+              prompt:
+                prompt,
+              model:
+                model,
+              size:
+                size
+            })
+        }
+      );
 
-    const data = await response.json();
+    const data =
+      await response.json();
 
     if (!response.ok) {
+
       throw new Error(
         data &&
         data.error &&
@@ -1926,42 +2629,64 @@ async function generateImage() {
       );
     }
 
-    const jobId = data.jobId;
+    const jobId =
+      data.jobId;
 
     if (!jobId) {
-      throw new Error("Image job ID was not returned.");
+
+      throw new Error(
+        "Image job ID was not returned."
+      );
     }
 
-    await pollImageJob(jobId);
+    await pollImageJob(
+      jobId
+    );
 
   } catch (error) {
 
     el.imageStatus.textContent =
-      "Error: " + error.message;
+      "Error: " +
+      error.message;
 
   } finally {
 
-    el.generateImage.disabled = false;
-
+    el.generateImage.disabled =
+      false;
   }
 }
 
-async function pollImageJob(jobId) {
+async function pollImageJob(
+  jobId
+) {
 
   let delay = 1500;
 
-  for (let attempt = 0; attempt < 120; attempt++) {
+  for (
+    let attempt = 0;
+    attempt < 120;
+    attempt++
+  ) {
 
-    await new Promise(function(resolve) {
-      setTimeout(resolve, delay);
-    });
-
-    const response = await fetch(
-      "/api/image/status?id=" +
-      encodeURIComponent(jobId)
+    await new Promise(
+      function(resolve) {
+        setTimeout(
+          resolve,
+          delay
+        );
+      }
     );
 
-    const data = await response.json();
+    const response =
+      await fetch(
+        "/api/image/status?id=" +
+        encodeURIComponent(
+          jobId
+        )
+      );
+
+    const data =
+      await response.json();
 
     if (!response.ok) {
 
@@ -1972,65 +2697,93 @@ async function pollImageJob(jobId) {
           ? data.error.message
           : "Could not retrieve image job"
       );
-
     }
 
-    if (data.status === "processing") {
+    if (
+      data.status ===
+      "processing"
+    ) {
 
       el.imageStatus.textContent =
-        "Generating image... " +
-        Math.round((attempt + 1) * 100 / 120) +
-        "%";
+        "Generating image...";
 
-      delay = Math.min(
-        Math.round(delay * 1.25),
-        8000
-      );
+      delay =
+        Math.min(
+          Math.round(
+            delay * 1.25
+          ),
+          8000
+        );
 
       continue;
     }
 
-    if (data.status === "succeeded") {
+    if (
+      data.status ===
+      "succeeded"
+    ) {
 
       el.imageStatus.textContent =
         "Image generated.";
 
-      el.imageResult.innerHTML = "";
+      el.imageResult.innerHTML =
+        "";
 
       const urls =
-        Array.isArray(data.data)
+        Array.isArray(
+          data.data
+        )
           ? data.data
           : [];
 
-      urls.forEach(function(url) {
+      urls.forEach(
+        function(item) {
 
-        if (!url || !url.url) return;
+          if (
+            !item ||
+            !item.url
+          ) {
+            return;
+          }
 
-        const img = document.createElement("img");
-        img.src = url.url;
-        img.alt = "Generated image";
-        img.loading = "lazy";
+          const img =
+            document.createElement(
+              "img"
+            );
 
-        el.imageResult.appendChild(img);
+          img.src =
+            item.url;
 
-      });
+          img.alt =
+            "Generated image";
+
+          img.loading =
+            "lazy";
+
+          el.imageResult.appendChild(
+            img
+          );
+        }
+      );
 
       return;
     }
 
     if (
-      data.status === "failed" ||
-      data.status === "blocked"
+      data.status ===
+        "failed" ||
+      data.status ===
+        "blocked"
     ) {
 
       throw new Error(
         data.error &&
         data.error.message
           ? data.error.message
-          : "Image generation " + data.status
+          : "Image generation " +
+            data.status
       );
     }
-
   }
 
   throw new Error(
@@ -2038,17 +2791,22 @@ async function pollImageJob(jobId) {
   );
 }
 
-/* -----------------------------
-   Startup
------------------------------ */
+/* =========================================================
+   STARTUP
+========================================================= */
 
 renderHistory();
 loadModels();
 autoResize();
 
 </script>
+
 </body>
 </html>`;
+
+/* =========================================================
+   MODEL CACHE
+========================================================= */
 
 const MODEL_CACHE = {
   chat: null,
@@ -2057,88 +2815,145 @@ const MODEL_CACHE = {
   imageExpires: 0
 };
 
-const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_TTL =
+  5 * 60 * 1000;
+
+/* =========================================================
+   WORKER
+========================================================= */
 
 export default {
+
   async fetch(request, env) {
-    const url = new URL(request.url);
+
+    const url =
+      new URL(request.url);
 
     try {
 
-      if (request.method === "GET" && url.pathname === "/") {
-        return new Response(HTML, {
-          status: 200,
-          headers: {
-            "content-type": "text/html; charset=UTF-8",
-            "cache-control": "no-store"
-          }
-        });
-      }
+      if (
+        request.method === "GET" &&
+        url.pathname === "/"
+      ) {
 
-      if (request.method === "GET" && url.pathname === "/api/models") {
-        return await handleModels(env);
+        return new Response(
+          HTML,
+          {
+            status: 200,
+            headers: {
+              "content-type":
+                "text/html; charset=UTF-8",
+              "cache-control":
+                "no-store"
+            }
+          }
+        );
       }
 
       if (
         request.method === "GET" &&
-        url.pathname === "/api/image-models"
+        url.pathname === "/api/models"
       ) {
-        return await handleImageModels(env);
+
+        return await handleModels(
+          env
+        );
+      }
+
+      if (
+        request.method === "GET" &&
+        url.pathname ===
+          "/api/image-models"
+      ) {
+
+        return await handleImageModels(
+          env
+        );
       }
 
       if (
         request.method === "POST" &&
         url.pathname === "/api/chat"
       ) {
-        return await handleChat(request, env);
+
+        return await handleChat(
+          request,
+          env
+        );
       }
 
       if (
         request.method === "POST" &&
         url.pathname === "/api/council"
       ) {
-        return await handleCouncil(request, env);
+
+        return await handleCouncil(
+          request,
+          env
+        );
       }
 
       if (
         request.method === "POST" &&
         url.pathname === "/api/image"
       ) {
-        return await handleImage(request, env);
+
+        return await handleImage(
+          request,
+          env
+        );
       }
 
       if (
         request.method === "GET" &&
-        url.pathname === "/api/image/status"
+        url.pathname ===
+          "/api/image/status"
       ) {
-        return await handleImageStatus(request, env);
+
+        return await handleImageStatus(
+          request,
+          env
+        );
       }
 
       if (
         request.method === "GET" &&
         url.pathname === "/api/health"
       ) {
-        return await handleHealth(env);
+
+        return await handleHealth(
+          env
+        );
       }
 
-      return json({
-        error: {
-          message: "Not found"
-        }
-      }, 404);
+      return json(
+        {
+          error: {
+            message:
+              "Not found"
+          }
+        },
+        404
+      );
 
     } catch (error) {
 
-      console.error("Worker error:", error);
+      console.error(
+        "Worker error:",
+        error
+      );
 
-      return json({
-        error: {
-          message:
-            error instanceof Error
-              ? error.message
-              : "Internal server error"
-        }
-      }, 500);
+      return json(
+        {
+          error: {
+            message:
+              error instanceof Error
+                ? error.message
+                : "Internal server error"
+          }
+        },
+        500
+      );
     }
   }
 };
@@ -2148,13 +2963,18 @@ export default {
 ========================================================= */
 
 function getBaseUrl(env) {
+
   return (
     env.XKIRO_BASE_URL ||
     "https://api.xkiro.com/v1"
-  ).replace(/\/+$/, "");
+  ).replace(
+    /\/+$/,
+    ""
+  );
 }
 
 function getApiKey(env) {
+
   return env.XKIRO_API_KEY || "";
 }
 
@@ -2162,27 +2982,37 @@ function getApiKey(env) {
    MODEL CATALOG
 ========================================================= */
 
-async function listModels(env, modality) {
+async function listModels(
+  env,
+  modality
+) {
 
   const suffix =
     modality
       ? "?modality=" +
-        encodeURIComponent(modality)
+        encodeURIComponent(
+          modality
+        )
       : "";
 
-  const response = await fetch(
-    getBaseUrl(env) +
-    "/models" +
-    suffix,
-    {
-      method: "GET",
-      headers: {
-        "Accept": "application/json"
+  const response =
+    await fetch(
+      getBaseUrl(env) +
+      "/models" +
+      suffix,
+      {
+        method: "GET",
+        headers: {
+          "Accept":
+            "application/json"
+        }
       }
-    }
-  );
+    );
 
-  const data = await readJsonSafe(response);
+  const data =
+    await readJsonSafe(
+      response
+    );
 
   if (!response.ok) {
 
@@ -2194,7 +3024,9 @@ async function listModels(env, modality) {
     );
   }
 
-  return Array.isArray(data.data)
+  return Array.isArray(
+    data.data
+  )
     ? data.data
     : [];
 }
@@ -2202,57 +3034,86 @@ async function listModels(env, modality) {
 function isFreeModel(model) {
 
   return (
-    String(model.access_tier || "")
-      .toLowerCase() === "free"
+    String(
+      model.access_tier || ""
+    ).toLowerCase() ===
+    "free"
   );
 }
 
-async function getFreeModels(env) {
+async function getFreeModels(
+  env
+) {
 
-  const now = Date.now();
+  const now =
+    Date.now();
 
   if (
     MODEL_CACHE.chat &&
-    MODEL_CACHE.chatExpires > now
+    MODEL_CACHE.chatExpires >
+      now
   ) {
+
     return MODEL_CACHE.chat;
   }
 
-  const models = await listModels(env, "chat");
+  const models =
+    await listModels(
+      env,
+      "chat"
+    );
 
-  const free = models
-    .filter(isFreeModel)
-    .filter(function(model) {
-      return model.modality === "chat" ||
-        !model.modality;
-    });
+  const free =
+    models
+      .filter(isFreeModel)
+      .filter(function(model) {
 
-  MODEL_CACHE.chat = free;
+        return (
+          model.modality ===
+            "chat" ||
+          !model.modality
+        );
+      });
+
+  MODEL_CACHE.chat =
+    free;
+
   MODEL_CACHE.chatExpires =
     now + CACHE_TTL;
 
   return free;
 }
 
-async function getFreeImageModels(env) {
+async function getFreeImageModels(
+  env
+) {
 
-  const now = Date.now();
+  const now =
+    Date.now();
 
   if (
     MODEL_CACHE.image &&
-    MODEL_CACHE.imageExpires > now
+    MODEL_CACHE.imageExpires >
+      now
   ) {
+
     return MODEL_CACHE.image;
   }
 
-  const models = await listModels(
-    env,
-    "image"
-  );
+  const models =
+    await listModels(
+      env,
+      "image"
+    );
 
-  const free = models.filter(isFreeModel);
+  const free =
+    models.filter(
+      isFreeModel
+    );
 
-  MODEL_CACHE.image = free;
+  MODEL_CACHE.image =
+    free;
+
   MODEL_CACHE.imageExpires =
     now + CACHE_TTL;
 
@@ -2260,48 +3121,66 @@ async function getFreeImageModels(env) {
 }
 
 /* =========================================================
-   MODELS ENDPOINT
+   MODELS API
 ========================================================= */
 
-async function handleModels(env) {
+async function handleModels(
+  env
+) {
 
   try {
 
     const models =
-      await getFreeModels(env);
+      await getFreeModels(
+        env
+      );
 
     return json({
-      models: models
+      models:
+        models
     });
 
   } catch (error) {
 
-    return json({
-      error: {
-        message: error.message
-      }
-    }, 502);
+    return json(
+      {
+        error: {
+          message:
+            error.message
+        }
+      },
+      502
+    );
   }
 }
 
-async function handleImageModels(env) {
+async function handleImageModels(
+  env
+) {
 
   try {
 
     const models =
-      await getFreeImageModels(env);
+      await getFreeImageModels(
+        env
+      );
 
     return json({
-      models: models
+      models:
+        models
     });
 
   } catch (error) {
 
-    return json({
-      error: {
-        message: error.message
-      }
-    }, 502);
+    return json(
+      {
+        error: {
+          message:
+            error.message
+        }
+      },
+      502
+    );
   }
 }
 
@@ -2309,85 +3188,131 @@ async function handleImageModels(env) {
    CHAT
 ========================================================= */
 
-async function handleChat(request, env) {
+async function handleChat(
+  request,
+  env
+) {
 
-  const apiKey = getApiKey(env);
+  const apiKey =
+    getApiKey(env);
 
   if (!apiKey) {
-    return json({
-      error: {
-        message:
-          "XKIRO_API_KEY is not configured on the Worker."
-      }
-    }, 500);
+
+    return json(
+      {
+        error: {
+          message:
+            "XKIRO_API_KEY is not configured on the Worker."
+        }
+      },
+      500
+    );
   }
 
-  const body = await readJsonRequest(request);
+  const body =
+    await readJsonRequest(
+      request
+    );
 
   const requestedModel =
-    typeof body.model === "string"
+    typeof body.model ===
+      "string"
       ? body.model.trim()
       : "";
 
   const messages =
-    Array.isArray(body.messages)
+    Array.isArray(
+      body.messages
+    )
       ? body.messages
       : [];
 
   if (!requestedModel) {
-    return json({
-      error: {
-        message: "A model is required."
-      }
-    }, 400);
+
+    return json(
+      {
+        error: {
+          message:
+            "A model is required."
+        }
+      },
+      400
+    );
   }
 
   if (!messages.length) {
-    return json({
-      error: {
-        message: "At least one message is required."
-      }
-    }, 400);
+
+    return json(
+      {
+        error: {
+          message:
+            "At least one message is required."
+        }
+      },
+      400
+    );
   }
 
   const freeModels =
-    await getFreeModels(env);
+    await getFreeModels(
+      env
+    );
 
   const allowed =
-    freeModels.find(function(model) {
-      return model.id === requestedModel;
-    });
+    freeModels.find(
+      function(model) {
+        return model.id ===
+          requestedModel;
+      }
+    );
 
   if (!allowed) {
 
-    return json({
-      error: {
-        message:
-          "Selected model is not available in the current free model catalog."
-      }
-    }, 400);
+    return json(
+      {
+        error: {
+          message:
+            "Selected model is not available in the current free model catalog."
+        }
+      },
+      400
+    );
   }
 
   const payload = {
-    model: requestedModel,
-    messages: messages.slice(-30),
-    stream: true,
+    model:
+      requestedModel,
+
+    messages:
+      messages.slice(-30),
+
+    stream:
+      true,
 
     web_search: {
-      enable: body.webSearch !== false,
-      count: 5
+      enable:
+        body.webSearch !== false,
+      count:
+        5
     }
   };
 
   const capabilities =
-    allowed.capabilities || {};
+    allowed.capabilities ||
+    {};
 
   if (
     capabilities.reasoning &&
-    Array.isArray(allowed.reasoning_efforts) &&
-    allowed.reasoning_efforts.includes("medium")
+    Array.isArray(
+      allowed.reasoning_efforts
+    ) &&
+    allowed.reasoning_efforts.includes(
+      "medium"
+    )
   ) {
-    payload.reasoning_effort = "medium";
+
+    payload.reasoning_effort =
+      "medium";
   }
 
   const response =
@@ -2395,16 +3320,25 @@ async function handleChat(request, env) {
       env,
       "/chat/completions",
       {
-        method: "POST",
-        body: JSON.stringify(payload),
-        stream: true
+        method:
+          "POST",
+
+        body:
+          JSON.stringify(
+            payload
+          ),
+
+        stream:
+          true
       }
     );
 
   if (!response.ok) {
 
     const data =
-      await readJsonSafe(response);
+      await readJsonSafe(
+        response
+      );
 
     return json(
       upstreamError(
@@ -2415,14 +3349,18 @@ async function handleChat(request, env) {
     );
   }
 
-  return transformChatStream(response);
+  return transformChatStream(
+    response
+  );
 }
 
 /* =========================================================
-   STREAM TRANSFORM
+   STREAM
 ========================================================= */
 
-function transformChatStream(upstream) {
+function transformChatStream(
+  upstream
+) {
 
   const reader =
     upstream.body.getReader();
@@ -2437,6 +3375,7 @@ function transformChatStream(upstream) {
 
   const stream =
     new ReadableStream({
+
       async start(controller) {
 
         try {
@@ -2453,32 +3392,53 @@ function transformChatStream(upstream) {
             buffer +=
               decoder.decode(
                 result.value,
-                { stream: true }
+                {
+                  stream: true
+                }
               );
 
             const events =
-              buffer.split("\n\n");
+              buffer.split(
+                "\n\n"
+              );
 
             buffer =
               events.pop() || "";
 
-            for (const event of events) {
+            for (
+              const event of events
+            ) {
 
               const lines =
-                event.split("\n");
+                event.split(
+                  "\n"
+                );
 
-              for (const line of lines) {
+              for (
+                const line of lines
+              ) {
 
-                if (!line.startsWith("data:")) {
+                if (
+                  !line.startsWith(
+                    "data:"
+                  )
+                ) {
                   continue;
                 }
 
                 const raw =
-                  line.slice(5).trim();
+                  line
+                    .slice(5)
+                    .trim();
 
-                if (!raw) continue;
+                if (!raw) {
+                  continue;
+                }
 
-                if (raw === "[DONE]") {
+                if (
+                  raw ===
+                  "[DONE]"
+                ) {
 
                   controller.enqueue(
                     encoder.encode(
@@ -2492,16 +3452,22 @@ function transformChatStream(upstream) {
                 let chunk;
 
                 try {
+
                   chunk =
-                    JSON.parse(raw);
+                    JSON.parse(
+                      raw
+                    );
+
                 } catch (_) {
+
                   continue;
                 }
 
                 if (
                   chunk.web_search &&
                   Array.isArray(
-                    chunk.web_search.results
+                    chunk.web_search
+                      .results
                   )
                 ) {
 
@@ -2509,7 +3475,9 @@ function transformChatStream(upstream) {
                     encoder.encode(
                       "data: " +
                       JSON.stringify({
-                        type: "meta",
+                        type:
+                          "meta",
+
                         web_search:
                           chunk.web_search
                       }) +
@@ -2519,17 +3487,22 @@ function transformChatStream(upstream) {
                 }
 
                 const choices =
-                  Array.isArray(chunk.choices)
+                  Array.isArray(
+                    chunk.choices
+                  )
                     ? chunk.choices
                     : [];
 
-                if (choices.length) {
+                if (
+                  choices.length
+                ) {
 
                   controller.enqueue(
                     encoder.encode(
                       "data: " +
                       JSON.stringify({
-                        choices: choices
+                        choices:
+                          choices
                       }) +
                       "\n\n"
                     )
@@ -2553,7 +3526,9 @@ function transformChatStream(upstream) {
             encoder.encode(
               "data: " +
               JSON.stringify({
-                type: "error",
+                type:
+                  "error",
+
                 error: {
                   message:
                     error instanceof Error
@@ -2570,81 +3545,119 @@ function transformChatStream(upstream) {
       },
 
       cancel() {
+
         try {
           reader.cancel();
         } catch (_) {}
       }
     });
 
-  return new Response(stream, {
-    status: 200,
-    headers: {
-      "content-type":
-        "text/event-stream; charset=utf-8",
-      "cache-control": "no-cache, no-transform",
-      "connection": "keep-alive",
-      "x-accel-buffering": "no"
+  return new Response(
+    stream,
+    {
+      status: 200,
+
+      headers: {
+        "content-type":
+          "text/event-stream; charset=utf-8",
+
+        "cache-control":
+          "no-cache, no-transform",
+
+        "connection":
+          "keep-alive",
+
+        "x-accel-buffering":
+          "no"
+      }
     }
-  });
+  );
 }
 
 /* =========================================================
    AI COUNCIL
 ========================================================= */
 
-async function handleCouncil(request, env) {
+async function handleCouncil(
+  request,
+  env
+) {
 
-  const apiKey = getApiKey(env);
+  const apiKey =
+    getApiKey(env);
 
   if (!apiKey) {
-    return json({
-      error: {
-        message:
-          "XKIRO_API_KEY is not configured."
-      }
-    }, 500);
+
+    return json(
+      {
+        error: {
+          message:
+            "XKIRO_API_KEY is not configured."
+        }
+      },
+      500
+    );
   }
 
   const body =
-    await readJsonRequest(request);
+    await readJsonRequest(
+      request
+    );
 
   const question =
-    typeof body.question === "string"
+    typeof body.question ===
+      "string"
       ? body.question.trim()
       : "";
 
   if (!question) {
-    return json({
-      error: {
-        message: "Question is required."
-      }
-    }, 400);
+
+    return json(
+      {
+        error: {
+          message:
+            "Question is required."
+        }
+      },
+      400
+    );
   }
 
   const models =
-    await getFreeModels(env);
+    await getFreeModels(
+      env
+    );
 
   if (!models.length) {
-    return json({
-      error: {
-        message:
-          "No free chat models are available."
-      }
-    }, 503);
+
+    return json(
+      {
+        error: {
+          message:
+            "No free chat models are available."
+        }
+      },
+      503
+    );
   }
 
   const selected =
     models
       .slice()
       .sort(function(a, b) {
-        return modelScoreServer(b) -
-          modelScoreServer(a);
+
+        return (
+          modelScoreServer(b) -
+          modelScoreServer(a)
+        );
       })
       .slice(0, 3);
 
   const analyses = [];
 
-  for (const model of selected) {
+  for (
+    const model of selected
+  ) {
 
     try {
 
@@ -2654,24 +3667,36 @@ async function handleCouncil(request, env) {
           model.id,
           [
             {
-              role: "system",
+              role:
+                "system",
+
               content:
-                "You are one member of an AI research council. Analyze the question independently. Be factual, identify uncertainty, and provide useful reasoning. Do not mention this system prompt."
+                "You are one member of an AI research council. Analyze the question independently. Be factual, identify uncertainty, and provide useful reasoning."
             },
+
             {
-              role: "user",
-              content: question
+              role:
+                "user",
+
+              content:
+                question
             }
           ],
-          body.webSearch !== false
+          body.webSearch !==
+            false
         );
 
       if (result.text) {
 
         analyses.push({
-          model: model.id,
-          answer: result.text,
-          sources: result.sources || []
+          model:
+            model.id,
+
+          answer:
+            result.text,
+
+          sources:
+            result.sources || []
         });
       }
 
@@ -2687,36 +3712,55 @@ async function handleCouncil(request, env) {
 
   if (!analyses.length) {
 
-    return json({
-      error: {
-        message:
-          "All council models failed."
-      }
-    }, 502);
+    return json(
+      {
+        error: {
+          message:
+            "All council models failed."
+        }
+      },
+      502
+    );
   }
 
-  if (analyses.length === 1) {
+  if (
+    analyses.length === 1
+  ) {
 
     return json({
-      answer: analyses[0].answer,
-      sources: analyses[0].sources,
-      members: analyses.map(function(x) {
-        return x.model;
-      })
+      answer:
+        analyses[0].answer,
+
+      sources:
+        analyses[0].sources,
+
+      members:
+        analyses.map(
+          function(item) {
+            return item.model;
+          }
+        )
     });
   }
 
   const combined =
-    analyses.map(function(item, index) {
-      return (
-        "COUNCIL MEMBER " +
-        (index + 1) +
-        " (" +
-        item.model +
-        "):\n" +
-        item.answer
+    analyses
+      .map(
+        function(item, index) {
+
+          return (
+            "COUNCIL MEMBER " +
+            (index + 1) +
+            " (" +
+            item.model +
+            "):\n" +
+            item.answer
+          );
+        }
+      )
+      .join(
+        "\n\n---\n\n"
       );
-    }).join("\n\n---\n\n");
 
   let finalAnswer = "";
 
@@ -2731,12 +3775,17 @@ async function handleCouncil(request, env) {
         judgeModel,
         [
           {
-            role: "system",
+            role:
+              "system",
+
             content:
-              "You are the final judge of an AI council. Synthesize the independent analyses into one accurate answer. Resolve contradictions using evidence and clearly state uncertainty when needed. Do not mention internal council mechanics unless useful."
+              "You are the final judge of an AI council. Synthesize the independent analyses into one accurate answer. Resolve contradictions using evidence and clearly state uncertainty when needed."
           },
+
           {
-            role: "user",
+            role:
+              "user",
+
             content:
               "Original question:\n" +
               question +
@@ -2764,51 +3813,85 @@ async function handleCouncil(request, env) {
 
   const sources = [];
 
-  analyses.forEach(function(item) {
+  analyses.forEach(
+    function(item) {
 
-    (item.sources || []).forEach(function(source) {
+      (
+        item.sources || []
+      ).forEach(
+        function(source) {
 
-      if (
-        source &&
-        source.url &&
-        !sources.some(function(existing) {
-          return existing.url === source.url;
-        })
-      ) {
-        sources.push(source);
-      }
+          if (
+            source &&
+            source.url &&
+            !sources.some(
+              function(existing) {
+                return (
+                  existing.url ===
+                  source.url
+                );
+              }
+            )
+          ) {
 
-    });
-
-  });
+            sources.push(
+              source
+            );
+          }
+        }
+      );
+    }
+  );
 
   return json({
-    answer: finalAnswer,
-    sources: sources.slice(0, 10),
-    members: analyses.map(function(item) {
-      return item.model;
-    })
+    answer:
+      finalAnswer,
+
+    sources:
+      sources.slice(0, 10),
+
+    members:
+      analyses.map(
+        function(item) {
+          return item.model;
+        }
+      )
   });
 }
 
-function modelScoreServer(model) {
+function modelScoreServer(
+  model
+) {
 
   let score = 0;
 
   const capabilities =
-    model.capabilities || {};
+    model.capabilities ||
+    {};
 
-  if (capabilities.reasoning) score += 40;
-  if (capabilities.vision) score += 20;
-  if (capabilities.tools) score += 10;
+  if (capabilities.reasoning) {
+    score += 40;
+  }
+
+  if (capabilities.vision) {
+    score += 20;
+  }
+
+  if (capabilities.tools) {
+    score += 10;
+  }
 
   score += Math.min(
-    Number(model.context_length || 0) / 10000,
+    Number(
+      model.context_length || 0
+    ) / 10000,
     30
   );
 
   score += Math.min(
-    Number(model.max_output_tokens || 0) / 5000,
+    Number(
+      model.max_output_tokens || 0
+    ) / 5000,
     20
   );
 
@@ -2823,16 +3906,24 @@ async function councilCall(
 ) {
 
   const payload = {
-    model: model,
-    messages: messages,
-    stream: false
+    model:
+      model,
+
+    messages:
+      messages,
+
+    stream:
+      false
   };
 
   if (useWebSearch) {
 
     payload.web_search = {
-      enable: true,
-      count: 5
+      enable:
+        true,
+
+      count:
+        5
     };
   }
 
@@ -2841,14 +3932,23 @@ async function councilCall(
       env,
       "/chat/completions",
       {
-        method: "POST",
-        body: JSON.stringify(payload),
-        timeoutMs: 90000
+        method:
+          "POST",
+
+        body:
+          JSON.stringify(
+            payload
+          ),
+
+        timeoutMs:
+          90000
       }
     );
 
   const data =
-    await readJsonSafe(response);
+    await readJsonSafe(
+      response
+    );
 
   if (!response.ok) {
 
@@ -2867,12 +3967,15 @@ async function councilCall(
   const text =
     choice &&
     choice.message &&
-    typeof choice.message.content === "string"
+    typeof choice.message.content ===
+      "string"
       ? choice.message.content
       : "";
 
   return {
-    text: text,
+    text:
+      text,
+
     sources:
       data.web_search &&
       Array.isArray(
@@ -2887,79 +3990,114 @@ async function councilCall(
    IMAGE GENERATION
 ========================================================= */
 
-async function handleImage(request, env) {
+async function handleImage(
+  request,
+  env
+) {
 
-  const apiKey = getApiKey(env);
+  const apiKey =
+    getApiKey(env);
 
   if (!apiKey) {
 
-    return json({
-      error: {
-        message:
-          "XKIRO_API_KEY is not configured."
-      }
-    }, 500);
+    return json(
+      {
+        error: {
+          message:
+            "XKIRO_API_KEY is not configured."
+        }
+      },
+      500
+    );
   }
 
   const body =
-    await readJsonRequest(request);
+    await readJsonRequest(
+      request
+    );
 
   const prompt =
-    typeof body.prompt === "string"
+    typeof body.prompt ===
+      "string"
       ? body.prompt.trim()
       : "";
 
   const model =
-    typeof body.model === "string"
+    typeof body.model ===
+      "string"
       ? body.model.trim()
       : "";
 
   const size =
-    typeof body.size === "string"
+    typeof body.size ===
+      "string"
       ? body.size
       : "1024x1024";
 
   if (!prompt) {
 
-    return json({
-      error: {
-        message: "Image prompt is required."
-      }
-    }, 400);
+    return json(
+      {
+        error: {
+          message:
+            "Image prompt is required."
+        }
+      },
+      400
+    );
   }
 
   if (!model) {
 
-    return json({
-      error: {
-        message: "Image model is required."
-      }
-    }, 400);
+    return json(
+      {
+        error: {
+          message:
+            "Image model is required."
+        }
+      },
+      400
+    );
   }
 
   const imageModels =
-    await getFreeImageModels(env);
+    await getFreeImageModels(
+      env
+    );
 
   const allowed =
-    imageModels.find(function(item) {
-      return item.id === model;
-    });
+    imageModels.find(
+      function(item) {
+        return item.id ===
+          model;
+      }
+    );
 
   if (!allowed) {
 
-    return json({
-      error: {
-        message:
-          "Selected image model is not available in the free catalog."
-      }
-    }, 400);
+    return json(
+      {
+        error: {
+          message:
+            "Selected image model is not available in the free catalog."
+        }
+      },
+      400
+    );
   }
 
   const payload = {
-    model: model,
-    prompt: prompt,
-    n: 1,
-    size: size
+    model:
+      model,
+
+    prompt:
+      prompt,
+
+    n:
+      1,
+
+    size:
+      size
   };
 
   const response =
@@ -2967,14 +4105,23 @@ async function handleImage(request, env) {
       env,
       "/images/generations",
       {
-        method: "POST",
-        body: JSON.stringify(payload),
-        timeoutMs: 30000
+        method:
+          "POST",
+
+        body:
+          JSON.stringify(
+            payload
+          ),
+
+        timeoutMs:
+          30000
       }
     );
 
   const data =
-    await readJsonSafe(response);
+    await readJsonSafe(
+      response
+    );
 
   if (!response.ok) {
 
@@ -2987,11 +4134,21 @@ async function handleImage(request, env) {
     );
   }
 
-  return json({
-    jobId: data.id,
-    status: data.status || "processing",
-    model: data.model || model
-  }, response.status || 202);
+  return json(
+    {
+      jobId:
+        data.id,
+
+      status:
+        data.status ||
+        "processing",
+
+      model:
+        data.model ||
+        model
+    },
+    response.status || 202
+  );
 }
 
 async function handleImageStatus(
@@ -2999,40 +4156,58 @@ async function handleImageStatus(
   env
 ) {
 
-  const apiKey = getApiKey(env);
+  const apiKey =
+    getApiKey(env);
 
   if (!apiKey) {
 
-    return json({
-      error: {
-        message:
-          "XKIRO_API_KEY is not configured."
-      }
-    }, 500);
+    return json(
+      {
+        error: {
+          message:
+            "XKIRO_API_KEY is not configured."
+        }
+      },
+      500
+    );
   }
 
   const url =
     new URL(request.url);
 
   const id =
-    url.searchParams.get("id");
+    url.searchParams.get(
+      "id"
+    );
 
   if (!id) {
 
-    return json({
-      error: {
-        message: "Image job id is required."
-      }
-    }, 400);
+    return json(
+      {
+        error: {
+          message:
+            "Image job id is required."
+        }
+      },
+      400
+    );
   }
 
-  if (!/^[A-Za-z0-9_-]{8,200}$/.test(id)) {
+  if (
+    !/^[A-Za-z0-9_-]{8,200}$/.test(
+      id
+    )
+  ) {
 
-    return json({
-      error: {
-        message: "Invalid image job id."
-      }
-    }, 400);
+    return json(
+      {
+        error: {
+          message:
+            "Invalid image job id."
+        }
+      },
+      400
+    );
   }
 
   const response =
@@ -3041,13 +4216,18 @@ async function handleImageStatus(
       "/images/generations/" +
         encodeURIComponent(id),
       {
-        method: "GET",
-        timeoutMs: 30000
+        method:
+          "GET",
+
+        timeoutMs:
+          30000
       }
     );
 
   const data =
-    await readJsonSafe(response);
+    await readJsonSafe(
+      response
+    );
 
   if (!response.ok) {
 
@@ -3061,13 +4241,25 @@ async function handleImageStatus(
   }
 
   return json({
-    id: data.id,
-    status: data.status,
-    model: data.model,
-    data: Array.isArray(data.data)
-      ? data.data
-      : [],
-    error: data.error || null
+    id:
+      data.id,
+
+    status:
+      data.status,
+
+    model:
+      data.model,
+
+    data:
+      Array.isArray(
+        data.data
+      )
+        ? data.data
+        : [],
+
+    error:
+      data.error ||
+      null
   });
 }
 
@@ -3075,7 +4267,9 @@ async function handleImageStatus(
    HEALTH
 ========================================================= */
 
-async function handleHealth(env) {
+async function handleHealth(
+  env
+) {
 
   let catalogOk = false;
   let freeModels = 0;
@@ -3084,34 +4278,52 @@ async function handleHealth(env) {
   try {
 
     const models =
-      await getFreeModels(env);
+      await getFreeModels(
+        env
+      );
 
-    catalogOk = true;
-    freeModels = models.length;
+    catalogOk =
+      true;
+
+    freeModels =
+      models.length;
 
   } catch (_) {}
 
   try {
 
     const models =
-      await getFreeImageModels(env);
+      await getFreeImageModels(
+        env
+      );
 
-    imageModels = models.length;
+    imageModels =
+      models.length;
 
   } catch (_) {}
 
   return json({
-    ok: true,
+    ok:
+      true,
+
     apiKeyConfigured:
-      Boolean(getApiKey(env)),
-    catalogOk: catalogOk,
-    freeChatModels: freeModels,
-    freeImageModels: imageModels
+      Boolean(
+        getApiKey(env)
+      ),
+
+    catalogOk:
+      catalogOk,
+
+    freeChatModels:
+      freeModels,
+
+    freeImageModels:
+      imageModels
   });
 }
 
 /* =========================================================
-   HTTP HELPERS
+   XKiro HTTP
 ========================================================= */
 
 async function xkiroFetch(
@@ -3120,7 +4332,8 @@ async function xkiroFetch(
   options
 ) {
 
-  options = options || {};
+  options =
+    options || {};
 
   const apiKey =
     getApiKey(env);
@@ -3139,7 +4352,8 @@ async function xkiroFetch(
 
   headers.set(
     "Authorization",
-    "Bearer " + apiKey
+    "Bearer " +
+      apiKey
   );
 
   headers.set(
@@ -3149,8 +4363,11 @@ async function xkiroFetch(
 
   if (
     options.body &&
-    !headers.has("Content-Type")
+    !headers.has(
+      "Content-Type"
+    )
   ) {
+
     headers.set(
       "Content-Type",
       "application/json"
@@ -3163,7 +4380,10 @@ async function xkiroFetch(
   const timeout =
     options.stream
       ? 30000
-      : (options.timeoutMs || 90000);
+      : (
+          options.timeoutMs ||
+          90000
+        );
 
   const timer =
     setTimeout(
@@ -3177,32 +4397,42 @@ async function xkiroFetch(
 
     const response =
       await fetch(
-        getBaseUrl(env) + path,
+        getBaseUrl(env) +
+          path,
         {
           method:
-            options.method || "GET",
-          headers: headers,
+            options.method ||
+            "GET",
+
+          headers:
+            headers,
+
           body:
-            options.body || undefined,
+            options.body ||
+            undefined,
+
           signal:
-            options.signal || controller.signal
+            options.signal ||
+            controller.signal
         }
       );
 
-    /*
-      For streaming responses the timeout only protects
-      connection establishment. Once the headers arrive,
-      the stream is allowed to continue.
-    */
-    clearTimeout(timer);
+    clearTimeout(
+      timer
+    );
 
     return response;
 
   } catch (error) {
 
-    clearTimeout(timer);
+    clearTimeout(
+      timer
+    );
 
-    if (error.name === "AbortError") {
+    if (
+      error.name ===
+      "AbortError"
+    ) {
 
       throw new Error(
         "xKiro request timed out."
@@ -3213,12 +4443,21 @@ async function xkiroFetch(
   }
 }
 
-async function readJsonRequest(request) {
+/* =========================================================
+   REQUEST HELPERS
+========================================================= */
+
+async function readJsonRequest(
+  request
+) {
 
   let body;
 
   try {
-    body = await request.json();
+
+    body =
+      await request.json();
+
   } catch (_) {
 
     throw new Error(
@@ -3228,7 +4467,8 @@ async function readJsonRequest(request) {
 
   if (
     !body ||
-    typeof body !== "object" ||
+    typeof body !==
+      "object" ||
     Array.isArray(body)
   ) {
 
@@ -3240,19 +4480,32 @@ async function readJsonRequest(request) {
   return body;
 }
 
-async function readJsonSafe(response) {
+async function readJsonSafe(
+  response
+) {
 
   const text =
     await response.text();
 
-  if (!text) return {};
+  if (!text) {
+    return {};
+  }
 
   try {
-    return JSON.parse(text);
+
+    return JSON.parse(
+      text
+    );
+
   } catch (_) {
+
     return {
       error: {
-        message: text.slice(0, 2000)
+        message:
+          text.slice(
+            0,
+            2000
+          )
       }
     };
   }
@@ -3266,11 +4519,13 @@ function upstreamError(
   const message =
     data &&
     data.error &&
-    typeof data.error === "object" &&
+    typeof data.error ===
+      "object" &&
     data.error.message
       ? data.error.message
       : data &&
-        typeof data.error === "string"
+        typeof data.error ===
+          "string"
         ? data.error
         : data &&
           data.message
@@ -3288,16 +4543,23 @@ function upstreamError(
   };
 }
 
-function json(data, status) {
+function json(
+  data,
+  status
+) {
 
   return new Response(
     JSON.stringify(data),
     {
-      status: status || 200,
+      status:
+        status || 200,
+
       headers: {
         "content-type":
           "application/json; charset=UTF-8",
-        "cache-control": "no-store"
+
+        "cache-control":
+          "no-store"
       }
     }
   );
