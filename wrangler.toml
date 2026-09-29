@@ -1,3 +1,5 @@
-name = "my-ai"
-main = "worker.js"
-compatibility_date = "2026-09-25"
+{
+  "name": "my-ai",
+  "main": "worker.js",
+  "compatibility_date": "2026-09-25"
+}
