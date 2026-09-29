@@ -1,6 +1,10 @@
 const CODECRAFT_BASE = "https://www.codecraftapi.com/v1";
 const IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
 
+/* =========================================================
+   AetherAI Worker
+   ========================================================= */
+
 function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
@@ -37,14 +41,11 @@ async function ccFetch(env, path, options = {}) {
   const key = apiKey(env);
 
   if (!key) {
-    return json(
-      {
-        error: {
-          message: "CODECRAFT_API_KEY is not configured."
-        }
-      },
-      500
-    );
+    return json({
+      error: {
+        message: "CODECRAFT_API_KEY is not configured."
+      }
+    }, 500);
   }
 
   const headers = new Headers(options.headers || {});
@@ -56,6 +57,10 @@ async function ccFetch(env, path, options = {}) {
     headers
   });
 }
+
+/* =========================================================
+   MODEL HELPERS
+   ========================================================= */
 
 function getCapabilities(model) {
   const caps = model && model.capabilities;
@@ -140,6 +145,10 @@ function sortModels(models) {
     });
 }
 
+/* =========================================================
+   STREAMING
+   ========================================================= */
+
 function extractDelta(obj) {
   if (!obj) return "";
 
@@ -187,6 +196,10 @@ function extractDelta(obj) {
   return "";
 }
 
+/* =========================================================
+   SYSTEM PROMPT
+   ========================================================= */
+
 function buildSystemPrompt(memories) {
   let memoryText = "";
 
@@ -213,6 +226,10 @@ function buildSystemPrompt(memories) {
   );
 }
 
+/* =========================================================
+   CHAT API
+   ========================================================= */
+
 async function handleChat(request, env) {
   try {
     const body = await request.json();
@@ -228,14 +245,11 @@ async function handleChat(request, env) {
       : [];
 
     if (!messages.length) {
-      return json(
-        {
-          error: {
-            message: "No messages were provided."
-          }
-        },
-        400
-      );
+      return json({
+        error: {
+          message: "No messages were provided."
+        }
+      }, 400);
     }
 
     const finalMessages = [
@@ -291,8 +305,7 @@ async function handleChat(request, env) {
         {
           status: response.status,
           headers: {
-            "Content-Type":
-              "application/json; charset=utf-8",
+            "Content-Type": "application/json; charset=utf-8",
             ...corsHeaders()
           }
         }
@@ -309,19 +322,20 @@ async function handleChat(request, env) {
       }
     });
   } catch (error) {
-    return json(
-      {
-        error: {
-          message:
-            error instanceof Error
-              ? error.message
-              : String(error)
-        }
-      },
-      500
-    );
+    return json({
+      error: {
+        message:
+          error instanceof Error
+            ? error.message
+            : String(error)
+      }
+    }, 500);
   }
 }
+
+/* =========================================================
+   MODELS API
+   ========================================================= */
 
 async function handleModels(env) {
   try {
@@ -339,8 +353,7 @@ async function handleModels(env) {
       return new Response(text, {
         status: response.status,
         headers: {
-          "Content-Type":
-            "application/json; charset=utf-8",
+          "Content-Type": "application/json; charset=utf-8",
           ...corsHeaders()
         }
       });
@@ -369,32 +382,30 @@ async function handleModels(env) {
 
     return json(data);
   } catch (error) {
-    return json(
-      {
-        error: {
-          message:
-            error instanceof Error
-              ? error.message
-              : String(error)
-        }
-      },
-      500
-    );
+    return json({
+      error: {
+        message:
+          error instanceof Error
+            ? error.message
+            : String(error)
+      }
+    }, 500);
   }
 }
+
+/* =========================================================
+   IMAGE GENERATION
+   ========================================================= */
 
 async function handleImageGeneration(request, env) {
   try {
     if (!env.AI || typeof env.AI.run !== "function") {
-      return json(
-        {
-          error: {
-            message:
-              "Cloudflare Workers AI binding is not available. Check wrangler.jsonc."
-          }
-        },
-        501
-      );
+      return json({
+        error: {
+          message:
+            "Cloudflare Workers AI binding is not available. Check wrangler.jsonc."
+        }
+      }, 501);
     }
 
     const body = await request.json();
@@ -402,50 +413,43 @@ async function handleImageGeneration(request, env) {
     const prompt = String(body.prompt || "").trim();
 
     if (!prompt) {
-      return json(
-        {
-          error: {
-            message: "Image prompt is empty."
-          }
-        },
-        400
-      );
+      return json({
+        error: {
+          message: "Image prompt is empty."
+        }
+      }, 400);
     }
 
     if (prompt.length > 2048) {
-      return json(
-        {
-          error: {
-            message:
-              "Image prompt must be 2048 characters or less."
-          }
-        },
-        400
-      );
+      return json({
+        error: {
+          message:
+            "Image prompt must be 2048 characters or less."
+        }
+      }, 400);
+    }
+
+    const options = {
+      prompt: prompt,
+      steps: 8
+    };
+
+    if (typeof body.seed === "number") {
+      options.seed = body.seed;
     }
 
     const result = await env.AI.run(
       IMAGE_MODEL,
-      {
-        prompt: prompt,
-        seed:
-          typeof body.seed === "number"
-            ? body.seed
-            : undefined,
-        steps: 8
-      }
+      options
     );
 
     if (!result || !result.image) {
-      return json(
-        {
-          error: {
-            message:
-              "Image model did not return an image."
-          }
-        },
-        502
-      );
+      return json({
+        error: {
+          message:
+            "Image model did not return an image."
+        }
+      }, 502);
     }
 
     return json({
@@ -456,19 +460,20 @@ async function handleImageGeneration(request, env) {
         result.image
     });
   } catch (error) {
-    return json(
-      {
-        error: {
-          message:
-            error instanceof Error
-              ? error.message
-              : String(error)
-        }
-      },
-      500
-    );
+    return json({
+      error: {
+        message:
+          error instanceof Error
+            ? error.message
+            : String(error)
+      }
+    }, 500);
   }
 }
+
+/* =========================================================
+   HEALTH
+   ========================================================= */
 
 async function handleHealth(env) {
   return json({
@@ -478,6 +483,10 @@ async function handleHealth(env) {
     workersAI: Boolean(env.AI)
   });
 }
+
+/* =========================================================
+   PWA
+   ========================================================= */
 
 function manifest() {
   return json({
@@ -520,7 +529,7 @@ function icon() {
 function serviceWorker() {
   return new Response(
     `
-const CACHE = "aetherai-v3";
+const CACHE = "aetherai-v4";
 
 self.addEventListener("install", event => {
   event.waitUntil(
@@ -553,14 +562,28 @@ self.addEventListener("activate", event => {
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
 
+  const url = new URL(event.request.url);
+
+  if (
+    url.pathname.startsWith("/api/")
+  ) {
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then(response => {
-        const copy = response.clone();
+        if (
+          response &&
+          response.ok &&
+          response.type !== "opaque"
+        ) {
+          const copy = response.clone();
 
-        caches.open(CACHE).then(cache => {
-          cache.put(event.request, copy);
-        });
+          caches.open(CACHE).then(cache => {
+            cache.put(event.request, copy);
+          });
+        }
 
         return response;
       })
@@ -578,12 +601,24 @@ self.addEventListener("fetch", event => {
   );
 }
 
+/* =========================================================
+   MAIN APP
+   IMPORTANT:
+   This uses String.raw. Do not put literal backtick
+   characters inside the HTML/JS template.
+   ========================================================= */
+
 function appHTML() {
   return String.raw`<!DOCTYPE html>
 <html lang="en">
 <head>
+
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+
+<meta
+  name="viewport"
+  content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"
+>
 
 <title>AetherAI</title>
 
@@ -597,6 +632,7 @@ function appHTML() {
 <link rel="icon" href="/icon.svg">
 
 <style>
+
 *{
   box-sizing:border-box;
 }
@@ -1029,8 +1065,7 @@ button{
   color:#fff;
 }
 
-.code-wrap pre,
-pre.code{
+.code-wrap pre{
   margin:0;
   padding:14px;
   overflow:auto;
@@ -1066,28 +1101,6 @@ pre.code{
   border-radius:8px;
   text-decoration:none;
   cursor:pointer;
-}
-
-.typing{
-  display:inline-flex;
-  gap:4px;
-  align-items:center;
-}
-
-.typing span{
-  width:5px;
-  height:5px;
-  background:#888;
-  border-radius:50%;
-  animation:bounce 1s infinite;
-}
-
-.typing span:nth-child(2){animation-delay:.15s}
-.typing span:nth-child(3){animation-delay:.3s}
-
-@keyframes bounce{
-  0%,60%,100%{transform:translateY(0);opacity:.5}
-  30%{transform:translateY(-4px);opacity:1}
 }
 
 .composer-wrap{
@@ -1223,6 +1236,7 @@ pre.code{
 }
 
 @media(max-width:760px){
+
   .sidebar{
     position:fixed;
     left:0;
@@ -1284,13 +1298,16 @@ pre.code{
     font-size:26px;
   }
 }
+
 </style>
 </head>
 
 <body>
+
 <div class="app">
 
   <aside class="sidebar" id="sidebar">
+
     <div class="brand">
       <div class="brand-icon">A</div>
       <span>AetherAI</span>
@@ -1310,6 +1327,7 @@ pre.code{
     <div class="history" id="history"></div>
 
     <div class="sidebar-bottom">
+
       <button class="small-btn" id="memoryBtn">
         🧠 Memory
       </button>
@@ -1317,7 +1335,9 @@ pre.code{
       <button class="small-btn" id="installBtn">
         ⌂ Add to Home Screen
       </button>
+
     </div>
+
   </aside>
 
   <div class="overlay" id="overlay"></div>
@@ -1325,29 +1345,55 @@ pre.code{
   <main class="main">
 
     <header class="topbar">
-      <button class="mobile-menu" id="menuBtn">☰</button>
 
-      <select class="model-select" id="modelSelect"></select>
+      <button class="mobile-menu" id="menuBtn">
+        ☰
+      </button>
 
-      <div class="model-info" id="modelInfo">
+      <select
+        class="model-select"
+        id="modelSelect"
+      ></select>
+
+      <div
+        class="model-info"
+        id="modelInfo"
+      >
         Auto-selected model
       </div>
+
     </header>
 
     <section class="chat" id="chat">
-      <div class="chat-inner" id="chatInner"></div>
+      <div
+        class="chat-inner"
+        id="chatInner"
+      ></div>
     </section>
 
-    <button class="scroll-bottom" id="scrollBottom">↓</button>
+    <button
+      class="scroll-bottom"
+      id="scrollBottom"
+    >
+      ↓
+    </button>
 
     <div class="composer-wrap">
+
       <div class="composer">
 
-        <div class="attachments" id="attachments"></div>
+        <div
+          class="attachments"
+          id="attachments"
+        ></div>
 
         <div class="composer-row">
 
-          <button class="icon-btn" id="attachBtn" title="Attach file">
+          <button
+            class="icon-btn"
+            id="attachBtn"
+            title="Attach file"
+          >
             ＋
           </button>
 
@@ -1375,679 +1421,1088 @@ pre.code{
             autocomplete="off"
           ></textarea>
 
-          <button class="send" id="sendBtn">↑</button>
+          <button
+            class="send"
+            id="sendBtn"
+          >
+            ↑
+          </button>
 
         </div>
+
       </div>
 
       <div class="bottom-note">
         AetherAI can make mistakes. Check important information.
       </div>
+
     </div>
 
   </main>
+
 </div>
 
 <script>
+
 (function(){
 
-  "use strict";
+"use strict";
 
-  var $ = function(id){
-    return document.getElementById(id);
-  };
+/* =========================================================
+   DOM
+   ========================================================= */
 
-  var state = {
-    chats: [],
-    currentChatId: null,
-    memories: [],
-    models: [],
-    selectedModel: localStorage.getItem("aether_model") || "",
-    attachments: [],
-    generating: false,
-    controller: null,
-    imageMode: false
-  };
+var $ = function(id){
+  return document.getElementById(id);
+};
 
-  var elements = {
-    sidebar: $("sidebar"),
-    overlay: $("overlay"),
-    menuBtn: $("menuBtn"),
-    newChat: $("newChat"),
-    search: $("search"),
-    history: $("history"),
-    memoryBtn: $("memoryBtn"),
-    installBtn: $("installBtn"),
-    modelSelect: $("modelSelect"),
-    modelInfo: $("modelInfo"),
-    chat: $("chat"),
-    chatInner: $("chatInner"),
-    scrollBottom: $("scrollBottom"),
-    prompt: $("prompt"),
-    sendBtn: $("sendBtn"),
-    attachBtn: $("attachBtn"),
-    fileInput: $("fileInput"),
-    attachments: $("attachments"),
-    imageBtn: $("imageBtn")
-  };
+var state = {
+  chats: [],
+  currentChatId: null,
+  memories: [],
+  models: [],
+  selectedModel:
+    localStorage.getItem("aether_model") || "",
+  attachments: [],
+  generating: false,
+  controller: null,
+  imageMode: false
+};
 
-  function uid(){
-    return Date.now().toString(36) +
-      Math.random().toString(36).slice(2);
+var elements = {
+  sidebar:$("sidebar"),
+  overlay:$("overlay"),
+  menuBtn:$("menuBtn"),
+  newChat:$("newChat"),
+  search:$("search"),
+  history:$("history"),
+  memoryBtn:$("memoryBtn"),
+  installBtn:$("installBtn"),
+  modelSelect:$("modelSelect"),
+  modelInfo:$("modelInfo"),
+  chat:$("chat"),
+  chatInner:$("chatInner"),
+  scrollBottom:$("scrollBottom"),
+  prompt:$("prompt"),
+  sendBtn:$("sendBtn"),
+  attachBtn:$("attachBtn"),
+  fileInput:$("fileInput"),
+  attachments:$("attachments"),
+  imageBtn:$("imageBtn")
+};
+
+/* =========================================================
+   BASIC HELPERS
+   ========================================================= */
+
+function uid(){
+  return (
+    Date.now().toString(36) +
+    Math.random().toString(36).slice(2)
+  );
+}
+
+function escapeHTML(value){
+  return String(value)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#39;");
+}
+
+function safeURL(url){
+  var value =
+    String(url || "").trim();
+
+  if (
+    /^https?:\/\//i.test(value) ||
+    /^mailto:/i.test(value) ||
+    /^\//.test(value)
+  ){
+    return value;
   }
 
-  function escapeHTML(value){
-    return String(value)
-      .replace(/&/g,"&amp;")
-      .replace(/</g,"&lt;")
-      .replace(/>/g,"&gt;")
-      .replace(/"/g,"&quot;")
-      .replace(/'/g,"&#39;");
-  }
+  return "#";
+}
 
-  function safeURL(url){
-    var value = String(url || "").trim();
+/* =========================================================
+   MARKDOWN
+   ========================================================= */
 
-    if (
-      /^https?:\\/\\//i.test(value) ||
-      /^mailto:/i.test(value) ||
-      /^\\//.test(value)
-    ){
-      return value;
-    }
+function inlineMarkdown(text){
 
-    return "#";
-  }
+  var source =
+    String(text || "");
 
-  function inlineMarkdown(text){
-    var source = String(text || "");
-    var inlineCodes = [];
+  var inlineCodes = [];
 
-    source = source.replace(/`([^`]+)`/g, function(_, code){
-      var id = inlineCodes.length;
-      inlineCodes.push(
-        '<span class="inline-code">' +
-        escapeHTML(code) +
-        '</span>'
-      );
-      return "@@INLINECODE" + id + "@@";
-    });
+  /*
+    IMPORTANT:
+    Do NOT write a literal backtick here.
+    String.fromCharCode(96) represents it safely.
+  */
 
-    source = escapeHTML(source);
+  var tick =
+    String.fromCharCode(96);
 
-    source = source.replace(
-      /\\[([^\\]]+)\\]\\(([^\\)]+)\\)/g,
-      function(_, label, url){
-        var safe = safeURL(
-          String(url).replace(/&amp;/g,"&")
+  var inlineCodeRegex =
+    new RegExp(
+      tick +
+      "([^" +
+      tick +
+      "]+)" +
+      tick,
+      "g"
+    );
+
+  source =
+    source.replace(
+      inlineCodeRegex,
+      function(_, code){
+
+        var id =
+          inlineCodes.length;
+
+        inlineCodes.push(
+          '<span class="inline-code">' +
+          escapeHTML(code) +
+          '</span>'
         );
 
-        return '<a href="' +
-          escapeHTML(safe) +
-          '" target="_blank" rel="noopener noreferrer">' +
-          label +
-          '</a>';
+        return (
+          "@@INLINECODE" +
+          id +
+          "@@"
+        );
       }
     );
 
-    source = source.replace(
-      /\\*\\*([^*]+)\\*\\*/g,
+  source =
+    escapeHTML(source);
+
+  source =
+    source.replace(
+      /$begin:math:display$\(\[\^$end:math:display$]+)\]$begin:math:text$\(\[\^$end:math:text$]+)\)/g,
+      function(_, label, url){
+
+        var safe =
+          safeURL(
+            String(url)
+              .replace(/&amp;/g,"&")
+          );
+
+        return (
+          '<a href="' +
+          escapeHTML(safe) +
+          '" target="_blank" rel="noopener noreferrer">' +
+          label +
+          '</a>'
+        );
+      }
+    );
+
+  source =
+    source.replace(
+      /\*\*([^*]+)\*\*/g,
       "<strong>$1</strong>"
     );
 
-    source = source.replace(
+  source =
+    source.replace(
       /__([^_]+)__/g,
       "<strong>$1</strong>"
     );
 
-    source = source.replace(
-      /(?<!\\*)\\*([^*\\n]+)\\*(?!\\*)/g,
+  source =
+    source.replace(
+      /(?<!\*)\*([^*\n]+)\*(?!\*)/g,
       "<em>$1</em>"
     );
 
-    source = source.replace(
-      /(?<!_)_([^_\\n]+)_(?!_)/g,
+  source =
+    source.replace(
+      /(?<!_)_([^_\n]+)_(?!_)/g,
       "<em>$1</em>"
     );
 
-    source = source.replace(
-      /@@INLINECODE(\\d+)@@/g,
+  source =
+    source.replace(
+      /@@INLINECODE(\d+)@@/g,
       function(_, id){
-        return inlineCodes[Number(id)] || "";
+
+        return (
+          inlineCodes[
+            Number(id)
+          ] || ""
+        );
       }
     );
 
-    return source;
-  }
+  return source;
+}
 
-  function markdown(source){
-    var text = String(source || "")
-      .replace(/\\r\\n/g,"\\n")
-      .replace(/\\r/g,"\\n");
+function markdown(source){
 
-    var codeBlocks = [];
+  var text =
+    String(source || "")
+      .replace(/\r\n/g,"\n")
+      .replace(/\r/g,"\n");
 
-    text = text.replace(
-      /^```([^\\n]*)\\n([\\s\\S]*?)^```[ \\t]*$/gm,
+  var codeBlocks = [];
+
+  /*
+    Fenced code blocks.
+
+    The backtick character is constructed
+    instead of being written directly.
+  */
+
+  var tick =
+    String.fromCharCode(96);
+
+  var fenceRegex =
+    new RegExp(
+      "^" +
+      tick +
+      tick +
+      tick +
+      "([^\\n]*)\\n([\\s\\S]*?)^" +
+      tick +
+      tick +
+      tick +
+      "[ \\t]*$",
+      "gm"
+    );
+
+  text =
+    text.replace(
+      fenceRegex,
       function(_, language, code){
-        var id = codeBlocks.length;
+
+        var id =
+          codeBlocks.length;
 
         codeBlocks.push({
-          language: language.trim() || "code",
-          code: code.replace(/\\n$/,"")
+          language:
+            language.trim() || "code",
+          code:
+            code.replace(/\n$/,"")
         });
 
-        return "@@CODEBLOCK" + id + "@@";
+        return (
+          "@@CODEBLOCK" +
+          id +
+          "@@"
+        );
       }
     );
 
-    var lines = text.split("\\n");
-    var output = [];
-    var paragraph = [];
-    var listType = null;
-    var listItems = [];
+  var lines =
+    text.split("\n");
 
-    function flushParagraph(){
-      if (!paragraph.length) return;
+  var output = [];
 
-      output.push(
-        "<p>" +
-        inlineMarkdown(paragraph.join("<br>")) +
-        "</p>"
-      );
+  var paragraph = [];
 
-      paragraph = [];
+  var listType = null;
+
+  var listItems = [];
+
+  function flushParagraph(){
+
+    if (!paragraph.length){
+      return;
     }
 
-    function flushList(){
-      if (!listItems.length) return;
+    output.push(
+      "<p>" +
+      inlineMarkdown(
+        paragraph.join("<br>")
+      ) +
+      "</p>"
+    );
 
-      var tag = listType === "ol" ? "ol" : "ul";
+    paragraph = [];
+  }
 
-      output.push(
-        "<" + tag + ">" +
-        listItems.map(function(item){
-          return "<li>" + inlineMarkdown(item) + "</li>";
-        }).join("") +
-        "</" + tag + ">"
-      );
+  function flushList(){
 
-      listItems = [];
-      listType = null;
+    if (!listItems.length){
+      return;
     }
 
-    lines.forEach(function(rawLine){
+    var tag =
+      listType === "ol"
+        ? "ol"
+        : "ul";
 
-      var line = rawLine;
+    output.push(
+      "<" +
+      tag +
+      ">" +
+      listItems
+        .map(function(item){
+          return (
+            "<li>" +
+            inlineMarkdown(item) +
+            "</li>"
+          );
+        })
+        .join("") +
+      "</" +
+      tag +
+      ">"
+    );
 
-      if (/^\\s*$/.test(line)){
-        flushParagraph();
-        flushList();
-        return;
-      }
+    listItems = [];
+    listType = null;
+  }
 
-      var heading = line.match(/^\\s*(#{1,6})\\s+(.+)$/);
+  lines.forEach(function(rawLine){
 
-      if (heading){
-        flushParagraph();
-        flushList();
+    var line = rawLine;
 
-        var level = heading[1].length;
+    if (/^\s*$/.test(line)){
 
-        output.push(
-          "<h" + level + ">" +
-          inlineMarkdown(heading[2]) +
-          "</h" + level + ">"
-        );
+      flushParagraph();
+      flushList();
 
-        return;
-      }
+      return;
+    }
 
-      if (/^\\s*(---+|\\*\\*\\*+)\\s*$/.test(line)){
-        flushParagraph();
-        flushList();
-        output.push("<hr>");
-        return;
-      }
+    var heading =
+      line.match(
+        /^\s*(#{1,6})\s+(.+)$/
+      );
 
-      var quote = line.match(/^\\s*>\\s?(.*)$/);
+    if (heading){
 
-      if (quote){
-        flushParagraph();
-        flushList();
+      flushParagraph();
+      flushList();
 
-        output.push(
-          "<blockquote>" +
-          inlineMarkdown(quote[1]) +
-          "</blockquote>"
-        );
+      var level =
+        heading[1].length;
 
-        return;
-      }
+      output.push(
+        "<h" +
+        level +
+        ">" +
+        inlineMarkdown(heading[2]) +
+        "</h" +
+        level +
+        ">"
+      );
 
-      var unordered = line.match(/^\\s*[-*+]\\s+(.+)$/);
+      return;
+    }
 
-      if (unordered){
-        flushParagraph();
+    if (
+      /^\s*(---+|\*\*\*+)\s*$/.test(line)
+    ){
 
-        if (listType && listType !== "ul"){
-          flushList();
-        }
+      flushParagraph();
+      flushList();
 
-        listType = "ul";
-        listItems.push(unordered[1]);
+      output.push("<hr>");
 
-        return;
-      }
+      return;
+    }
 
-      var ordered = line.match(/^\\s*\\d+[.)]\\s+(.+)$/);
+    var quote =
+      line.match(
+        /^\s*>\s?(.*)$/
+      );
 
-      if (ordered){
-        flushParagraph();
+    if (quote){
 
-        if (listType && listType !== "ol"){
-          flushList();
-        }
+      flushParagraph();
+      flushList();
 
-        listType = "ol";
-        listItems.push(ordered[1]);
+      output.push(
+        "<blockquote>" +
+        inlineMarkdown(quote[1]) +
+        "</blockquote>"
+      );
 
-        return;
-      }
+      return;
+    }
+
+    var unordered =
+      line.match(
+        /^\s*[-*+]\s+(.+)$/
+      );
+
+    if (unordered){
+
+      flushParagraph();
 
       if (
-        /^@@CODEBLOCK\\d+@@$/.test(line.trim())
+        listType &&
+        listType !== "ul"
       ){
-        flushParagraph();
         flushList();
-
-        var codeId = Number(
-          line.trim()
-            .replace("@@CODEBLOCK","")
-            .replace("@@","")
-        );
-
-        var block = codeBlocks[codeId];
-
-        if (block){
-          output.push(
-            '<div class="code-wrap">' +
-              '<div class="code-head">' +
-                '<span>' +
-                  escapeHTML(block.language) +
-                '</span>' +
-                '<button class="code-copy" data-code="' +
-                  encodeURIComponent(block.code) +
-                '">' +
-                  'Copy' +
-                '</button>' +
-              '</div>' +
-              '<pre><code>' +
-                escapeHTML(block.code) +
-              '</code></pre>' +
-            '</div>'
-          );
-        }
-
-        return;
       }
 
-      paragraph.push(line);
-    });
+      listType = "ul";
 
-    flushParagraph();
-    flushList();
-
-    return output.join("");
-  }
-
-  function saveState(){
-    localStorage.setItem(
-      "aether_chats",
-      JSON.stringify(state.chats)
-    );
-
-    localStorage.setItem(
-      "aether_memories",
-      JSON.stringify(state.memories)
-    );
-  }
-
-  function loadState(){
-    try{
-      state.chats =
-        JSON.parse(
-          localStorage.getItem("aether_chats") || "[]"
-        );
-    }catch{
-      state.chats = [];
-    }
-
-    try{
-      state.memories =
-        JSON.parse(
-          localStorage.getItem("aether_memories") || "[]"
-        );
-    }catch{
-      state.memories = [];
-    }
-
-    if (!state.chats.length){
-      createChat(false);
-    }else{
-      state.currentChatId =
-        state.chats[0].id;
-    }
-  }
-
-  function currentChat(){
-    return state.chats.find(function(chat){
-      return chat.id === state.currentChatId;
-    });
-  }
-
-  function createChat(render){
-    var chat = {
-      id: uid(),
-      title: "New chat",
-      messages: [],
-      created: Date.now(),
-      updated: Date.now()
-    };
-
-    state.chats.unshift(chat);
-    state.currentChatId = chat.id;
-
-    saveState();
-
-    if (render !== false){
-      renderHistory();
-      renderChat();
-    }
-
-    closeSidebar();
-  }
-
-  function renderHistory(){
-    var query =
-      String(elements.search.value || "")
-        .trim()
-        .toLowerCase();
-
-    var chats = state.chats.filter(function(chat){
-      if (!query) return true;
-
-      return (
-        chat.title.toLowerCase().includes(query) ||
-        chat.messages.some(function(m){
-          return String(m.content || "")
-            .toLowerCase()
-            .includes(query);
-        })
+      listItems.push(
+        unordered[1]
       );
-    });
 
-    elements.history.innerHTML = chats.map(function(chat){
-      var active =
-        chat.id === state.currentChatId
-          ? ' style="background:#22222a"'
-          : "";
-
-      return (
-        '<button class="chat-item" data-chat="' +
-        escapeHTML(chat.id) +
-        '"' +
-        active +
-        '>' +
-        escapeHTML(chat.title || "New chat") +
-        '</button>'
-      );
-    }).join("");
-  }
-
-  function welcomeHTML(){
-    return (
-      '<div class="welcome">' +
-        '<div class="welcome-logo">A</div>' +
-        '<h1>How can I help?</h1>' +
-        '<p>Ask AetherAI anything.</p>' +
-        '<div class="suggestions">' +
-          '<button class="suggestion">Explain something simply</button>' +
-          '<button class="suggestion">Write some code</button>' +
-          '<button class="suggestion">Research a topic</button>' +
-          '<button class="suggestion">Create an image</button>' +
-        '</div>' +
-      '</div>'
-    );
-  }
-
-  function renderImageMessage(message){
-    var image = message.image || "";
-
-    return (
-      '<div class="image-result">' +
-        '<img src="' +
-          escapeHTML(image) +
-          '" alt="Generated image">' +
-        '<div class="image-actions">' +
-          '<a href="' +
-            escapeHTML(image) +
-            '" target="_blank" rel="noopener noreferrer">' +
-            'Open image' +
-          '</a>' +
-          '<a href="' +
-            escapeHTML(image) +
-            '" download="aetherai-image.jpg">' +
-            'Save image' +
-          '</a>' +
-        '</div>' +
-      '</div>'
-    );
-  }
-
-  function renderMessage(message, index){
-    var isUser = message.role === "user";
-
-    var content = "";
-
-    if (message.type === "image"){
-      content = renderImageMessage(message);
-    }else{
-      content =
-        '<div class="md">' +
-        markdown(message.content || "") +
-        '</div>';
-    }
-
-    var actions = "";
-
-    if (!isUser){
-      actions =
-        '<div class="message-actions">' +
-          '<button class="action copy-message" data-index="' +
-            index +
-          '">Copy</button>' +
-          '<button class="action regenerate" data-index="' +
-            index +
-          '">Regenerate</button>' +
-        '</div>';
-    }
-
-    return (
-      '<article class="message ' +
-        (isUser ? "user" : "assistant") +
-      '">' +
-
-        '<div class="avatar ' +
-          (isUser ? "user-avatar" : "ai") +
-        '">' +
-          (isUser ? "U" : "A") +
-        '</div>' +
-
-        '<div class="bubble">' +
-          content +
-          actions +
-        '</div>' +
-
-      '</article>'
-    );
-  }
-
-  function renderChat(){
-    var chat = currentChat();
-
-    if (!chat || !chat.messages.length){
-      elements.chatInner.innerHTML =
-        welcomeHTML();
       return;
     }
+
+    var ordered =
+      line.match(
+        /^\s*\d+[.)]\s+(.+)$/
+      );
+
+    if (ordered){
+
+      flushParagraph();
+
+      if (
+        listType &&
+        listType !== "ol"
+      ){
+        flushList();
+      }
+
+      listType = "ol";
+
+      listItems.push(
+        ordered[1]
+      );
+
+      return;
+    }
+
+    if (
+      /^@@CODEBLOCK\d+@@$/.test(
+        line.trim()
+      )
+    ){
+
+      flushParagraph();
+      flushList();
+
+      var codeId =
+        Number(
+          line
+            .trim()
+            .replace(
+              "@@CODEBLOCK",
+              ""
+            )
+            .replace(
+              "@@",
+              ""
+            )
+        );
+
+      var block =
+        codeBlocks[codeId];
+
+      if (block){
+
+        output.push(
+          '<div class="code-wrap">' +
+
+            '<div class="code-head">' +
+
+              '<span>' +
+                escapeHTML(
+                  block.language
+                ) +
+              '</span>' +
+
+              '<button class="code-copy" data-code="' +
+                encodeURIComponent(
+                  block.code
+                ) +
+              '">' +
+                'Copy' +
+              '</button>' +
+
+            '</div>' +
+
+            '<pre><code>' +
+              escapeHTML(
+                block.code
+              ) +
+            '</code></pre>' +
+
+          '</div>'
+        );
+      }
+
+      return;
+    }
+
+    paragraph.push(line);
+
+  });
+
+  flushParagraph();
+  flushList();
+
+  return output.join("");
+}
+
+/* =========================================================
+   STORAGE
+   ========================================================= */
+
+function saveState(){
+
+  localStorage.setItem(
+    "aether_chats",
+    JSON.stringify(state.chats)
+  );
+
+  localStorage.setItem(
+    "aether_memories",
+    JSON.stringify(state.memories)
+  );
+}
+
+function loadState(){
+
+  try{
+
+    state.chats =
+      JSON.parse(
+        localStorage.getItem(
+          "aether_chats"
+        ) || "[]"
+      );
+
+  }catch{
+
+    state.chats = [];
+  }
+
+  try{
+
+    state.memories =
+      JSON.parse(
+        localStorage.getItem(
+          "aether_memories"
+        ) || "[]"
+      );
+
+  }catch{
+
+    state.memories = [];
+  }
+
+  if (!state.chats.length){
+
+    createChat(false);
+
+  }else{
+
+    state.currentChatId =
+      state.chats[0].id;
+  }
+}
+
+function currentChat(){
+
+  return state.chats.find(
+    function(chat){
+      return (
+        chat.id ===
+        state.currentChatId
+      );
+    }
+  );
+}
+
+/* =========================================================
+   CHAT MANAGEMENT
+   ========================================================= */
+
+function createChat(render){
+
+  var chat = {
+    id:uid(),
+    title:"New chat",
+    messages:[],
+    created:Date.now(),
+    updated:Date.now()
+  };
+
+  state.chats.unshift(chat);
+
+  state.currentChatId =
+    chat.id;
+
+  saveState();
+
+  if (render !== false){
+
+    renderHistory();
+    renderChat();
+  }
+
+  closeSidebar();
+}
+
+function renderHistory(){
+
+  var query =
+    String(
+      elements.search.value || ""
+    )
+      .trim()
+      .toLowerCase();
+
+  var chats =
+    state.chats.filter(
+      function(chat){
+
+        if (!query){
+          return true;
+        }
+
+        return (
+          String(chat.title || "")
+            .toLowerCase()
+            .includes(query) ||
+
+          chat.messages.some(
+            function(message){
+
+              return String(
+                message.content || ""
+              )
+                .toLowerCase()
+                .includes(query);
+            }
+          )
+        );
+      }
+    );
+
+  elements.history.innerHTML =
+    chats.map(
+      function(chat){
+
+        var active =
+          chat.id ===
+          state.currentChatId
+            ? ' style="background:#22222a"'
+            : "";
+
+        return (
+          '<button class="chat-item" data-chat="' +
+          escapeHTML(chat.id) +
+          '"' +
+          active +
+          '>' +
+          escapeHTML(
+            chat.title ||
+            "New chat"
+          ) +
+          '</button>'
+        );
+      }
+    ).join("");
+}
+
+/* =========================================================
+   UI
+   ========================================================= */
+
+function welcomeHTML(){
+
+  return (
+    '<div class="welcome">' +
+
+      '<div class="welcome-logo">' +
+        'A' +
+      '</div>' +
+
+      '<h1>' +
+        'How can I help?' +
+      '</h1>' +
+
+      '<p>' +
+        'Ask AetherAI anything.' +
+      '</p>' +
+
+      '<div class="suggestions">' +
+
+        '<button class="suggestion">' +
+          'Explain something simply' +
+        '</button>' +
+
+        '<button class="suggestion">' +
+          'Write some code' +
+        '</button>' +
+
+        '<button class="suggestion">' +
+          'Research a topic' +
+        '</button>' +
+
+        '<button class="suggestion">' +
+          'Create an image' +
+        '</button>' +
+
+      '</div>' +
+
+    '</div>'
+  );
+}
+
+function renderImageMessage(message){
+
+  var image =
+    message.image || "";
+
+  return (
+
+    '<div class="image-result">' +
+
+      '<img src="' +
+        escapeHTML(image) +
+        '" alt="Generated image">' +
+
+      '<div class="image-actions">' +
+
+        '<a href="' +
+          escapeHTML(image) +
+          '" target="_blank" rel="noopener noreferrer">' +
+          'Open image' +
+        '</a>' +
+
+        '<a href="' +
+          escapeHTML(image) +
+          '" download="aetherai-image.jpg">' +
+          'Save image' +
+        '</a>' +
+
+      '</div>' +
+
+    '</div>'
+  );
+}
+
+function renderMessage(message,index){
+
+  var isUser =
+    message.role === "user";
+
+  var content = "";
+
+  if (
+    message.type ===
+    "image"
+  ){
+
+    content =
+      renderImageMessage(
+        message
+      );
+
+  }else{
+
+    content =
+      '<div class="md">' +
+      markdown(
+        message.content || ""
+      ) +
+      '</div>';
+  }
+
+  var actions = "";
+
+  if (!isUser){
+
+    actions =
+      '<div class="message-actions">' +
+
+        '<button class="action copy-message" data-index="' +
+          index +
+        '">' +
+          'Copy' +
+        '</button>' +
+
+        '<button class="action regenerate" data-index="' +
+          index +
+        '">' +
+          'Regenerate' +
+        '</button>' +
+
+      '</div>';
+  }
+
+  return (
+
+    '<article class="message ' +
+      (isUser
+        ? "user"
+        : "assistant") +
+    '">' +
+
+      '<div class="avatar ' +
+        (
+          isUser
+            ? "user-avatar"
+            : "ai"
+        ) +
+      '">' +
+        (
+          isUser
+            ? "U"
+            : "A"
+        ) +
+      '</div>' +
+
+      '<div class="bubble">' +
+        content +
+        actions +
+      '</div>' +
+
+    '</article>'
+  );
+}
+
+function renderChat(){
+
+  var chat =
+    currentChat();
+
+  if (
+    !chat ||
+    !chat.messages.length
+  ){
 
     elements.chatInner.innerHTML =
-      chat.messages.map(renderMessage).join("");
+      welcomeHTML();
 
-    elements.chat.scrollTop =
-      elements.chat.scrollHeight;
+    return;
   }
 
-  function renderStreamingAssistant(index){
-    var chat = currentChat();
+  elements.chatInner.innerHTML =
+    chat.messages
+      .map(renderMessage)
+      .join("");
 
-    if (!chat) return;
+  elements.chat.scrollTop =
+    elements.chat.scrollHeight;
+}
 
-    var existing =
-      document.querySelector(
-        '[data-streaming-message]'
-      );
+function renderStreamingAssistant(index){
 
-    var content =
-      chat.messages[index] &&
-      chat.messages[index].content
-        ? chat.messages[index].content
-        : "";
+  var chat =
+    currentChat();
 
-    var html =
-      '<article class="message assistant" data-streaming-message>' +
-        '<div class="avatar ai">A</div>' +
-        '<div class="bubble">' +
-          '<div class="md">' +
-            markdown(content) +
-          '</div>' +
+  if (!chat){
+    return;
+  }
+
+  var existing =
+    document.querySelector(
+      "[data-streaming-message]"
+    );
+
+  var content =
+    chat.messages[index] &&
+    chat.messages[index].content
+      ? chat.messages[index].content
+      : "";
+
+  var html =
+    '<article class="message assistant" data-streaming-message>' +
+
+      '<div class="avatar ai">' +
+        'A' +
+      '</div>' +
+
+      '<div class="bubble">' +
+
+        '<div class="md">' +
+          markdown(content) +
         '</div>' +
-      '</article>';
 
-    if (existing){
-      existing.outerHTML = html;
-    }else{
-      elements.chatInner.insertAdjacentHTML(
-        "beforeend",
-        html
-      );
-    }
+      '</div>' +
+
+    '</article>';
+
+  if (existing){
+
+    existing.outerHTML =
+      html;
+
+  }else{
+
+    elements.chatInner.insertAdjacentHTML(
+      "beforeend",
+      html
+    );
+  }
+}
+
+/* =========================================================
+   SCROLLING
+   ========================================================= */
+
+function isNearBottom(){
+
+  return (
+    elements.chat.scrollHeight -
+    elements.chat.scrollTop -
+    elements.chat.clientHeight
+  ) < 140;
+}
+
+function scrollToBottom(){
+
+  elements.chat.scrollTop =
+    elements.chat.scrollHeight;
+}
+
+function updateScrollButton(){
+
+  var away =
+    !isNearBottom();
+
+  elements.scrollBottom.style.display =
+    away
+      ? "block"
+      : "none";
+}
+
+/* =========================================================
+   GENERATION STATE
+   ========================================================= */
+
+function setGenerating(value){
+
+  state.generating =
+    value;
+
+  if (value){
+
+    elements.sendBtn.textContent =
+      "■";
+
+    elements.sendBtn.title =
+      "Stop";
+
+  }else{
+
+    elements.sendBtn.textContent =
+      "↑";
+
+    elements.sendBtn.title =
+      "Send";
   }
 
-  function isNearBottom(){
-    return (
-      elements.chat.scrollHeight -
-      elements.chat.scrollTop -
-      elements.chat.clientHeight
-    ) < 140;
+  elements.prompt.disabled =
+    false;
+}
+
+/* =========================================================
+   TITLE
+   ========================================================= */
+
+function autoTitle(chat,text){
+
+  if (
+    chat.title !== "New chat" ||
+    !text
+  ){
+    return;
   }
 
-  function scrollToBottom(){
-    elements.chat.scrollTop =
-      elements.chat.scrollHeight;
+  var clean =
+    text
+      .replace(/\s+/g," ")
+      .trim();
+
+  chat.title =
+    clean.length > 42
+      ? clean.slice(0,42) + "…"
+      : clean;
+}
+
+/* =========================================================
+   IMAGE DETECTION
+   ========================================================= */
+
+function looksLikeImageRequest(text){
+
+  var value =
+    String(text || "")
+      .toLowerCase()
+      .trim();
+
+  var action =
+    /^(create|generate|draw|make|design|render|produce|show|give me|make me|create me)/i
+      .test(value);
+
+  var imageWord =
+    /(image|picture|photo|wallpaper|illustration|logo|poster|artwork|portrait|thumbnail|background)/i
+      .test(value);
+
+  return (
+    action &&
+    imageWord
+  );
+}
+
+/* =========================================================
+   IMAGE GENERATION
+   ========================================================= */
+
+async function generateImage(prompt){
+
+  var chat =
+    currentChat();
+
+  if (!chat){
+    return;
   }
 
-  function updateScrollButton(){
-    var away = !isNearBottom();
+  setGenerating(true);
 
-    elements.scrollBottom.style.display =
-      away ? "block" : "none";
-  }
+  chat.messages.push({
+    role:"user",
+    content:prompt
+  });
 
-  function setGenerating(value){
-    state.generating = value;
+  autoTitle(
+    chat,
+    prompt
+  );
 
-    if (value){
-      elements.sendBtn.textContent = "■";
-      elements.sendBtn.title = "Stop";
-    }else{
-      elements.sendBtn.textContent = "↑";
-      elements.sendBtn.title = "Send";
-    }
+  chat.updated =
+    Date.now();
 
-    elements.prompt.disabled = false;
-  }
+  renderChat();
+  renderHistory();
 
-  function autoTitle(chat, text){
-    if (
-      chat.title !== "New chat" ||
-      !text
-    ){
-      return;
-    }
+  chat.messages.push({
+    role:"assistant",
+    content:"Generating your image…"
+  });
 
-    var clean =
-      text.replace(/\\s+/g," ").trim();
+  renderChat();
 
-    chat.title =
-      clean.length > 42
-        ? clean.slice(0,42) + "…"
-        : clean;
-  }
+  try{
 
-  function looksLikeImageRequest(text){
-    var value =
-      String(text || "")
-        .toLowerCase()
-        .trim();
-
-    var action =
-      /^(create|generate|draw|make|design|render|produce|show|give me|make me|create me)/i
-        .test(value);
-
-    var imageWord =
-      /(image|picture|photo|wallpaper|illustration|logo|poster|artwork|portrait|thumbnail|background)/i
-        .test(value);
-
-    return action && imageWord;
-  }
-
-  async function generateImage(prompt){
-    var chat = currentChat();
-
-    if (!chat) return;
-
-    setGenerating(true);
-
-    var userMessage = {
-      role: "user",
-      content: prompt
-    };
-
-    chat.messages.push(userMessage);
-    autoTitle(chat,prompt);
-    chat.updated = Date.now();
-
-    renderChat();
-    renderHistory();
-
-    var loadingIndex = chat.messages.length;
-
-    chat.messages.push({
-      role: "assistant",
-      content: "Generating your image…"
-    });
-
-    renderChat();
-
-    try{
-      var response = await fetch(
+    var response =
+      await fetch(
         "/api/generate-image",
         {
           method:"POST",
           headers:{
-            "Content-Type":"application/json"
+            "Content-Type":
+              "application/json"
           },
           body:JSON.stringify({
             prompt:prompt
@@ -2055,1075 +2510,1665 @@ pre.code{
         }
       );
 
-      var data = await response.json();
-
-      if (!response.ok || !data.image){
-        throw new Error(
-          data &&
-          data.error &&
-          data.error.message
-            ? data.error.message
-            : "Image generation failed."
-        );
-      }
-
-      chat.messages.pop();
-
-      chat.messages.push({
-        role:"assistant",
-        type:"image",
-        content:"Generated image",
-        image:data.image
-      });
-
-      chat.updated = Date.now();
-
-      saveState();
-      renderChat();
-      renderHistory();
-
-    }catch(error){
-      chat.messages.pop();
-
-      chat.messages.push({
-        role:"assistant",
-        content:
-          "I couldn't generate the image.\\n\\n" +
-          "**Error:** " +
-          String(error.message || error)
-      });
-
-      saveState();
-      renderChat();
-      renderHistory();
-    }finally{
-      setGenerating(false);
-    }
-  }
-
-  function collectMemory(text){
-    var value =
-      String(text || "").trim();
-
-    if (!value) return;
-
-    var match =
-      value.match(
-        /(?:remember that|remember|my name is|i am|i'm|i like|i prefer)\\s+(.{3,180})/i
-      );
-
-    if (!match) return;
-
-    var memory = match[0].trim();
+    var data =
+      await response.json();
 
     if (
-      !state.memories.some(function(item){
-        return item.toLowerCase() ===
-          memory.toLowerCase();
-      })
+      !response.ok ||
+      !data.image
     ){
-      state.memories.unshift(memory);
-      state.memories =
-        state.memories.slice(0,50);
 
-      saveState();
+      throw new Error(
+        data &&
+        data.error &&
+        data.error.message
+          ? data.error.message
+          : "Image generation failed."
+      );
     }
+
+    chat.messages.pop();
+
+    chat.messages.push({
+      role:"assistant",
+      type:"image",
+      content:"Generated image",
+      image:data.image
+    });
+
+    chat.updated =
+      Date.now();
+
+    saveState();
+
+    renderChat();
+    renderHistory();
+
+  }catch(error){
+
+    chat.messages.pop();
+
+    chat.messages.push({
+      role:"assistant",
+      content:
+        "I couldn't generate the image.\n\n" +
+        "**Error:** " +
+        String(
+          error.message ||
+          error
+        )
+    });
+
+    saveState();
+
+    renderChat();
+    renderHistory();
+
+  }finally{
+
+    setGenerating(false);
+  }
+}
+
+/* =========================================================
+   MEMORY
+   ========================================================= */
+
+function collectMemory(text){
+
+  var value =
+    String(text || "")
+      .trim();
+
+  if (!value){
+    return;
   }
 
-  function buildMessages(){
-    var chat = currentChat();
+  var match =
+    value.match(
+      /(?:remember that|remember|my name is|i am|i'm|i like|i prefer)\s+(.{3,180})/i
+    );
 
-    if (!chat) return [];
+  if (!match){
+    return;
+  }
 
-    return chat.messages
-      .filter(function(message){
+  var memory =
+    match[0].trim();
+
+  if (
+    !state.memories.some(
+      function(item){
+
         return (
-          message.role === "user" ||
-          message.role === "assistant"
+          item.toLowerCase() ===
+          memory.toLowerCase()
         );
-      })
-      .filter(function(message){
-        return message.type !== "image";
-      })
-      .map(function(message){
-        return {
-          role:message.role,
-          content:message.content
-        };
-      });
+      }
+    )
+  ){
+
+    state.memories.unshift(
+      memory
+    );
+
+    state.memories =
+      state.memories.slice(
+        0,
+        50
+      );
+
+    saveState();
+  }
+}
+
+/* =========================================================
+   API MESSAGE BUILDING
+   ========================================================= */
+
+function buildMessages(){
+
+  var chat =
+    currentChat();
+
+  if (!chat){
+    return [];
   }
 
-  function parseSSEChunk(buffer, callback){
-    var normalized =
-      buffer.replace(/\\r\\n/g,"\\n");
+  return chat.messages
+    .filter(
+      function(message){
 
-    var parts =
-      normalized.split("\\n\\n");
+        return (
+          message.role ===
+            "user" ||
+          message.role ===
+            "assistant"
+        );
+      }
+    )
+    .filter(
+      function(message){
 
-    var remainder =
-      parts.pop() || "";
+        return (
+          message.type !==
+          "image"
+        );
+      }
+    )
+    .map(
+      function(message){
 
-    parts.forEach(function(event){
-      var lines = event.split("\\n");
+        return {
+          role:
+            message.role,
+          content:
+            message.content
+        };
+      }
+    );
+}
+
+/* =========================================================
+   SSE PARSER
+   ========================================================= */
+
+function parseSSEChunk(
+  buffer,
+  callback
+){
+
+  var normalized =
+    buffer.replace(
+      /\r\n/g,
+      "\n"
+    );
+
+  var parts =
+    normalized.split(
+      "\n\n"
+    );
+
+  var remainder =
+    parts.pop() || "";
+
+  parts.forEach(
+    function(event){
+
+      var lines =
+        event.split("\n");
+
       var dataLines = [];
 
-      lines.forEach(function(line){
-        if (line.indexOf("data:") === 0){
-          dataLines.push(
-            line.slice(5).trim()
-          );
+      lines.forEach(
+        function(line){
+
+          if (
+            line.indexOf(
+              "data:"
+            ) === 0
+          ){
+
+            dataLines.push(
+              line.slice(5).trim()
+            );
+          }
         }
-      });
+      );
 
-      if (!dataLines.length) return;
+      if (
+        !dataLines.length
+      ){
+        return;
+      }
 
-      var data = dataLines.join("\\n");
+      var data =
+        dataLines.join("\n");
 
-      if (data === "[DONE]"){
-        callback({done:true});
+      if (
+        data === "[DONE]"
+      ){
+
+        callback({
+          done:true
+        });
+
         return;
       }
 
       try{
-        callback({
-          json:JSON.parse(data)
-        });
-      }catch{
-        // Ignore malformed SSE chunks.
-      }
-    });
 
-    return remainder;
+        callback({
+          json:
+            JSON.parse(data)
+        });
+
+      }catch{
+        /* Wait for next chunk. */
+      }
+
+    }
+  );
+
+  return remainder;
+}
+
+/* =========================================================
+   SEND MESSAGE
+   ========================================================= */
+
+async function sendMessage(){
+
+  if (state.generating){
+
+    if (state.controller){
+      state.controller.abort();
+    }
+
+    return;
   }
 
-  async function sendMessage(){
-    if (state.generating){
-      if (state.controller){
-        state.controller.abort();
-      }
-      return;
-    }
+  var prompt =
+    String(
+      elements.prompt.value || ""
+    ).trim();
 
-    var prompt =
-      String(elements.prompt.value || "").trim();
+  if (
+    !prompt &&
+    !state.attachments.length
+  ){
+    return;
+  }
 
-    if (!prompt && !state.attachments.length){
-      return;
-    }
+  var chat =
+    currentChat();
 
-    var chat = currentChat();
+  if (!chat){
 
-    if (!chat){
-      createChat(false);
-      chat = currentChat();
-    }
+    createChat(false);
 
-    var nearBottom = isNearBottom();
+    chat =
+      currentChat();
+  }
 
-    if (
-      state.imageMode ||
-      looksLikeImageRequest(prompt)
-    ){
-      elements.prompt.value = "";
-      resizePrompt();
+  var nearBottom =
+    isNearBottom();
 
-      state.imageMode = false;
-      elements.imageBtn.classList.remove("active");
+  if (
+    state.imageMode ||
+    looksLikeImageRequest(prompt)
+  ){
 
-      await generateImage(prompt);
-      return;
-    }
+    elements.prompt.value =
+      "";
 
-    var userContent = prompt;
-
-    if (state.attachments.length){
-      var fileText =
-        state.attachments.map(function(file){
-          if (file.kind === "image"){
-            return (
-              "\\n[Attached image: " +
-              file.name +
-              "]"
-            );
-          }
-
-          return (
-            "\\n\\n[File: " +
-            file.name +
-            "]\\n" +
-            file.text
-          );
-        }).join("\\n");
-
-      userContent += fileText;
-    }
-
-    elements.prompt.value = "";
     resizePrompt();
 
-    collectMemory(prompt);
+    state.imageMode =
+      false;
 
-    chat.messages.push({
-      role:"user",
-      content:userContent
-    });
+    elements.imageBtn.classList.remove(
+      "active"
+    );
 
-    autoTitle(chat,prompt || "Attached files");
-    chat.updated = Date.now();
+    await generateImage(
+      prompt
+    );
 
-    saveState();
-    renderHistory();
+    return;
+  }
 
-    var assistantIndex =
-      chat.messages.length;
+  var userContent =
+    prompt;
 
-    chat.messages.push({
-      role:"assistant",
-      content:""
-    });
+  if (
+    state.attachments.length
+  ){
 
-    renderChat();
+    var fileText =
+      state.attachments
+        .map(
+          function(file){
 
-    if (nearBottom){
-      scrollToBottom();
-    }
+            if (
+              file.kind ===
+              "image"
+            ){
 
-    setGenerating(true);
+              return (
+                "\n[Attached image: " +
+                file.name +
+                "]"
+              );
+            }
 
-    state.controller =
-      new AbortController();
+            return (
+              "\n\n[File: " +
+              file.name +
+              "]\n" +
+              file.text
+            );
+          }
+        )
+        .join("\n");
 
-    var model =
-      state.selectedModel ||
-      (
-        state.models[0]
-          ? state.models[0].id
-          : ""
-      );
+    userContent +=
+      fileText;
+  }
 
-    try{
-      var response = await fetch(
+  elements.prompt.value =
+    "";
+
+  resizePrompt();
+
+  collectMemory(
+    prompt
+  );
+
+  chat.messages.push({
+    role:"user",
+    content:userContent
+  });
+
+  autoTitle(
+    chat,
+    prompt ||
+      "Attached files"
+  );
+
+  chat.updated =
+    Date.now();
+
+  saveState();
+
+  renderHistory();
+
+  var assistantIndex =
+    chat.messages.length;
+
+  chat.messages.push({
+    role:"assistant",
+    content:""
+  });
+
+  renderChat();
+
+  if (nearBottom){
+    scrollToBottom();
+  }
+
+  setGenerating(true);
+
+  state.controller =
+    new AbortController();
+
+  var model =
+    state.selectedModel ||
+    (
+      state.models[0]
+        ? state.models[0].id
+        : ""
+    );
+
+  try{
+
+    var response =
+      await fetch(
         "/api/chat",
         {
           method:"POST",
           headers:{
-            "Content-Type":"application/json"
+            "Content-Type":
+              "application/json"
           },
-          signal:state.controller.signal,
+          signal:
+            state.controller.signal,
           body:JSON.stringify({
             model:model,
-            messages:buildMessages(),
-            memories:state.memories,
-            max_tokens:8192,
-            temperature:.7
+            messages:
+              buildMessages(),
+            memories:
+              state.memories,
+            max_tokens:
+              8192,
+            temperature:
+              0.7
           })
         }
       );
 
-      if (!response.ok){
-        var errorText =
-          await response.text();
+    if (!response.ok){
 
-        var parsedError = null;
+      var errorText =
+        await response.text();
 
-        try{
-          parsedError =
-            JSON.parse(errorText);
-        }catch{}
+      var parsedError =
+        null;
 
-        throw new Error(
-          parsedError &&
-          parsedError.error &&
-          parsedError.error.message
-            ? parsedError.error.message
-            : errorText ||
-              "Request failed."
-        );
-      }
-
-      if (!response.body){
-        throw new Error(
-          "Streaming is not supported by this response."
-        );
-      }
-
-      var reader =
-        response.body.getReader();
-
-      var decoder =
-        new TextDecoder();
-
-      var buffer = "";
-      var finished = false;
-
-      while (!finished){
-        var result =
-          await reader.read();
-
-        if (result.done) break;
-
-        buffer +=
-          decoder.decode(
-            result.value,
-            {stream:true}
+      try{
+        parsedError =
+          JSON.parse(
+            errorText
           );
+      }catch{}
 
-        buffer =
-          parseSSEChunk(
-            buffer,
-            function(event){
+      throw new Error(
+        parsedError &&
+        parsedError.error &&
+        parsedError.error.message
+          ? parsedError.error.message
+          : errorText ||
+            "Request failed."
+      );
+    }
 
-              if (event.done){
-                finished = true;
-                return;
-              }
+    if (!response.body){
 
-              if (!event.json) return;
+      throw new Error(
+        "Streaming is not supported by this response."
+      );
+    }
 
-              var delta =
-                extractDelta(event.json);
+    var reader =
+      response.body.getReader();
 
-              if (!delta) return;
+    var decoder =
+      new TextDecoder();
 
-              chat.messages[
-                assistantIndex
-              ].content += delta;
+    var buffer = "";
 
-              renderStreamingAssistant(
-                assistantIndex
+    var finished =
+      false;
+
+    while (!finished){
+
+      var result =
+        await reader.read();
+
+      if (result.done){
+        break;
+      }
+
+      buffer +=
+        decoder.decode(
+          result.value,
+          {
+            stream:true
+          }
+        );
+
+      buffer =
+        parseSSEChunk(
+          buffer,
+          function(event){
+
+            if (event.done){
+
+              finished = true;
+
+              return;
+            }
+
+            if (!event.json){
+              return;
+            }
+
+            var delta =
+              extractDelta(
+                event.json
               );
 
-              if (isNearBottom()){
-                scrollToBottom();
-              }
-
+            if (!delta){
+              return;
             }
-          );
-      }
 
-      buffer += decoder.decode();
+            chat.messages[
+              assistantIndex
+            ].content +=
+              delta;
 
-      chat.updated = Date.now();
+            renderStreamingAssistant(
+              assistantIndex
+            );
 
-      saveState();
-      renderHistory();
+            /*
+              Only auto-scroll when the
+              user is already near bottom.
+            */
 
-      var finalNearBottom =
-        isNearBottom();
+            if (
+              isNearBottom()
+            ){
+              scrollToBottom();
+            }
 
-      renderChat();
-
-      if (finalNearBottom){
-        scrollToBottom();
-      }
-
-    }catch(error){
-
-      if (
-        error &&
-        error.name === "AbortError"
-      ){
-        chat.messages[
-          assistantIndex
-        ].content +=
-          "\\n\\n_Generation stopped._";
-      }else{
-        chat.messages[
-          assistantIndex
-        ].content =
-          "Sorry, something went wrong.\\n\\n" +
-          "**Error:** " +
-          String(
-            error && error.message
-              ? error.message
-              : error
-          );
-      }
-
-      saveState();
-      renderChat();
-
-    }finally{
-      state.controller = null;
-      state.attachments = [];
-      renderAttachments();
-      setGenerating(false);
-    }
-  }
-
-  async function loadModels(){
-    elements.modelSelect.innerHTML =
-      '<option>Loading models…</option>';
-
-    try{
-      var response =
-        await fetch("/api/models");
-
-      var data =
-        await response.json();
-
-      var models =
-        Array.isArray(data.data)
-          ? data.data
-          : Array.isArray(data)
-            ? data
-            : [];
-
-      state.models = models;
-
-      if (!state.models.length){
-        elements.modelSelect.innerHTML =
-          '<option>No models available</option>';
-
-        return;
-      }
-
-      var savedExists =
-        state.models.some(function(model){
-          return model.id ===
-            state.selectedModel;
-        });
-
-      if (!savedExists){
-        state.selectedModel =
-          state.models[0].id;
-
-        localStorage.setItem(
-          "aether_model",
-          state.selectedModel
+          }
         );
-      }
-
-      elements.modelSelect.innerHTML =
-        state.models.map(function(model,index){
-          return (
-            '<option value="' +
-            escapeHTML(model.id) +
-            '">' +
-            escapeHTML(
-              (index === 0 ? "★ " : "") +
-              (model.name || model.id)
-            ) +
-            '</option>'
-          );
-        }).join("");
-
-      elements.modelSelect.value =
-        state.selectedModel;
-
-      updateModelInfo();
-
-    }catch(error){
-
-      elements.modelSelect.innerHTML =
-        '<option>Model loading failed</option>';
-
-      elements.modelInfo.textContent =
-        "Could not load models";
     }
+
+    buffer +=
+      decoder.decode();
+
+    chat.updated =
+      Date.now();
+
+    saveState();
+
+    renderHistory();
+
+    var finalNearBottom =
+      isNearBottom();
+
+    renderChat();
+
+    if (
+      finalNearBottom
+    ){
+      scrollToBottom();
+    }
+
+  }catch(error){
+
+    if (
+      error &&
+      error.name ===
+      "AbortError"
+    ){
+
+      chat.messages[
+        assistantIndex
+      ].content +=
+        "\n\n_Generation stopped._";
+
+    }else{
+
+      chat.messages[
+        assistantIndex
+      ].content =
+        "Sorry, something went wrong.\n\n" +
+        "**Error:** " +
+        String(
+          error &&
+          error.message
+            ? error.message
+            : error
+        );
+    }
+
+    saveState();
+
+    renderChat();
+
+  }finally{
+
+    state.controller =
+      null;
+
+    state.attachments =
+      [];
+
+    renderAttachments();
+
+    setGenerating(false);
   }
+}
 
-  function updateModelInfo(){
-    var model =
-      state.models.find(function(item){
-        return item.id ===
-          state.selectedModel;
-      });
+/* =========================================================
+   MODELS
+   ========================================================= */
 
-    if (!model){
-      elements.modelInfo.textContent =
-        "Auto-selected model";
+async function loadModels(){
+
+  elements.modelSelect.innerHTML =
+    "<option>Loading models…</option>";
+
+  try{
+
+    var response =
+      await fetch(
+        "/api/models"
+      );
+
+    var data =
+      await response.json();
+
+    var models =
+      Array.isArray(data.data)
+        ? data.data
+        : Array.isArray(data)
+          ? data
+          : [];
+
+    state.models =
+      models;
+
+    if (!state.models.length){
+
+      elements.modelSelect.innerHTML =
+        "<option>No models available</option>";
+
       return;
     }
 
-    var caps =
-      getCapabilities(model);
+    var savedExists =
+      state.models.some(
+        function(model){
 
-    var labels = [];
-
-    if (caps.has("reasoning"))
-      labels.push("reasoning");
-
-    if (caps.has("vision"))
-      labels.push("vision");
-
-    if (caps.has("web_search"))
-      labels.push("web");
-
-    if (caps.has("tools"))
-      labels.push("tools");
-
-    elements.modelInfo.textContent =
-      labels.length
-        ? labels.join(" · ")
-        : "AetherAI model";
-  }
-
-  function renderAttachments(){
-    elements.attachments.innerHTML =
-      state.attachments.map(function(file,index){
-        return (
-          '<div class="attachment">' +
-            escapeHTML(file.name) +
-            ' × ' +
-            '<button class="action remove-file" data-file="' +
-              index +
-            '">remove</button>' +
-          '</div>'
-        );
-      }).join("");
-  }
-
-  function readAsDataURL(file){
-    return new Promise(function(resolve,reject){
-      var reader = new FileReader();
-
-      reader.onload =
-        function(){
-          resolve(reader.result);
-        };
-
-      reader.onerror =
-        function(){
-          reject(
-            new Error(
-              "Could not read " +
-              file.name
-            )
+          return (
+            model.id ===
+            state.selectedModel
           );
-        };
-
-      reader.readAsDataURL(file);
-    });
-  }
-
-  function readAsText(file){
-    return new Promise(function(resolve,reject){
-      var reader = new FileReader();
-
-      reader.onload =
-        function(){
-          resolve(String(reader.result || ""));
-        };
-
-      reader.onerror =
-        function(){
-          reject(
-            new Error(
-              "Could not read " +
-              file.name
-            )
-          );
-        };
-
-      reader.readAsText(file);
-    });
-  }
-
-  async function addFiles(files){
-    var list =
-      Array.from(files || []);
-
-    for (var i=0;i<list.length;i++){
-      var file = list[i];
-
-      if (file.size > 8 * 1024 * 1024){
-        alert(
-          file.name +
-          " is larger than 8 MB."
-        );
-        continue;
-      }
-
-      if (file.type.indexOf("image/") === 0){
-
-        if (file.size > 5 * 1024 * 1024){
-          alert(
-            file.name +
-            " is larger than 5 MB. Images must be 5 MB or less."
-          );
-          continue;
         }
+      );
 
-        try{
-          var dataURL =
-            await readAsDataURL(file);
+    if (!savedExists){
 
-          state.attachments.push({
-            name:file.name,
-            kind:"image",
-            image:dataURL,
-            text:""
-          });
-        }catch(error){
-          alert(error.message);
-        }
-
-        continue;
-      }
-
-      var isText =
-        file.type.indexOf("text/") === 0 ||
-        /\\.(txt|md|markdown|csv|json|xml|html|js|css|py|java|c|cpp|h|hpp|ts|tsx|jsx)$/i
-          .test(file.name);
-
-      if (isText){
-        try{
-          var text =
-            await readAsText(file);
-
-          state.attachments.push({
-            name:file.name,
-            kind:"text",
-            text:text.slice(0,100000)
-          });
-        }catch(error){
-          alert(error.message);
-        }
-
-        continue;
-      }
-
-      state.attachments.push({
-        name:file.name,
-        kind:"text",
-        text:
-          "[This file type is attached but its binary contents were not extracted by the browser.]"
-      });
-    }
-
-    renderAttachments();
-  }
-
-  function resizePrompt(){
-    elements.prompt.style.height =
-      "auto";
-
-    elements.prompt.style.height =
-      Math.min(
-        elements.prompt.scrollHeight,
-        180
-      ) + "px";
-  }
-
-  function openSidebar(){
-    elements.sidebar.classList.add("open");
-    elements.overlay.classList.add("show");
-  }
-
-  function closeSidebar(){
-    elements.sidebar.classList.remove("open");
-    elements.overlay.classList.remove("show");
-  }
-
-  elements.menuBtn.addEventListener(
-    "click",
-    openSidebar
-  );
-
-  elements.overlay.addEventListener(
-    "click",
-    closeSidebar
-  );
-
-  elements.newChat.addEventListener(
-    "click",
-    function(){
-      createChat(true);
-    }
-  );
-
-  elements.search.addEventListener(
-    "input",
-    renderHistory
-  );
-
-  elements.modelSelect.addEventListener(
-    "change",
-    function(){
       state.selectedModel =
-        elements.modelSelect.value;
+        state.models[0].id;
 
       localStorage.setItem(
         "aether_model",
         state.selectedModel
       );
-
-      updateModelInfo();
     }
-  );
 
-  elements.attachBtn.addEventListener(
-    "click",
-    function(){
-      elements.fileInput.click();
-    }
-  );
+    elements.modelSelect.innerHTML =
+      state.models
+        .map(
+          function(model,index){
 
-  elements.fileInput.addEventListener(
-    "change",
-    function(){
-      addFiles(elements.fileInput.files);
-      elements.fileInput.value = "";
-    }
-  );
+            return (
+              '<option value="' +
+              escapeHTML(
+                model.id
+              ) +
+              '">' +
 
-  elements.imageBtn.addEventListener(
-    "click",
-    function(){
-      state.imageMode =
-        !state.imageMode;
+              escapeHTML(
+                (
+                  index === 0
+                    ? "★ "
+                    : ""
+                ) +
+                (
+                  model.name ||
+                  model.id
+                )
+              ) +
 
-      elements.imageBtn.classList.toggle(
-        "active",
-        state.imageMode
-      );
-
-      elements.prompt.placeholder =
-        state.imageMode
-          ? "Describe the image you want..."
-          : "Message AetherAI...";
-    }
-  );
-
-  elements.prompt.addEventListener(
-    "input",
-    resizePrompt
-  );
-
-  elements.prompt.addEventListener(
-    "keydown",
-    function(event){
-      if (
-        event.key === "Enter" &&
-        !event.shiftKey
-      ){
-        event.preventDefault();
-        sendMessage();
-      }
-    }
-  );
-
-  elements.sendBtn.addEventListener(
-    "click",
-    sendMessage
-  );
-
-  elements.scrollBottom.addEventListener(
-    "click",
-    scrollToBottom
-  );
-
-  elements.chat.addEventListener(
-    "scroll",
-    updateScrollButton
-  );
-
-  elements.history.addEventListener(
-    "click",
-    function(event){
-      var button =
-        event.target.closest(".chat-item");
-
-      if (!button) return;
-
-      state.currentChatId =
-        button.dataset.chat;
-
-      renderHistory();
-      renderChat();
-      closeSidebar();
-    }
-  );
-
-  elements.attachments.addEventListener(
-    "click",
-    function(event){
-      var button =
-        event.target.closest(".remove-file");
-
-      if (!button) return;
-
-      var index =
-        Number(button.dataset.file);
-
-      state.attachments.splice(
-        index,
-        1
-      );
-
-      renderAttachments();
-    }
-  );
-
-  elements.chatInner.addEventListener(
-    "click",
-    async function(event){
-
-      var suggestion =
-        event.target.closest(".suggestion");
-
-      if (suggestion){
-        elements.prompt.value =
-          suggestion.textContent;
-
-        if (
-          suggestion.textContent
-            .toLowerCase()
-            .includes("image")
-        ){
-          state.imageMode = true;
-          elements.imageBtn.classList.add("active");
-          elements.prompt.placeholder =
-            "Describe the image you want...";
-        }
-
-        resizePrompt();
-        elements.prompt.focus();
-        return;
-      }
-
-      var copyCode =
-        event.target.closest(".code-copy");
-
-      if (copyCode){
-        try{
-          var code =
-            decodeURIComponent(
-              copyCode.dataset.code || ""
+              '</option>'
             );
+          }
+        )
+        .join("");
 
-          await navigator.clipboard.writeText(code);
+    elements.modelSelect.value =
+      state.selectedModel;
 
-          copyCode.textContent = "Copied";
+    updateModelInfo();
 
-          setTimeout(function(){
-            copyCode.textContent = "Copy";
-          },1200);
+  }catch(error){
 
-        }catch{
-          copyCode.textContent = "Failed";
-        }
+    elements.modelSelect.innerHTML =
+      "<option>Model loading failed</option>";
 
-        return;
+    elements.modelInfo.textContent =
+      "Could not load models";
+  }
+}
+
+function updateModelInfo(){
+
+  var model =
+    state.models.find(
+      function(item){
+
+        return (
+          item.id ===
+          state.selectedModel
+        );
       }
+    );
 
-      var copyMessage =
-        event.target.closest(".copy-message");
+  if (!model){
 
-      if (copyMessage){
-        var index =
-          Number(copyMessage.dataset.index);
+    elements.modelInfo.textContent =
+      "Auto-selected model";
 
-        var chat = currentChat();
+    return;
+  }
 
-        if (!chat || !chat.messages[index])
-          return;
+  var caps =
+    getCapabilitiesClient(
+      model
+    );
 
-        var message =
-          chat.messages[index];
+  var labels = [];
 
-        try{
-          await navigator.clipboard.writeText(
-            message.content || ""
+  if (
+    caps.has("reasoning")
+  ){
+    labels.push("reasoning");
+  }
+
+  if (
+    caps.has("vision")
+  ){
+    labels.push("vision");
+  }
+
+  if (
+    caps.has("web_search")
+  ){
+    labels.push("web");
+  }
+
+  if (
+    caps.has("tools")
+  ){
+    labels.push("tools");
+  }
+
+  elements.modelInfo.textContent =
+    labels.length
+      ? labels.join(" · ")
+      : "AetherAI model";
+}
+
+function getCapabilitiesClient(model){
+
+  var caps =
+    model &&
+    model.capabilities;
+
+  if (
+    Array.isArray(caps)
+  ){
+
+    return new Set(
+      caps.map(
+        function(x){
+          return String(x)
+            .toLowerCase();
+        }
+      )
+    );
+  }
+
+  if (
+    caps &&
+    typeof caps ===
+      "object"
+  ){
+
+    return new Set(
+      Object.keys(caps)
+        .filter(
+          function(key){
+            return (
+              caps[key] === true
+            );
+          }
+        )
+        .map(
+          function(key){
+            return key.toLowerCase();
+          }
+        )
+    );
+  }
+
+  return new Set();
+}
+
+/* =========================================================
+   ATTACHMENTS
+   ========================================================= */
+
+function renderAttachments(){
+
+  elements.attachments.innerHTML =
+    state.attachments
+      .map(
+        function(file,index){
+
+          return (
+            '<div class="attachment">' +
+
+              escapeHTML(
+                file.name
+              ) +
+
+              ' × ' +
+
+              '<button class="action remove-file" data-file="' +
+                index +
+              '">' +
+                'remove' +
+              '</button>' +
+
+            '</div>'
           );
-
-          copyMessage.textContent = "Copied";
-
-          setTimeout(function(){
-            copyMessage.textContent = "Copy";
-          },1200);
-
-        }catch{
-          copyMessage.textContent = "Failed";
         }
+      )
+      .join("");
+}
 
-        return;
-      }
+function readAsDataURL(file){
 
-      var regenerate =
-        event.target.closest(".regenerate");
+  return new Promise(
+    function(resolve,reject){
 
-      if (regenerate){
-        regenerateLast();
-      }
+      var reader =
+        new FileReader();
+
+      reader.onload =
+        function(){
+          resolve(
+            reader.result
+          );
+        };
+
+      reader.onerror =
+        function(){
+
+          reject(
+            new Error(
+              "Could not read " +
+              file.name
+            )
+          );
+        };
+
+      reader.readAsDataURL(
+        file
+      );
     }
   );
+}
 
-  function regenerateLast(){
-    var chat = currentChat();
+function readAsText(file){
 
-    if (!chat || state.generating)
-      return;
+  return new Promise(
+    function(resolve,reject){
 
-    var lastAssistant = -1;
+      var reader =
+        new FileReader();
 
-    for (
-      var i=chat.messages.length-1;
-      i>=0;
-      i--
-    ){
-      if (
-        chat.messages[i].role ===
-        "assistant"
-      ){
-        lastAssistant = i;
-        break;
-      }
+      reader.onload =
+        function(){
+
+          resolve(
+            String(
+              reader.result || ""
+            )
+          );
+        };
+
+      reader.onerror =
+        function(){
+
+          reject(
+            new Error(
+              "Could not read " +
+              file.name
+            )
+          );
+        };
+
+      reader.readAsText(
+        file
+      );
     }
+  );
+}
 
-    if (lastAssistant < 0)
-      return;
+async function addFiles(files){
 
-    var userIndex =
-      lastAssistant - 1;
+  var list =
+    Array.from(
+      files || []
+    );
+
+  for (
+    var i = 0;
+    i < list.length;
+    i++
+  ){
+
+    var file =
+      list[i];
 
     if (
-      !chat.messages[userIndex] ||
-      chat.messages[userIndex].role !==
-      "user"
+      file.size >
+      8 * 1024 * 1024
     ){
+
+      alert(
+        file.name +
+        " is larger than 8 MB."
+      );
+
+      continue;
+    }
+
+    if (
+      file.type.indexOf(
+        "image/"
+      ) === 0
+    ){
+
+      if (
+        file.size >
+        5 * 1024 * 1024
+      ){
+
+        alert(
+          file.name +
+          " is larger than 5 MB. Images must be 5 MB or less."
+        );
+
+        continue;
+      }
+
+      try{
+
+        var dataURL =
+          await readAsDataURL(
+            file
+          );
+
+        state.attachments.push({
+          name:file.name,
+          kind:"image",
+          image:dataURL,
+          text:""
+        });
+
+      }catch(error){
+
+        alert(
+          error.message
+        );
+      }
+
+      continue;
+    }
+
+    var isText =
+      file.type.indexOf(
+        "text/"
+      ) === 0 ||
+
+      /\.(txt|md|markdown|csv|json|xml|html|js|css|py|java|c|cpp|h|hpp|ts|tsx|jsx)$/i
+        .test(file.name);
+
+    if (isText){
+
+      try{
+
+        var text =
+          await readAsText(
+            file
+          );
+
+        state.attachments.push({
+          name:file.name,
+          kind:"text",
+          text:
+            text.slice(
+              0,
+              100000
+            )
+        });
+
+      }catch(error){
+
+        alert(
+          error.message
+        );
+      }
+
+      continue;
+    }
+
+    state.attachments.push({
+      name:file.name,
+      kind:"text",
+      text:
+        "[This file type is attached but its binary contents were not extracted by the browser.]"
+    });
+  }
+
+  renderAttachments();
+}
+
+/* =========================================================
+   TEXTAREA
+   ========================================================= */
+
+function resizePrompt(){
+
+  elements.prompt.style.height =
+    "auto";
+
+  elements.prompt.style.height =
+    Math.min(
+      elements.prompt.scrollHeight,
+      180
+    ) + "px";
+}
+
+/* =========================================================
+   MOBILE SIDEBAR
+   ========================================================= */
+
+function openSidebar(){
+
+  elements.sidebar.classList.add(
+    "open"
+  );
+
+  elements.overlay.classList.add(
+    "show"
+  );
+}
+
+function closeSidebar(){
+
+  elements.sidebar.classList.remove(
+    "open"
+  );
+
+  elements.overlay.classList.remove(
+    "show"
+  );
+}
+
+/* =========================================================
+   EVENTS
+   ========================================================= */
+
+elements.menuBtn.addEventListener(
+  "click",
+  openSidebar
+);
+
+elements.overlay.addEventListener(
+  "click",
+  closeSidebar
+);
+
+elements.newChat.addEventListener(
+  "click",
+  function(){
+    createChat(true);
+  }
+);
+
+elements.search.addEventListener(
+  "input",
+  renderHistory
+);
+
+elements.modelSelect.addEventListener(
+  "change",
+  function(){
+
+    state.selectedModel =
+      elements.modelSelect.value;
+
+    localStorage.setItem(
+      "aether_model",
+      state.selectedModel
+    );
+
+    updateModelInfo();
+  }
+);
+
+elements.attachBtn.addEventListener(
+  "click",
+  function(){
+    elements.fileInput.click();
+  }
+);
+
+elements.fileInput.addEventListener(
+  "change",
+  function(){
+
+    addFiles(
+      elements.fileInput.files
+    );
+
+    elements.fileInput.value =
+      "";
+  }
+);
+
+elements.imageBtn.addEventListener(
+  "click",
+  function(){
+
+    state.imageMode =
+      !state.imageMode;
+
+    elements.imageBtn.classList.toggle(
+      "active",
+      state.imageMode
+    );
+
+    elements.prompt.placeholder =
+      state.imageMode
+        ? "Describe the image you want..."
+        : "Message AetherAI...";
+  }
+);
+
+elements.prompt.addEventListener(
+  "input",
+  resizePrompt
+);
+
+elements.prompt.addEventListener(
+  "keydown",
+  function(event){
+
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey
+    ){
+
+      event.preventDefault();
+
+      sendMessage();
+    }
+  }
+);
+
+elements.sendBtn.addEventListener(
+  "click",
+  sendMessage
+);
+
+elements.scrollBottom.addEventListener(
+  "click",
+  scrollToBottom
+);
+
+elements.chat.addEventListener(
+  "scroll",
+  updateScrollButton
+);
+
+/* =========================================================
+   HISTORY
+   ========================================================= */
+
+elements.history.addEventListener(
+  "click",
+  function(event){
+
+    var button =
+      event.target.closest(
+        ".chat-item"
+      );
+
+    if (!button){
       return;
     }
 
-    var oldUser =
-      chat.messages[userIndex].content;
+    state.currentChatId =
+      button.dataset.chat;
 
-    chat.messages.splice(
-      lastAssistant,
-      1
-    );
-
-    chat.messages.splice(
-      userIndex,
-      1
-    );
-
-    saveState();
+    renderHistory();
     renderChat();
-
-    elements.prompt.value =
-      oldUser;
-
-    resizePrompt();
-
-    sendMessage();
+    closeSidebar();
   }
+);
 
-  elements.memoryBtn.addEventListener(
-    "click",
-    function(){
-      if (!state.memories.length){
-        alert(
-          "No saved memories yet.\\n\\n" +
-          "Try saying things like: " +
-          "\"Remember that I prefer concise answers.\""
+/* =========================================================
+   REMOVE ATTACHMENT
+   ========================================================= */
+
+elements.attachments.addEventListener(
+  "click",
+  function(event){
+
+    var button =
+      event.target.closest(
+        ".remove-file"
+      );
+
+    if (!button){
+      return;
+    }
+
+    var index =
+      Number(
+        button.dataset.file
+      );
+
+    state.attachments.splice(
+      index,
+      1
+    );
+
+    renderAttachments();
+  }
+);
+
+/* =========================================================
+   CHAT ACTIONS
+   ========================================================= */
+
+elements.chatInner.addEventListener(
+  "click",
+  async function(event){
+
+    var suggestion =
+      event.target.closest(
+        ".suggestion"
+      );
+
+    if (suggestion){
+
+      elements.prompt.value =
+        suggestion.textContent;
+
+      if (
+        suggestion.textContent
+          .toLowerCase()
+          .includes("image")
+      ){
+
+        state.imageMode =
+          true;
+
+        elements.imageBtn.classList.add(
+          "active"
         );
+
+        elements.prompt.placeholder =
+          "Describe the image you want...";
+      }
+
+      resizePrompt();
+
+      elements.prompt.focus();
+
+      return;
+    }
+
+    var copyCode =
+      event.target.closest(
+        ".code-copy"
+      );
+
+    if (copyCode){
+
+      try{
+
+        var code =
+          decodeURIComponent(
+            copyCode.dataset.code ||
+            ""
+          );
+
+        await navigator.clipboard.writeText(
+          code
+        );
+
+        copyCode.textContent =
+          "Copied";
+
+        setTimeout(
+          function(){
+            copyCode.textContent =
+              "Copy";
+          },
+          1200
+        );
+
+      }catch{
+
+        copyCode.textContent =
+          "Failed";
+      }
+
+      return;
+    }
+
+    var copyMessage =
+      event.target.closest(
+        ".copy-message"
+      );
+
+    if (copyMessage){
+
+      var index =
+        Number(
+          copyMessage.dataset.index
+        );
+
+      var chat =
+        currentChat();
+
+      if (
+        !chat ||
+        !chat.messages[index]
+      ){
         return;
       }
 
-      alert(
-        "AetherAI Memory:\\n\\n" +
-        state.memories.join("\\n")
-      );
+      var message =
+        chat.messages[index];
+
+      try{
+
+        await navigator.clipboard.writeText(
+          message.content || ""
+        );
+
+        copyMessage.textContent =
+          "Copied";
+
+        setTimeout(
+          function(){
+            copyMessage.textContent =
+              "Copy";
+          },
+          1200
+        );
+
+      }catch{
+
+        copyMessage.textContent =
+          "Failed";
+      }
+
+      return;
     }
+
+    var regenerate =
+      event.target.closest(
+        ".regenerate"
+      );
+
+    if (regenerate){
+      regenerateLast();
+    }
+  }
+);
+
+/* =========================================================
+   REGENERATE
+   ========================================================= */
+
+function regenerateLast(){
+
+  var chat =
+    currentChat();
+
+  if (
+    !chat ||
+    state.generating
+  ){
+    return;
+  }
+
+  var lastAssistant =
+    -1;
+
+  for (
+    var i =
+      chat.messages.length - 1;
+    i >= 0;
+    i--
+  ){
+
+    if (
+      chat.messages[i].role ===
+      "assistant"
+    ){
+
+      lastAssistant =
+        i;
+
+      break;
+    }
+  }
+
+  if (
+    lastAssistant < 0
+  ){
+    return;
+  }
+
+  var userIndex =
+    lastAssistant - 1;
+
+  if (
+    !chat.messages[userIndex] ||
+    chat.messages[userIndex].role !==
+      "user"
+  ){
+    return;
+  }
+
+  var oldUser =
+    chat.messages[userIndex].content;
+
+  chat.messages.splice(
+    lastAssistant,
+    1
   );
 
-  var deferredInstallPrompt = null;
+  chat.messages.splice(
+    userIndex,
+    1
+  );
+
+  saveState();
+
+  renderChat();
+
+  elements.prompt.value =
+    oldUser;
+
+  resizePrompt();
+
+  sendMessage();
+}
+
+/* =========================================================
+   MEMORY BUTTON
+   ========================================================= */
+
+elements.memoryBtn.addEventListener(
+  "click",
+  function(){
+
+    if (
+      !state.memories.length
+    ){
+
+      alert(
+        "No saved memories yet.\n\n" +
+        "Try saying things like: " +
+        "\"Remember that I prefer concise answers.\""
+      );
+
+      return;
+    }
+
+    alert(
+      "AetherAI Memory:\n\n" +
+      state.memories.join("\n")
+    );
+  }
+);
+
+/* =========================================================
+   PWA INSTALL
+   ========================================================= */
+
+var deferredInstallPrompt =
+  null;
+
+window.addEventListener(
+  "beforeinstallprompt",
+  function(event){
+
+    event.preventDefault();
+
+    deferredInstallPrompt =
+      event;
+  }
+);
+
+elements.installBtn.addEventListener(
+  "click",
+  async function(){
+
+    if (
+      deferredInstallPrompt
+    ){
+
+      deferredInstallPrompt.prompt();
+
+      try{
+
+        await deferredInstallPrompt.userChoice;
+
+      }catch{}
+
+      deferredInstallPrompt =
+        null;
+
+      return;
+    }
+
+    alert(
+      "On iPhone: open this AetherAI page in Safari, tap Share, then choose 'Add to Home Screen'."
+    );
+  }
+);
+
+/* =========================================================
+   SERVICE WORKER
+   ========================================================= */
+
+if (
+  "serviceWorker" in
+  navigator
+){
 
   window.addEventListener(
-    "beforeinstallprompt",
-    function(event){
-      event.preventDefault();
-      deferredInstallPrompt = event;
+    "load",
+    function(){
+
+      navigator.serviceWorker
+        .register("/sw.js")
+        .catch(
+          function(){
+            /* PWA optional */
+          }
+        );
     }
   );
+}
 
-  elements.installBtn.addEventListener(
-    "click",
-    async function(){
+/* =========================================================
+   START
+   ========================================================= */
 
-      if (deferredInstallPrompt){
-        deferredInstallPrompt.prompt();
+loadState();
 
-        try{
-          await deferredInstallPrompt.userChoice;
-        }catch{}
+renderHistory();
 
-        deferredInstallPrompt = null;
-        return;
-      }
+renderChat();
 
-      alert(
-        "On iPhone: open this AetherAI page in Safari, tap Share, then choose 'Add to Home Screen'."
-      );
-    }
-  );
+resizePrompt();
 
-  if ("serviceWorker" in navigator){
-    window.addEventListener(
-      "load",
-      function(){
-        navigator.serviceWorker.register(
-          "/sw.js"
-        ).catch(function(){
-          // PWA is optional.
-        });
-      }
-    );
-  }
-
-  loadState();
-  renderHistory();
-  renderChat();
-  resizePrompt();
-  loadModels();
+loadModels();
 
 })();
+
 </script>
 
 </body>
 </html>`;
 }
 
+/* =========================================================
+   ROUTER
+   ========================================================= */
+
 export default {
+
   async fetch(request, env) {
 
-    if (request.method === "OPTIONS") {
-      return new Response(null, {
-        status: 204,
-        headers: corsHeaders()
-      });
+    if (
+      request.method ===
+      "OPTIONS"
+    ){
+
+      return new Response(
+        null,
+        {
+          status:204,
+          headers:corsHeaders()
+        }
+      );
     }
 
     const url =
-      new URL(request.url);
+      new URL(
+        request.url
+      );
 
     if (
       request.method === "GET" &&
-      url.pathname === "/api/health"
+      url.pathname ===
+        "/api/health"
     ){
-      return handleHealth(env);
+
+      return handleHealth(
+        env
+      );
     }
 
     if (
       request.method === "GET" &&
-      url.pathname === "/api/models"
+      url.pathname ===
+        "/api/models"
     ){
-      return handleModels(env);
+
+      return handleModels(
+        env
+      );
     }
 
     if (
       request.method === "POST" &&
-      url.pathname === "/api/chat"
+      url.pathname ===
+        "/api/chat"
     ){
-      return handleChat(request, env);
+
+      return handleChat(
+        request,
+        env
+      );
     }
 
     if (
       request.method === "POST" &&
-      url.pathname === "/api/generate-image"
+      url.pathname ===
+        "/api/generate-image"
     ){
+
       return handleImageGeneration(
         request,
         env
@@ -3132,22 +4177,39 @@ export default {
 
     if (
       request.method === "GET" &&
-      url.pathname === "/manifest.json"
+      url.pathname ===
+        "/api/health"
     ){
+
+      return handleHealth(
+        env
+      );
+    }
+
+    if (
+      request.method === "GET" &&
+      url.pathname ===
+        "/manifest.json"
+    ){
+
       return manifest();
     }
 
     if (
       request.method === "GET" &&
-      url.pathname === "/icon.svg"
+      url.pathname ===
+        "/icon.svg"
     ){
+
       return icon();
     }
 
     if (
       request.method === "GET" &&
-      url.pathname === "/sw.js"
+      url.pathname ===
+        "/sw.js"
     ){
+
       return serviceWorker();
     }
 
@@ -3158,7 +4220,10 @@ export default {
         url.pathname === "/index.html"
       )
     ){
-      return html(appHTML());
+
+      return html(
+        appHTML()
+      );
     }
 
     return json(
