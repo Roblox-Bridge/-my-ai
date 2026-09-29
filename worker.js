@@ -2395,11 +2395,10 @@ function renderMarkdown(text){
    * template cannot break during Cloudflare deployment.
    */
 
-  const fencePattern =
-    new RegExp(
-      "```([a-zA-Z0-9_+\\\\-]*)\\\\n?([\\\\s\\\\S]*?)```",
-      "g"
-    );
+  const fencePattern = new RegExp(
+  "```([a-zA-Z0-9_+-]*)\\n?([\\s\\S]*?)```",
+  "g"
+);
 
 
   source =
