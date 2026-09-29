@@ -1,5 +1,9 @@
 {
+  "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "my-ai",
   "main": "worker.js",
-  "compatibility_date": "2026-09-25"
+  "compatibility_date": "2026-09-25",
+  "ai": {
+    "binding": "AI"
+  }
 }
