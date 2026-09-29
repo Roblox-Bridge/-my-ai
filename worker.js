@@ -1,120 +1,697 @@
+const BASE = 'https://www.codecraftapi.com/v1';
+
+function corsHeaders(extra = {}) {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    ...extra
+  };
+}
+
+function json(data, status = 200, extra = {}) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      ...corsHeaders(extra)
+    }
+  });
+}
+
+function apiKey(env) {
+  return String(env.CODECRAFT_API_KEY || '').trim();
+}
+
+async function ccFetch(env, path, options = {}) {
+  const headers = new Headers(options.headers || {});
+  headers.set('Authorization', `Bearer ${apiKey(env)}`);
+  headers.set('Content-Type', 'application/json');
+
+  return fetch(BASE + path, {
+    ...options,
+    headers
+  });
+}
+
+async function bodyJson(resp) {
+  const text = await resp.text();
+  let data;
+
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = { raw: text };
+  }
+
+  return { data, text };
+}
+
 const HTML = String.raw`<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>AetherAI</title>
-<style>
-:root{color-scheme:dark;--bg:#090b10;--panel:#10141b;--panel2:#171c25;--border:#293140;--text:#edf1f7;--muted:#8d98a9;--accent:#7d8cff;--danger:#e56b75}
-*{box-sizing:border-box}
-html,body{margin:0;width:100%;height:100%;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-button,input,textarea,select{font:inherit}
-button{color:inherit;cursor:pointer}
-body{overflow:hidden}
-.app{height:100dvh;display:flex}
-.side{width:275px;flex:none;background:#0d1016;border-right:1px solid var(--border);display:flex;flex-direction:column}
-.brand{padding:19px 17px;font-size:19px;font-weight:800;border-bottom:1px solid var(--border)}
-.brand b{color:var(--accent)}
-.new{margin:14px;padding:11px 13px;border-radius:11px;border:1px solid var(--border);background:var(--panel);text-align:left}
-.hist{overflow:auto;padding:0 9px 20px}
-.histTitle{font-size:11px;color:var(--muted);padding:8px;text-transform:uppercase;letter-spacing:.08em}
-.item{padding:10px 11px;border-radius:9px;color:#c9d0dc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
-.item:hover{background:var(--panel2)}
-.main{min-width:0;flex:1;display:flex;flex-direction:column}
-.top{height:62px;display:flex;align-items:center;gap:10px;padding:0 15px;border-bottom:1px solid var(--border);background:#0b0e13}
-.hamb{display:none}
-.name{font-weight:750}
-.controls{margin-left:auto;display:flex;gap:8px;align-items:center}
-.select,.btn,.icon{background:var(--panel);border:1px solid var(--border);border-radius:10px;color:var(--text)}
-.select{max-width:290px;padding:8px 10px}
-.btn{padding:8px 11px}
-.btn.active{border-color:var(--accent);color:#d8dcff}
-.icon{width:38px;height:38px}
-.chat{flex:1;overflow:auto}
-.messages{max-width:930px;margin:auto;padding:28px 19px 145px}
-.msg{display:flex;gap:12px;margin-bottom:25px}
-.ava{width:34px;height:34px;flex:none;border-radius:10px;background:var(--panel2);display:grid;place-items:center;font-size:12px;font-weight:800}
-.bubble{min-width:0;flex:1;line-height:1.65}
-.bubble p{margin:0 0 11px}
-.bubble p:last-child{margin:0}
-.bubble pre{background:#07090d;border:1px solid var(--border);border-radius:10px;padding:13px;overflow:auto}
-.bubble code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em}
-.bubble :not(pre)>code{background:#1a2029;padding:2px 5px;border-radius:5px}
-.bubble a{color:#aab2ff}
-.sources{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
-.source{border:1px solid var(--border);background:var(--panel);padding:6px 8px;border-radius:8px;font-size:12px;color:#c4cbd7;text-decoration:none}
-.composerWrap{position:fixed;left:275px;right:0;bottom:0;padding:13px 19px 19px;background:linear-gradient(transparent,var(--bg) 28%)}
-.composer{max-width:930px;margin:auto;background:#11151c;border:1px solid var(--border);border-radius:16px;padding:10px}
-.chips{display:flex;gap:7px;flex-wrap:wrap;padding:2px 2px 8px}
-.chip{font-size:12px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:6px 8px}
-.row{display:flex;gap:8px;align-items:end}
-.prompt{flex:1;min-height:44px;max-height:190px;resize:none;border:0;outline:0;background:transparent;color:var(--text);padding:9px}
-.send{background:var(--accent);border:0;color:white;font-weight:750;border-radius:11px;padding:11px 17px}
-.send.stop{background:var(--danger)}
-.foot{display:flex;align-items:center;gap:8px;padding-top:7px}
-.small{font-size:12px;color:var(--muted)}
-.grow{flex:1}
-.modalBack{position:fixed;inset:0;background:#000b;display:none;align-items:center;justify-content:center;padding:18px;z-index:50}
-.modalBack.show{display:flex}
-.modal{width:min(780px,100%);max-height:90dvh;overflow:auto;background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:18px}
-.modalHead{display:flex;gap:10px;align-items:center}
-.modalHead h3{margin:0;flex:1}
-.modelCard{padding:11px;border:1px solid var(--border);border-radius:10px;margin-top:8px}
-.tag{display:inline-block;font-size:11px;padding:3px 6px;background:var(--panel2);border-radius:6px;margin:2px}
-.error{color:#ff9a9a}
-.ok{color:#9fe0b2}
 
-@media(max-width:800px){
-.side{position:fixed;z-index:40;top:0;bottom:0;left:-285px;transition:left .2s}
-.side.open{left:0}
-.hamb{display:block}
-.composerWrap{left:0}
-.controls .select{max-width:160px}
-.controls .btn{display:none}
-.messages{padding-left:12px;padding-right:12px}
+<meta
+  name="viewport"
+  content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"
+>
+
+<meta name="theme-color" content="#212121">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AetherAI">
+
+<link rel="manifest" href="/manifest.json">
+
+<title>AetherAI</title>
+
+<style>
+*{
+  box-sizing:border-box
+}
+
+html,
+body{
+  margin:0;
+  width:100%;
+  height:100%;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  background:#212121;
+  color:#ececec;
+  overflow:hidden
+}
+
+button,
+input,
+textarea{
+  font:inherit
+}
+
+button{
+  color:inherit
+}
+
+.app{
+  height:100%;
+  display:flex
+}
+
+.sidebar{
+  width:280px;
+  background:#171717;
+  border-right:1px solid #303030;
+  display:flex;
+  flex-direction:column;
+  padding:12px
+}
+
+.brand{
+  height:48px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:0 10px;
+  font-weight:700;
+  font-size:18px
+}
+
+.logo{
+  width:30px;
+  height:30px;
+  border-radius:9px;
+  background:#fff;
+  color:#111;
+  display:grid;
+  place-items:center;
+  font-weight:900
+}
+
+.new{
+  width:100%;
+  height:46px;
+  border:1px solid #3b3b3b;
+  background:#212121;
+  border-radius:12px;
+  text-align:left;
+  padding:0 14px;
+  cursor:pointer
+}
+
+.new:hover,
+.history-item:hover{
+  background:#2a2a2a
+}
+
+.search{
+  margin:10px 0;
+  position:relative
+}
+
+.search input{
+  width:100%;
+  height:38px;
+  background:#212121;
+  border:1px solid #333;
+  border-radius:10px;
+  color:#eee;
+  padding:0 12px;
+  outline:none
+}
+
+.history{
+  overflow:auto;
+  flex:1
+}
+
+.history-item{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  border-radius:9px;
+  padding:9px 10px;
+  cursor:pointer;
+  margin:2px 0
+}
+
+.history-item.active{
+  background:#2b2b2b
+}
+
+.history-title{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  flex:1;
+  font-size:14px
+}
+
+.more{
+  background:none;
+  border:0;
+  opacity:.55;
+  cursor:pointer
+}
+
+.side-bottom{
+  border-top:1px solid #303030;
+  padding-top:10px
+}
+
+.side-btn{
+  width:100%;
+  border:0;
+  background:transparent;
+  text-align:left;
+  padding:11px;
+  border-radius:9px;
+  cursor:pointer
+}
+
+.side-btn:hover{
+  background:#2a2a2a
+}
+
+.main{
+  min-width:0;
+  flex:1;
+  display:flex;
+  flex-direction:column
+}
+
+.topbar{
+  height:58px;
+  border-bottom:1px solid #303030;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 16px
+}
+
+.top-left{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-width:0
+}
+
+.mobile-menu{
+  display:none;
+  border:0;
+  background:transparent;
+  font-size:23px
+}
+
+.model-select{
+  background:transparent;
+  border:0;
+  color:#eee;
+  font-weight:600;
+  max-width:220px;
+  outline:none
+}
+
+.model-select option{
+  background:#212121
+}
+
+.top-actions{
+  display:flex;
+  gap:4px
+}
+
+.icon-btn{
+  width:38px;
+  height:38px;
+  border:0;
+  background:transparent;
+  border-radius:9px;
+  cursor:pointer;
+  font-size:18px
+}
+
+.icon-btn:hover{
+  background:#303030
+}
+
+.chat{
+  flex:1;
+  overflow:auto
+}
+
+.messages{
+  max-width:850px;
+  margin:auto;
+  padding:24px 20px 170px
+}
+
+.welcome{
+  min-height:55vh;
+  display:grid;
+  place-items:center;
+  text-align:center
+}
+
+.welcome h1{
+  font-size:32px;
+  margin:0 0 10px
+}
+
+.welcome p{
+  color:#a6a6a6;
+  margin:0
+}
+
+.msg{
+  display:flex;
+  gap:14px;
+  margin:0 0 28px
+}
+
+.avatar{
+  width:30px;
+  height:30px;
+  border-radius:8px;
+  flex:none;
+  display:grid;
+  place-items:center;
+  font-size:14px
+}
+
+.user .avatar{
+  background:#555
+}
+
+.assistant .avatar{
+  background:#fff;
+  color:#111
+}
+
+.bubble{
+  min-width:0;
+  flex:1;
+  line-height:1.65;
+  font-size:15.5px
+}
+
+.bubble p{
+  margin:0 0 12px
+}
+
+.bubble p:last-child{
+  margin-bottom:0
+}
+
+.bubble pre{
+  background:#111;
+  border:1px solid #333;
+  border-radius:10px;
+  padding:13px;
+  overflow:auto;
+  white-space:pre-wrap
+}
+
+.bubble code{
+  background:#303030;
+  padding:2px 5px;
+  border-radius:5px
+}
+
+.bubble pre code{
+  background:none;
+  padding:0
+}
+
+.message-actions{
+  display:flex;
+  gap:4px;
+  margin-top:7px
+}
+
+.mini{
+  border:0;
+  background:transparent;
+  color:#8f8f8f;
+  padding:4px 7px;
+  border-radius:7px;
+  cursor:pointer;
+  font-size:12px
+}
+
+.mini:hover{
+  background:#303030;
+  color:#eee
+}
+
+.composer-wrap{
+  position:fixed;
+  bottom:0;
+  left:280px;
+  right:0;
+  background:linear-gradient(transparent,#212121 28%);
+  padding:24px 18px 16px
+}
+
+.composer{
+  max-width:850px;
+  margin:auto;
+  background:#303030;
+  border:1px solid #4a4a4a;
+  border-radius:18px;
+  box-shadow:0 4px 20px #0005
+}
+
+.attachments{
+  display:flex;
+  gap:7px;
+  flex-wrap:wrap;
+  padding:9px 12px 0
+}
+
+.chip{
+  background:#202020;
+  border:1px solid #444;
+  border-radius:9px;
+  padding:6px 9px;
+  font-size:12px
+}
+
+.compose-row{
+  display:flex;
+  align-items:flex-end;
+  padding:8px
+}
+
+.attach{
+  width:42px;
+  height:42px;
+  border:0;
+  background:transparent;
+  border-radius:10px;
+  cursor:pointer;
+  font-size:21px
+}
+
+.attach:hover{
+  background:#3a3a3a
+}
+
+.prompt{
+  flex:1;
+  resize:none;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:#eee;
+  max-height:180px;
+  min-height:42px;
+  padding:10px 8px;
+  line-height:1.45
+}
+
+.send{
+  width:42px;
+  height:42px;
+  border:0;
+  border-radius:11px;
+  background:#fff;
+  color:#111;
+  cursor:pointer;
+  font-weight:800
+}
+
+.send:disabled{
+  opacity:.35;
+  cursor:default
+}
+
+.hint{
+  text-align:center;
+  font-size:11px;
+  color:#777;
+  padding-top:8px
+}
+
+.drawer-backdrop{
+  display:none
+}
+
+.modal{
+  position:fixed;
+  inset:0;
+  background:#0008;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  z-index:20
+}
+
+.modal.open{
+  display:flex
+}
+
+.card{
+  width:min(520px,100%);
+  background:#202020;
+  border:1px solid #444;
+  border-radius:16px;
+  padding:18px
+}
+
+.card h2{
+  margin:0 0 14px
+}
+
+.card p{
+  color:#aaa;
+  font-size:14px;
+  line-height:1.5
+}
+
+.memory-list{
+  max-height:300px;
+  overflow:auto
+}
+
+.memory-row{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  padding:10px;
+  border-bottom:1px solid #333
+}
+
+.danger{
+  color:#ff8d8d
+}
+
+.close{
+  float:right;
+  background:none;
+  border:0;
+  font-size:20px;
+  cursor:pointer
+}
+
+@media(max-width:700px){
+
+.sidebar{
+  position:fixed;
+  z-index:15;
+  top:0;
+  bottom:0;
+  left:0;
+  transform:translateX(-100%);
+  transition:transform .2s;
+  width:84%
+}
+
+.sidebar.open{
+  transform:translateX(0)
+}
+
+.drawer-backdrop{
+  position:fixed;
+  inset:0;
+  background:#0008;
+  z-index:14
+}
+
+.drawer-backdrop.open{
+  display:block
+}
+
+.mobile-menu{
+  display:block
+}
+
+.composer-wrap{
+  left:0;
+  padding:16px 10px 10px
+}
+
+.messages{
+  padding:18px 13px 145px
+}
+
+.topbar{
+  padding:0 8px
+}
+
+.model-select{
+  max-width:170px
+}
+
+.welcome h1{
+  font-size:27px
+}
+
+.msg{
+  gap:9px
+}
+
+.bubble{
+  font-size:15px
+}
+
+.hint{
+  display:none
+}
+
 }
 </style>
 </head>
 
 <body>
+
 <div class="app">
 
-<aside class="side" id="side">
-<div class="brand">Aether<b>AI</b></div>
-<button class="new" id="newBtn">＋ New chat</button>
-<div class="hist">
-<div class="histTitle">History</div>
-<div id="history"></div>
+<aside class="sidebar" id="sidebar">
+
+<div class="brand">
+<div class="logo">A</div>
+<span>AetherAI</span>
 </div>
+
+<button class="new" id="newChat">
+＋ New chat
+</button>
+
+<div class="search">
+<input id="search" placeholder="Search chats">
+</div>
+
+<div class="history" id="history"></div>
+
+<div class="side-bottom">
+
+<button class="side-btn" id="memoryBtn">
+🧠 Memory
+</button>
+
+<button class="side-btn" id="clearBtn">
+⚙ Clear local data
+</button>
+
+</div>
+
 </aside>
+
+<div class="drawer-backdrop" id="backdrop"></div>
 
 <main class="main">
 
-<header class="top">
-<button class="icon hamb" id="menu">☰</button>
-<div class="name">AetherAI</div>
+<header class="topbar">
 
-<div class="controls">
-<select class="select" id="model">
+<div class="top-left">
+
+<button class="mobile-menu" id="menu">
+☰
+</button>
+
+<select class="model-select" id="model">
 <option>Loading models…</option>
 </select>
 
-<button class="btn" id="council">♟ Council</button>
-
-<button class="icon" id="modelInfo" title="Model info">ⓘ</button>
 </div>
+
+<div class="top-actions">
+
+<button class="icon-btn" id="newTop" title="New chat">
+＋
+</button>
+
+</div>
+
 </header>
 
 <section class="chat" id="chat">
+
 <div class="messages" id="messages"></div>
+
 </section>
 
-<div class="composerWrap">
+<div class="composer-wrap">
+
 <div class="composer">
 
-<div class="chips" id="chips"></div>
+<div class="attachments" id="attachments"></div>
 
-<div class="row">
+<div class="compose-row">
+
+<button class="attach" id="attach" title="Attach files">
+＋
+</button>
+
+<input
+id="file"
+type="file"
+hidden
+multiple
+accept="image/*,.pdf,.txt,.md,.json,.csv,.doc,.docx"
+>
+
 <textarea
 class="prompt"
 id="prompt"
@@ -122,835 +699,933 @@ rows="1"
 placeholder="Message AetherAI…"
 ></textarea>
 
-<button class="send" id="send">Send</button>
-</div>
-
-<div class="foot">
-
-<button class="icon" id="fileBtn" title="Attach image or text file">＋</button>
-
-<input
-id="files"
-type="file"
-multiple
-hidden
-accept="image/png,image/jpeg,image/webp,image/gif,.txt,.md,.json,.csv,.js,.html,.css,.py,.java,.cpp,.c,.ts">
-
-<span class="small" id="status">Ready</span>
-
-<span class="grow"></span>
-
-<span class="small" id="usage"></span>
+<button class="send" id="send">
+↑
+</button>
 
 </div>
+
 </div>
+
+<div class="hint">
+AetherAI can make mistakes. Check important information.
+</div>
+
 </div>
 
 </main>
 </div>
 
-<div class="modalBack" id="back">
-<div class="modal">
+<div class="modal" id="memoryModal">
 
-<div class="modalHead">
-<h3 id="modalTitle">Model</h3>
-<button class="icon" id="close">×</button>
+<div class="card">
+
+<button class="close" id="closeMemory">
+×
+</button>
+
+<h2>Memory</h2>
+
+<p>
+Memories are stored locally on this device.
+AetherAI can use them in future chats.
+</p>
+
+<div class="memory-list" id="memoryList"></div>
+
+<button class="side-btn danger" id="clearMemory">
+Clear all memories
+</button>
+
 </div>
 
-<div id="modalBody"></div>
-
-</div>
 </div>
 
 <script>
 
-const $=id=>document.getElementById(id);
-
-const state={
-  models:[],
-  messages:[],
-  history:JSON.parse(localStorage.getItem("aether_history")||"[]"),
-  files:[],
-  controller:null
+const state = {
+  chats: JSON.parse(localStorage.getItem('aether_chats') || '[]'),
+  current: null,
+  attachments: [],
+  memories: JSON.parse(localStorage.getItem('aether_memories') || '[]'),
+  models: [],
+  busy: false
 };
 
-const bt=String.fromCharCode(96);
+const $ = id => document.getElementById(id);
+
+function save(){
+  localStorage.setItem(
+    'aether_chats',
+    JSON.stringify(state.chats)
+  );
+
+  localStorage.setItem(
+    'aether_memories',
+    JSON.stringify(state.memories)
+  );
+}
+
+function uid(){
+  return Date.now().toString(36) +
+    Math.random().toString(36).slice(2,8);
+}
 
 function esc(s){
-  return String(s??"")
-    .replace(/&/g,"&amp;")
-    .replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;")
-    .replace(/"/g,"&quot;")
-    .replace(/'/g,"&#39;");
+  return String(s).replace(
+    /[&<>"']/g,
+    c => ({
+      '&':'&amp;',
+      '<':'&lt;',
+      '>':'&gt;',
+      '"':'&quot;',
+      "'":'&#39;'
+    }[c])
+  );
 }
 
 function md(s){
 
-  let v=esc(s);
+  let x = esc(s);
 
-  const blocks=[];
-
-  const fence=new RegExp(
-    bt+bt+bt+"([\\s\\S]*?)"+bt+bt+bt,
-    "g"
+  x = x.replace(
+    /\x60{3}([\s\S]*?)\x60{3}/g,
+    '<pre><code>$1</code></pre>'
   );
 
-  const inline=new RegExp(
-    bt+"([^"+bt+"]+)"+bt,
-    "g"
+  x = x.replace(
+    /\*\*(.*?)\*\*/g,
+    '<strong>$1</strong>'
   );
 
-  v=v.replace(
-    fence,
-    (m,c)=>{
-      const i=blocks.push(
-        "<pre><code>"+c+"</code></pre>"
-      )-1;
-
-      return "__BLOCK_"+i+"__";
-    }
+  x = x.replace(
+    /\x60([^\x60]+)\x60/g,
+    '<code>$1</code>'
   );
 
-  v=v.replace(
-    new RegExp("\\*\\*(.+?)\\*\\*","g"),
-    "<strong>$1</strong>"
+  x = x.replace(
+    /\n/g,
+    '<br>'
   );
 
-  v=v.replace(
-    new RegExp("\\*(.+?)\\*","g"),
-    "<em>$1</em>"
-  );
-
-  v=v.replace(
-    inline,
-    "<code>$1</code>"
-  );
-
-  v=v.replace(
-    new RegExp(
-      "\\[([^\\]]+)\\]\\((https?:\\/\\/[^\\s)]+)\\)",
-      "g"
-    ),
-    "<a href=\"$2\" target=\"_blank\" rel=\"noopener noreferrer\">$1</a>"
-  );
-
-  v=v.replace(
-    new RegExp("(^|\\n)### (.+)","g"),
-    "$1<h3>$2</h3>"
-  );
-
-  v=v.replace(
-    new RegExp("(^|\\n)## (.+)","g"),
-    "$1<h2>$2</h2>"
-  );
-
-  v=v.replace(
-    new RegExp("(^|\\n)# (.+)","g"),
-    "$1<h1>$2</h1>"
-  );
-
-  v=v.replace(
-    new RegExp("\\n{2,}","g"),
-    "</p><p>"
-  );
-
-  v=v.replace(
-    new RegExp("\\n","g"),
-    "<br>"
-  );
-
-  v="<p>"+v+"</p>";
-
-  v=v.replace(
-    new RegExp("<p>(<h[1-3]>)","g"),
-    "$1"
-  );
-
-  v=v.replace(
-    new RegExp("(<\\/h[1-3]>)<\\/p>","g"),
-    "$1"
-  );
-
-  v=v.replace(
-    new RegExp("<p>(<pre>)","g"),
-    "$1"
-  );
-
-  v=v.replace(
-    new RegExp("(<\\/pre>)<\\/p>","g"),
-    "$1"
-  );
-
-  blocks.forEach(
-    (x,i)=>{
-      v=v.replace("__BLOCK_"+i+"__",x);
-    }
-  );
-
-  return v;
+  return x;
 }
 
-function save(){
-  localStorage.setItem(
-    "aether_history",
-    JSON.stringify(
-      state.history.slice(-40)
+function renderHistory(filter = ''){
+
+  const h = $('history');
+
+  h.innerHTML = '';
+
+  state.chats
+    .filter(c =>
+      !filter ||
+      c.title.toLowerCase().includes(filter.toLowerCase())
     )
-  );
-}
-
-function renderHistory(){
-
-  $("history").innerHTML="";
-
-  state.history
     .slice()
     .reverse()
-    .forEach((h,i)=>{
+    .forEach(c => {
 
-      const d=document.createElement("div");
+      const d = document.createElement('div');
 
-      d.className="item";
+      d.className =
+        'history-item ' +
+        (c.id === state.current ? 'active' : '');
 
-      d.textContent=h.title||"New chat";
+      d.innerHTML =
+        '<span>💬</span>' +
+        '<span class="history-title"></span>' +
+        '<button class="more">⋯</button>';
 
-      d.onclick=()=>{
-        state.messages=h.messages||[];
-        render();
-        $("side").classList.remove("open");
+      d.querySelector('.history-title').textContent =
+        c.title || 'New chat';
+
+      d.onclick = e => {
+
+        if(e.target.classList.contains('more')){
+
+          if(confirm('Delete this chat?')){
+
+            state.chats =
+              state.chats.filter(
+                x => x.id !== c.id
+              );
+
+            if(state.current === c.id){
+              state.current = null;
+            }
+
+            save();
+            renderHistory();
+            renderCurrent();
+          }
+
+        }else{
+
+          state.current = c.id;
+
+          renderHistory();
+          renderCurrent();
+          closeDrawer();
+        }
+
       };
 
-      $("history").appendChild(d);
-
+      h.appendChild(d);
     });
 }
 
-function render(){
+function current(){
+  return state.chats.find(
+    c => c.id === state.current
+  );
+}
 
-  const box=$("messages");
+function renderCurrent(){
 
-  box.innerHTML="";
+  const box = $('messages');
 
-  if(!state.messages.length){
+  box.innerHTML = '';
 
-    box.innerHTML=
-      '<div style="text-align:center;padding-top:18vh;color:#8d98a9">'+
-      '<h1 style="color:#edf1f7">How can I help?</h1>'+
-      '<div>Ask anything, attach a file, or use Council.</div>'+
+  const c = current();
+
+  if(!c){
+
+    box.innerHTML =
+      '<div class="welcome">' +
+      '<div>' +
+      '<h1>How can I help you?</h1>' +
+      '<p>Ask anything, upload an image or attach a file.</p>' +
+      '</div>' +
       '</div>';
 
     return;
   }
 
-  for(const m of state.messages){
+  c.messages.forEach(
+    m => addMessage(
+      m.role,
+      m.content,
+      false
+    )
+  );
 
-    const e=document.createElement("div");
-
-    e.className="msg";
-
-    let sources="";
-
-    if(m.sources?.length){
-
-      sources=
-        '<div class="sources">'+
-        m.sources.map(s=>
-          '<a class="source" target="_blank" rel="noopener" href="'+
-          esc(s.url||s.link||"#")+
-          '">'+
-          esc(s.title||s.name||s.url||"Source")+
-          '</a>'
-        ).join("")+
-        "</div>";
-    }
-
-    e.innerHTML=
-      '<div class="ava">'+
-      (m.role==="user"?"U":"A")+
-      '</div>'+
-      '<div class="bubble">'+
-      md(m.content||"")+
-      sources+
-      '</div>';
-
-    box.appendChild(e);
-  }
-
-  $("chat").scrollTop=$("chat").scrollHeight;
+  $('chat').scrollTop =
+    $('chat').scrollHeight;
 }
 
-function reset(){
+function addMessage(role,text,actions=true){
 
-  if(state.messages.length){
+  const d =
+    document.createElement('div');
 
-    state.history.push({
-      title:
-        (
-          state.messages.find(
-            x=>x.role==="user"
-          )?.content||
-          "New chat"
-        ).slice(0,70),
+  d.className =
+    'msg ' + role;
 
-      messages:state.messages
-    });
+  d.innerHTML =
+    '<div class="avatar">' +
+    (role === 'user' ? 'U' : 'A') +
+    '</div>' +
 
-    save();
-  }
+    '<div class="bubble">' +
 
-  state.messages=[];
-  state.files=[];
+    '<div class="content">' +
+    md(text) +
+    '</div>' +
 
-  renderFiles();
-  render();
+    (
+      actions
+      ?
+      '<div class="message-actions">' +
+      '<button class="mini copy">Copy</button>' +
+      (
+        role === 'assistant'
+        ?
+        '<button class="mini regen">Regenerate</button>'
+        :
+        ''
+      ) +
+      '</div>'
+      :
+      ''
+    ) +
+
+    '</div>';
+
+  d.querySelector('.copy')?.addEventListener(
+    'click',
+    () => navigator.clipboard?.writeText(text)
+  );
+
+  d.querySelector('.regen')?.addEventListener(
+    'click',
+    () => regenerate()
+  );
+
+  $('messages').appendChild(d);
+
+  return d;
 }
 
-function renderFiles(){
+function newChat(){
 
-  $("chips").innerHTML=
-    state.files.map(
-      (f,i)=>
-        '<span class="chip">'+
-        esc(f.name)+
-        ' <button data-i="'+i+'">×</button>'+
-        '</span>'
-    ).join("");
-
-  $("chips")
-    .querySelectorAll("button")
-    .forEach(
-      b=>{
-        b.onclick=()=>{
-          state.files.splice(+b.dataset.i,1);
-          renderFiles();
-        };
-      }
-    );
-}
-
-async function filePart(file){
-
-  if(file.type.startsWith("image/")){
-
-    if(file.size>5*1024*1024){
-      throw new Error(
-        file.name+" is larger than 5 MB"
-      );
-    }
-
-    return await new Promise(
-      (res,rej)=>{
-
-        const r=new FileReader();
-
-        r.onload=()=>{
-          res({
-            type:"image_url",
-            image_url:{
-              url:String(r.result)
-            }
-          });
-        };
-
-        r.onerror=rej;
-
-        r.readAsDataURL(file);
-      }
-    );
-  }
-
-  if(file.size>1024*1024){
-    throw new Error(
-      file.name+" is larger than 1 MB"
-    );
-  }
-
-  return {
-    type:"text",
-    text:
-      "\\n\\n--- FILE: "+
-      file.name+
-      " ---\\n"+
-      (await file.text())
+  const c = {
+    id: uid(),
+    title: 'New chat',
+    messages: [],
+    created: Date.now()
   };
+
+  state.chats.push(c);
+
+  state.current = c.id;
+
+  state.attachments = [];
+
+  renderAttachments();
+
+  save();
+
+  renderHistory();
+
+  renderCurrent();
+
+  closeDrawer();
+
+  $('prompt').focus();
+}
+
+function ensureChat(title){
+
+  if(!current()){
+    newChat();
+  }
+
+  const c = current();
+
+  if(
+    c.title === 'New chat' &&
+    title
+  ){
+    c.title =
+      title.slice(0,50);
+  }
+
+  return c;
+}
+
+function renderAttachments(){
+
+  const a = $('attachments');
+
+  a.innerHTML = '';
+
+  state.attachments.forEach(
+    (f,i) => {
+
+      const d =
+        document.createElement('div');
+
+      d.className = 'chip';
+
+      d.textContent =
+        '📎 ' + f.name + ' ×';
+
+      d.onclick = () => {
+
+        state.attachments.splice(i,1);
+
+        renderAttachments();
+      };
+
+      a.appendChild(d);
+    }
+  );
 }
 
 async function loadModels(){
 
-  const s=$("model");
-
-  s.innerHTML=
-    "<option>Loading models…</option>";
-
   try{
 
-    const r=await fetch(
-      "/api/models",
-      {cache:"no-store"}
-    );
-
-    const d=await r.json();
+    const r =
+      await fetch('/api/models');
 
     if(!r.ok){
+      throw new Error(await r.text());
+    }
 
+    const data =
+      await r.json();
+
+    state.models =
+      data.data || [];
+
+    $('model').innerHTML = '';
+
+    state.models.forEach(m => {
+
+      const o =
+        document.createElement('option');
+
+      o.value = m.id;
+
+      o.textContent =
+        m.name || m.id;
+
+      $('model').appendChild(o);
+
+    });
+
+    if(!state.models.length){
       throw new Error(
-        d.error?.message||
-        d.error||
-        "HTTP "+r.status
+        'No models available'
       );
     }
 
-    state.models=d.data||[];
-
-    s.innerHTML="";
-
-    state.models.forEach(
-      m=>{
-
-        const o=document.createElement("option");
-
-        o.value=m.id;
-
-        o.textContent=
-          (m.name||m.id)+
-          (
-            m.capabilities?.includes("reasoning")
-            ?" · reasoning"
-            :""
-          );
-
-        s.appendChild(o);
-      }
-    );
-
-    if(!state.models.length){
-
-      s.innerHTML=
-        "<option>No models available</option>";
-
-    }else{
-
-      const preferred=[
-        "gpt-5.6-luna",
-        "claude-opus-4.8",
-        "deepseek-v4-flash-0731"
-      ];
-
-      const p=
-        preferred.find(
-          x=>state.models.some(
-            m=>m.id===x
-          )
-        );
-
-      if(p)s.value=p;
-    }
-
-    $("status").textContent=
-      state.models.length+
-      " models available";
-
   }catch(e){
 
-    s.innerHTML=
-      '<option value="">Models failed — retry</option>';
+    $('model').innerHTML =
+      '<option>Models failed — retry</option>';
 
-    $("status").textContent=
-      e.message;
+    console.error(e);
   }
-}
-
-function selected(){
-
-  return state.models.find(
-    m=>m.id===$("model").value
-  );
 }
 
 async function send(){
 
-  const text=$("prompt").value.trim();
-
-  if(!text&&!state.files.length){
+  if(state.busy){
     return;
   }
 
-  if(state.controller){
+  const prompt =
+    $('prompt').value.trim();
 
-    state.controller.abort();
-
+  if(
+    !prompt &&
+    !state.attachments.length
+  ){
     return;
   }
 
-  let content=text;
+  const c =
+    ensureChat(
+      prompt || 'File chat'
+    );
+
+  const files =
+    state.attachments.slice();
+
+  state.attachments = [];
+
+  renderAttachments();
+
+  c.messages.push({
+    role:'user',
+    content:
+      prompt ||
+      'Please analyze the attached file(s).'
+  });
+
+  if(c.title === 'New chat'){
+
+    c.title =
+      (
+        prompt ||
+        files[0]?.name ||
+        'New chat'
+      ).slice(0,50);
+  }
+
+  save();
+
+  renderHistory();
+
+  renderCurrent();
+
+  state.busy = true;
+
+  $('send').disabled = true;
+
+  $('prompt').value = '';
+
+  autoSize();
+
+  const ai =
+    addMessage(
+      'assistant',
+      '',
+      false
+    );
+
+  const content =
+    ai.querySelector('.content');
 
   try{
 
-    for(const f of state.files){
+    let selected =
+      $('model').value;
 
-      const p=await filePart(f);
+    if(
+      files.some(
+        f => f.type.startsWith('image/')
+      )
+    ){
 
-      if(p.type==="text"){
+      const currentModel =
+        state.models.find(
+          m => m.id === selected
+        );
 
-        content+=p.text;
+      if(
+        !currentModel?.capabilities?.vision
+      ){
 
-      }else if(Array.isArray(content)){
+        const vision =
+          state.models.find(
+            m => m.capabilities?.vision
+          );
 
-        content.push(p);
+        if(vision){
 
-      }else{
+          selected =
+            vision.id;
 
-        content=[
-          {
-            type:"text",
-            text:content
-          },
-          p
-        ];
+          $('model').value =
+            vision.id;
+        }
       }
     }
 
-  }catch(e){
+    const payload = {
+      model:selected,
+      messages:buildMessages(
+        c,
+        files
+      ),
+      stream:true
+    };
 
-    $("status").textContent=
-      e.message;
-
-    return;
-  }
-
-  state.messages.push({
-    role:"user",
-    content:text||"[Attached file(s)]"
-  });
-
-  const a={
-    role:"assistant",
-    content:""
-  };
-
-  state.messages.push(a);
-
-  $("prompt").value="";
-
-  state.files=[];
-
-  renderFiles();
-
-  render();
-
-  $("status").textContent=
-    "Thinking…";
-
-  $("send").textContent=
-    "Stop";
-
-  $("send").classList.add("stop");
-
-  state.controller=
-    new AbortController();
-
-  try{
-
-    const apiMessages=
-      state.messages
-      .slice(0,-1)
-      .map(
-        (m,i)=>{
-
-          if(
-            i===
-            state.messages.length-2
-          ){
-
-            return{
-              role:"user",
-              content
-            };
-
-          }
-
-          return{
-            role:m.role,
-            content:m.content
-          };
+    const r =
+      await fetch(
+        '/api/chat',
+        {
+          method:'POST',
+          headers:{
+            'Content-Type':
+              'application/json'
+          },
+          body:
+            JSON.stringify(payload)
         }
       );
 
-    const r=await fetch(
-      "/api/chat",
-      {
-        method:"POST",
-
-        headers:{
-          "content-type":
-            "application/json"
-        },
-
-        body:JSON.stringify({
-          model:$("model").value,
-          messages:apiMessages,
-          stream:true
-        }),
-
-        signal:state.controller.signal
-      }
-    );
-
     if(!r.ok){
 
-      const t=await r.text();
+      const t =
+        await r.text();
 
-      throw new Error(
-        t||
-        ("HTTP "+r.status)
-      );
+      throw new Error(t);
     }
 
-    const reader=
+    const reader =
       r.body.getReader();
 
-    const dec=
+    const decoder =
       new TextDecoder();
 
-    let buf="";
+    let buffer = '';
+    let answer = '';
 
     while(true){
 
-      const q=
+      const q =
         await reader.read();
 
-      if(q.done)break;
+      if(q.done){
+        break;
+      }
 
-      buf+=
-        dec.decode(
+      buffer +=
+        decoder.decode(
           q.value,
           {stream:true}
         );
 
-      const events=
-        buf.split("\n\n");
+      const lines =
+        buffer.split('\n');
 
-      buf=
-        events.pop()||"";
+      buffer =
+        lines.pop();
 
-      for(const ev of events){
+      for(const line of lines){
 
-        let data="";
-
-        for(
-          const line
-          of ev.split("\n")
-        ){
-
-          if(
-            line.startsWith("data:")
-          ){
-
-            data+=
-              line.slice(5).trim();
-          }
-        }
-
-        if(
-          !data||
-          data==="[DONE]"
-        ){
+        if(!line.startsWith('data:')){
           continue;
         }
 
-        let j;
+        const raw =
+          line.slice(5).trim();
+
+        if(raw === '[DONE]'){
+          continue;
+        }
 
         try{
 
-          j=JSON.parse(data);
+          const j =
+            JSON.parse(raw);
 
-        }catch{
+          const delta =
+            j.choices?.[0]?.delta?.content ||
+            '';
 
-          continue;
-        }
+          answer += delta;
 
-        if(j.error){
+          content.innerHTML =
+            md(answer);
 
-          throw new Error(
-            j.error.message||
-            j.error
-          );
-        }
+          $('chat').scrollTop =
+            $('chat').scrollHeight;
 
-        const delta=
-          j.choices?.[0]?.delta?.content;
-
-        if(delta){
-
-          a.content+=delta;
-
-        }
-
-        if(j.usage){
-
-          $("usage").textContent=
-            (
-              j.usage.total_tokens||0
-            )+
-            " tokens";
-        }
-
-        render();
+        }catch{}
       }
     }
 
+    c.messages.push({
+      role:'assistant',
+      content:
+        answer ||
+        'No response received.'
+    });
+
+    save();
+
+    ai.querySelector('.bubble')
+      .insertAdjacentHTML(
+        'beforeend',
+        '<div class="message-actions">' +
+        '<button class="mini copy">Copy</button>' +
+        '<button class="mini regen">Regenerate</button>' +
+        '</div>'
+      );
+
+    ai.querySelector('.copy').onclick =
+      () => navigator.clipboard?.writeText(
+        answer
+      );
+
+    ai.querySelector('.regen').onclick =
+      () => regenerate();
+
+    extractMemory(
+      prompt,
+      answer
+    );
+
   }catch(e){
 
-    if(e.name!=="AbortError"){
+    content.innerHTML =
+      '<p class="danger">Error: ' +
+      esc(e.message) +
+      '</p>';
 
-      a.content=
-        "Error: "+
-        e.message;
-    }
+    c.messages.push({
+      role:'assistant',
+      content:
+        'Error: ' + e.message
+    });
 
-    render();
+    save();
 
   }finally{
 
-    state.controller=null;
+    state.busy = false;
 
-    $("send").textContent=
-      "Send";
+    $('send').disabled = false;
 
-    $("send").classList.remove(
-      "stop"
-    );
-
-    $("status").textContent=
-      "Ready";
+    $('prompt').focus();
   }
 }
 
-async function council(){
+function buildMessages(c,files){
 
-  const prompt=
-    $("prompt").value.trim();
+  const msgs =
+    [...c.messages];
 
-  if(!prompt)return;
+  const last =
+    msgs.pop();
 
-  $("prompt").value="";
+  const out =
+    msgs.map(
+      m => ({
+        role:m.role,
+        content:m.content
+      })
+    );
 
-  const candidates=
-    state.models
-      .filter(
-        m=>m.type==="chat"
-      )
-      .slice(0,3);
+  let userContent = [];
 
-  if(!candidates.length){
+  if(last?.content){
 
-    $("status").textContent=
-      "No chat models available";
+    userContent.push({
+      type:'text',
+      text:last.content
+    });
+  }
 
+  for(const f of files){
+
+    if(
+      f.type.startsWith('image/')
+    ){
+
+      userContent.push({
+        type:'image_url',
+        image_url:{
+          url:f.data
+        }
+      });
+
+    }else{
+
+      userContent.push({
+        type:'text',
+        text:
+          'Attached file: ' +
+          f.name +
+          '\n' +
+          (f.text || '')
+      });
+    }
+  }
+
+  if(userContent.length){
+
+    out.push({
+      role:'user',
+      content:userContent
+    });
+  }
+
+  if(state.memories.length){
+
+    out.unshift({
+      role:'system',
+      content:
+        'Use these remembered facts only when relevant. ' +
+        state.memories.join('; ')
+    });
+  }
+
+  return out;
+}
+
+async function prepareFile(file){
+
+  return new Promise(resolve => {
+
+    const fr =
+      new FileReader();
+
+    fr.onload = () => {
+
+      const data =
+        String(fr.result);
+
+      if(
+        file.type.startsWith('image/')
+      ){
+
+        resolve({
+          name:file.name,
+          type:file.type,
+          data
+        });
+
+      }else{
+
+        resolve({
+          name:file.name,
+          type:file.type,
+          text:data.slice(0,120000)
+        });
+      }
+    };
+
+    if(
+      file.type.startsWith('image/')
+    ){
+
+      fr.readAsDataURL(file);
+
+    }else{
+
+      fr.readAsText(file);
+    }
+  });
+}
+
+async function regenerate(){
+
+  const c =
+    current();
+
+  if(
+    !c ||
+    state.busy ||
+    c.messages.length < 2
+  ){
     return;
   }
 
-  state.messages.push({
-    role:"user",
-    content:prompt
-  });
+  c.messages.pop();
 
-  const a={
-    role:"assistant",
-    content:"Running Council…"
-  };
+  const last =
+    c.messages.pop();
 
-  state.messages.push(a);
+  $('prompt').value =
+    last.content;
 
-  render();
+  save();
 
-  try{
+  renderCurrent();
 
-    const r=
-      await fetch(
-        "/api/council",
-        {
-          method:"POST",
+  await send();
+}
 
-          headers:{
-            "content-type":
-              "application/json"
-          },
+function extractMemory(prompt,answer){
 
-          body:JSON.stringify({
-            prompt,
-            models:
-              candidates.map(
-                x=>x.id
-              )
-          })
-        }
-      );
+  const p =
+    prompt.toLowerCase();
 
-    const d=
-      await r.json();
+  if(
+    /remember|my name is|i am|i'm|i like|i prefer/.test(p)
+  ){
 
-    if(!r.ok){
+    const item =
+      prompt.slice(0,220);
 
-      throw new Error(
-        d.error?.message||
-        d.error||
-        "Council failed"
-      );
+    if(
+      item &&
+      !state.memories.includes(item)
+    ){
+
+      state.memories.push(item);
+
+      state.memories =
+        state.memories.slice(-30);
+
+      save();
     }
-
-    a.content=
-      d.answer||
-      "No council answer.";
-
-    render();
-
-  }catch(e){
-
-    a.content=
-      "Council error: "+
-      e.message;
-
-    render();
   }
 }
 
-$("send").onclick=
-  send;
+function openMemory(){
 
-$("council").onclick=
-  council;
+  const list =
+    $('memoryList');
 
-$("newBtn").onclick=
-  reset;
+  list.innerHTML =
+    state.memories.length
 
-$("menu").onclick=
-  ()=>$("side").classList.toggle(
-    "open"
-  );
+    ?
 
-$("fileBtn").onclick=
-  ()=>$("files").click();
-
-$("files").onchange=
-  ()=>{
-    state.files.push(
-      ...Array.from(
-        $("files").files
+    state.memories
+      .map(
+        (m,i) =>
+          '<div class="memory-row">' +
+          '<span>' +
+          esc(m) +
+          '</span>' +
+          '<button class="mini" onclick="removeMemory(' +
+          i +
+          ')">Delete</button>' +
+          '</div>'
       )
+      .join('')
+
+    :
+
+    '<p>No memories yet.</p>';
+
+  $('memoryModal')
+    .classList.add('open');
+}
+
+window.removeMemory =
+  i => {
+
+    state.memories.splice(
+      i,
+      1
     );
 
-    $("files").value="";
+    save();
 
-    renderFiles();
+    openMemory();
   };
 
-$("prompt").addEventListener(
-  "keydown",
-  e=>{
+function closeDrawer(){
+
+  $('sidebar')
+    .classList.remove('open');
+
+  $('backdrop')
+    .classList.remove('open');
+}
+
+function autoSize(){
+
+  const x =
+    $('prompt');
+
+  x.style.height =
+    'auto';
+
+  x.style.height =
+    Math.min(
+      x.scrollHeight,
+      180
+    ) + 'px';
+}
+
+$('newChat').onclick =
+  newChat;
+
+$('newTop').onclick =
+  newChat;
+
+$('send').onclick =
+  send;
+
+$('attach').onclick =
+  () => $('file').click();
+
+$('file').onchange =
+  async e => {
+
+    state.attachments =
+      await Promise.all(
+        [...e.target.files]
+          .map(prepareFile)
+      );
+
+    renderAttachments();
+
+    e.target.value = '';
+  };
+
+$('prompt').addEventListener(
+  'input',
+  autoSize
+);
+
+$('prompt').addEventListener(
+  'keydown',
+  e => {
+
     if(
-      e.key==="Enter"&&
+      e.key === 'Enter' &&
       !e.shiftKey
     ){
 
@@ -961,619 +1636,355 @@ $("prompt").addEventListener(
   }
 );
 
-$("prompt").addEventListener(
-  "input",
-  e=>{
-
-    e.target.style.height=
-      "auto";
-
-    e.target.style.height=
-      Math.min(
-        e.target.scrollHeight,
-        190
-      )+
-      "px";
-  }
-);
-
-$("modelInfo").onclick=
-  ()=>{
-
-    const m=selected();
-
-    $("modalTitle").textContent=
-      m?.name||
-      m?.id||
-      "Model";
-
-    $("modalBody").innerHTML=
-      m?
-
-      '<p>'+
-      esc(
-        m.description||""
-      )+
-      '</p>'+
-
-      '<p>Context: '+
-      esc(
-        m.context_window||"?"
-      )+
-      '</p>'+
-
-      '<div>'+
-      (
-        (m.capabilities||[])
-        .map(
-          x=>
-            '<span class="tag">'+
-            esc(x)+
-            '</span>'
-        )
-        .join("")
-      )+
-      '</div>'+
-
-      '<p class="small">'+
-      'Input /1K: '+
-      esc(
-        m.pricing?.input_per_1k??"?"
-      )+
-      ' · Output /1K: '+
-      esc(
-        m.pricing?.output_per_1k??"?"
-      )+
-      '</p>'
-
-      :
-
-      "No model selected";
-
-    $("back").classList.add(
-      "show"
+$('search').oninput =
+  e =>
+    renderHistory(
+      e.target.value
     );
+
+$('menu').onclick =
+  () => {
+
+    $('sidebar')
+      .classList.add('open');
+
+    $('backdrop')
+      .classList.add('open');
   };
 
-$("close").onclick=
-  ()=>$("back").classList.remove(
-    "show"
-  );
+$('backdrop').onclick =
+  closeDrawer;
+
+$('memoryBtn').onclick =
+  openMemory;
+
+$('closeMemory').onclick =
+  () =>
+    $('memoryModal')
+      .classList.remove('open');
+
+$('clearMemory').onclick =
+  () => {
+
+    if(
+      confirm(
+        'Clear all memories?'
+      )
+    ){
+
+      state.memories = [];
+
+      save();
+
+      openMemory();
+    }
+  };
+
+$('clearBtn').onclick =
+  () => {
+
+    if(
+      confirm(
+        'Delete all local chats and memories?'
+      )
+    ){
+
+      localStorage.removeItem(
+        'aether_chats'
+      );
+
+      localStorage.removeItem(
+        'aether_memories'
+      );
+
+      location.reload();
+    }
+  };
 
 renderHistory();
 
-render();
+renderCurrent();
 
 loadModels();
 
+if(
+  'serviceWorker' in navigator
+){
+
+  navigator.serviceWorker
+    .register('/sw.js')
+    .catch(() => {});
+}
+
 </script>
+
 </body>
 </html>`;
 
-const BASE =
-  "https://www.codecraftapi.com/v1";
-
-const JSON_HEADERS={
-  "content-type":
-    "application/json; charset=utf-8",
-
-  "access-control-allow-origin":
-    "*",
-
-  "access-control-allow-headers":
-    "Content-Type, Authorization",
-
-  "access-control-allow-methods":
-    "GET,POST,OPTIONS"
-};
-
-function json(data,status=200){
-
-  return new Response(
-    JSON.stringify(data),
-    {
-      status,
-      headers:JSON_HEADERS
-    }
-  );
-}
-
-function auth(env){
-
-  return env.CODECRAFT_API_KEY||"";
-}
-
-async function cc(
-  env,
-  path,
-  opts={}
-){
-
-  const h=
-    new Headers(
-      opts.headers||{}
-    );
-
-  h.set(
-    "Authorization",
-    "Bearer "+auth(env)
-  );
-
-  if(
-    opts.body&&
-    !h.has("content-type")
-  ){
-
-    h.set(
-      "content-type",
-      "application/json"
-    );
-  }
-
-  return fetch(
-    BASE+path,
-    {
-      ...opts,
-      headers:h
-    }
-  );
-}
-
-async function models(env){
-
-  const r=
-    await cc(
-      env,
-      "/models",
+const MANIFEST = JSON.stringify(
+  {
+    name:'AetherAI',
+    short_name:'AetherAI',
+    start_url:'/',
+    display:'standalone',
+    background_color:'#212121',
+    theme_color:'#212121',
+    orientation:'portrait',
+    icons:[
       {
-        method:"GET"
+        src:'/icon.svg',
+        sizes:'any',
+        type:'image/svg+xml',
+        purpose:'any maskable'
       }
-    );
-
-  const t=
-    await r.text();
-
-  let d;
-
-  try{
-
-    d=JSON.parse(t);
-
-  }catch{
-
-    d={
-      error:t
-    };
-  }
-
-  return{
-    r,
-    d
-  };
-}
-
-async function chat(
-  env,
-  body
-){
-
-  if(!auth(env)){
-
-    return json(
-      {
-        error:
-          "CODECRAFT_API_KEY is not configured."
-      },
-      500
-    );
-  }
-
-  if(
-    !body?.model||
-    !Array.isArray(
-      body.messages
-    )
-  ){
-
-    return json(
-      {
-        error:
-          "model and messages are required"
-      },
-      400
-    );
-  }
-
-  const payload={
-    model:
-      body.model,
-
-    messages:
-      body.messages,
-
-    stream:true,
-
-    max_tokens:
-      body.max_tokens||8192
-  };
-
-  for(
-    const k of [
-      "temperature",
-      "top_p",
-      "tools",
-      "tool_choice",
-      "response_format",
-      "stop",
-      "frequency_penalty",
-      "presence_penalty",
-      "seed"
     ]
-  ){
+  },
+  null,
+  2
+);
+
+const SW = `
+const CACHE='aetherai-v1';
+
+self.addEventListener(
+  'install',
+  e => self.skipWaiting()
+);
+
+self.addEventListener(
+  'activate',
+  e => e.waitUntil(
+    self.clients.claim()
+  )
+);
+
+self.addEventListener(
+  'fetch',
+  e => {
+
+    if(e.request.method !== 'GET'){
+      return;
+    }
+
+    e.respondWith(
+      fetch(e.request)
+        .catch(
+          () => caches.match(e.request)
+        )
+    );
+  }
+);
+`;
+
+const ICON = `
+<svg
+ xmlns="http://www.w3.org/2000/svg"
+ viewBox="0 0 128 128"
+>
+<rect
+ width="128"
+ height="128"
+ rx="30"
+ fill="#fff"
+/>
+
+<path
+ d="M64 24c-23 0-41 15-41 34 0 11 6 21 16 27l-5 18 18-10c4 1 8 2 12 2 23 0 41-15 41-34S87 24 64 24Z"
+ fill="#111"
+/>
+
+<path
+ d="M47 59h34M47 72h22"
+ stroke="#fff"
+ stroke-width="7"
+ stroke-linecap="round"
+/>
+</svg>
+`;
+
+export default {
+
+  async fetch(request, env){
 
     if(
-      body[k]!==undefined
-    ){
-
-      payload[k]=
-        body[k];
-    }
-  }
-
-  const r=
-    await cc(
-      env,
-      "/chat/completions",
-      {
-        method:"POST",
-
-        body:
-          JSON.stringify(
-            payload
-          )
-      }
-    );
-
-  if(!r.ok){
-
-    return new Response(
-      await r.text(),
-      {
-        status:r.status,
-        headers:
-          JSON_HEADERS
-      }
-    );
-  }
-
-  return new Response(
-    r.body,
-    {
-      status:200,
-
-      headers:{
-        "content-type":
-          "text/event-stream; charset=utf-8",
-
-        "cache-control":
-          "no-cache, no-transform",
-
-        "connection":
-          "keep-alive",
-
-        "x-accel-buffering":
-          "no",
-
-        "access-control-allow-origin":
-          "*"
-      }
-    }
-  );
-}
-
-async function council(
-  env,
-  body
-){
-
-  const prompt=
-    String(
-      body?.prompt||""
-    ).trim();
-
-  const ids=
-    Array.isArray(
-      body?.models
-    )
-      ?
-        body.models.slice(0,3)
-      :
-        [];
-
-  if(
-    !prompt||
-    !ids.length
-  ){
-
-    return json(
-      {
-        error:
-          "prompt and models are required"
-      },
-      400
-    );
-  }
-
-  const answers=[];
-
-  for(
-    const model of ids
-  ){
-
-    const r=
-      await cc(
-        env,
-        "/chat/completions",
-        {
-          method:"POST",
-
-          body:
-            JSON.stringify({
-              model,
-
-              messages:[
-                {
-                  role:"system",
-
-                  content:
-                    "You are one independent member of an AI council. Give a useful answer and state uncertainty when appropriate."
-                },
-
-                {
-                  role:"user",
-                  content:prompt
-                }
-              ],
-
-              stream:false,
-
-              max_tokens:4096
-            })
-        }
-      );
-
-    if(r.ok){
-
-      const d=
-        await r.json();
-
-      answers.push({
-        model,
-
-        answer:
-          d.choices?.[0]?.message?.content||
-          ""
-      });
-    }
-  }
-
-  if(!answers.length){
-
-    return json(
-      {
-        error:
-          "No council model returned a successful answer."
-      },
-      502
-    );
-  }
-
-  const synthModel=
-    answers[0].model;
-
-  const r=
-    await cc(
-      env,
-      "/chat/completions",
-      {
-        method:"POST",
-
-        body:
-          JSON.stringify({
-
-            model:
-              synthModel,
-
-            messages:[
-              {
-                role:"system",
-
-                content:
-                  "Synthesize the independent council answers into one clear, accurate response. Do not blindly agree; resolve contradictions using evidence in the answers."
-              },
-
-              {
-                role:"user",
-
-                content:
-                  JSON.stringify({
-                    question:prompt,
-                    answers
-                  })
-              }
-            ],
-
-            stream:false,
-
-            max_tokens:8192
-          })
-      }
-    );
-
-  if(!r.ok){
-
-    return json({
-      answer:
-        answers
-          .map(
-            x=>
-              "## "+
-              x.model+
-              "\n"+
-              x.answer
-          )
-          .join(
-            "\n\n---\n\n"
-          ),
-
-      answers
-    });
-  }
-
-  const d=
-    await r.json();
-
-  return json({
-    answer:
-      d.choices?.[0]?.message?.content||
-      "",
-
-    answers
-  });
-}
-
-export default{
-
-  async fetch(
-    request,
-    env
-  ){
-
-    const u=
-      new URL(
-        request.url
-      );
-
-    if(
-      request.method===
-      "OPTIONS"
+      request.method === 'OPTIONS'
     ){
 
       return new Response(
         null,
         {
-          status:204,
-          headers:
-            JSON_HEADERS
+          headers:corsHeaders()
         }
       );
     }
 
-    try{
+    const url =
+      new URL(request.url);
 
-      if(
-        u.pathname===
-          "/"||
-        u.pathname===
-          "/index.html"
-      ){
+    if(
+      url.pathname === '/manifest.json'
+    ){
 
-        return new Response(
-          HTML,
-          {
-            headers:{
-              "content-type":
-                "text/html; charset=utf-8",
-
-              "cache-control":
-                "no-store"
-            }
+      return new Response(
+        MANIFEST,
+        {
+          headers:{
+            'Content-Type':
+              'application/manifest+json',
+            ...corsHeaders()
           }
-        );
-      }
-
-      if(
-        u.pathname===
-        "/api/health"
-      ){
-
-        return json({
-          ok:true,
-
-          provider:
-            "CodeCraft API",
-
-          has_key:
-            !!auth(env),
-
-          base:
-            BASE
-        });
-      }
-
-      if(
-        u.pathname===
-          "/api/models"&&
-        request.method===
-          "GET"
-      ){
-
-        const {
-          r,
-          d
-        }=
-          await models(env);
-
-        return json(
-          d,
-          r.status
-        );
-      }
-
-      if(
-        u.pathname===
-          "/api/chat"&&
-        request.method===
-          "POST"
-      ){
-
-        return chat(
-          env,
-          await request.json()
-        );
-      }
-
-      if(
-        u.pathname===
-          "/api/council"&&
-        request.method===
-          "POST"
-      ){
-
-        return council(
-          env,
-          await request.json()
-        );
-      }
-
-      return json(
-        {
-          error:
-            "Not found"
-        },
-        404
-      );
-
-    }catch(e){
-
-      return json(
-        {
-          error:
-            e?.message||
-            String(e)
-        },
-        500
+        }
       );
     }
+
+    if(
+      url.pathname === '/sw.js'
+    ){
+
+      return new Response(
+        SW,
+        {
+          headers:{
+            'Content-Type':
+              'application/javascript; charset=utf-8',
+            ...corsHeaders()
+          }
+        }
+      );
+    }
+
+    if(
+      url.pathname === '/icon.svg'
+    ){
+
+      return new Response(
+        ICON,
+        {
+          headers:{
+            'Content-Type':
+              'image/svg+xml',
+            ...corsHeaders()
+          }
+        }
+      );
+    }
+
+    if(
+      url.pathname === '/api/health'
+    ){
+
+      return json({
+        ok:true,
+        provider:'CodeCraft',
+        has_key:!!apiKey(env)
+      });
+    }
+
+    if(
+      url.pathname === '/api/models'
+    ){
+
+      if(!apiKey(env)){
+
+        return json(
+          {
+            error:{
+              message:
+                'CODECRAFT_API_KEY is not configured'
+            }
+          },
+          500
+        );
+      }
+
+      const r =
+        await ccFetch(
+          env,
+          '/models'
+        );
+
+      const {data} =
+        await bodyJson(r);
+
+      return json(
+        data,
+        r.status
+      );
+    }
+
+    if(
+      url.pathname === '/api/chat' &&
+      request.method === 'POST'
+    ){
+
+      if(!apiKey(env)){
+
+        return json(
+          {
+            error:{
+              message:
+                'CODECRAFT_API_KEY is not configured'
+            }
+          },
+          500
+        );
+      }
+
+      let body;
+
+      try{
+
+        body =
+          await request.json();
+
+      }catch{
+
+        return json(
+          {
+            error:{
+              message:'Invalid JSON'
+            }
+          },
+          400
+        );
+      }
+
+      const r =
+        await ccFetch(
+          env,
+          '/chat/completions',
+          {
+            method:'POST',
+            body:
+              JSON.stringify(body)
+          }
+        );
+
+      return new Response(
+        r.body,
+        {
+          status:r.status,
+          headers:{
+            'Content-Type':
+              r.headers.get(
+                'Content-Type'
+              ) ||
+              'application/json',
+            ...corsHeaders()
+          }
+        }
+      );
+    }
+
+    return new Response(
+      HTML,
+      {
+        headers:{
+          'Content-Type':
+            'text/html; charset=utf-8',
+          ...corsHeaders()
+        }
+      }
+    );
   }
 };
