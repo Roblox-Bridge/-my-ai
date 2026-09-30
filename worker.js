@@ -1,2004 +1,840 @@
-const CODECRAFT_BASE = "https://codecraftapi.com/v1";
-const IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
+const BASE = 'https://www.codecraftapi.com/v1';
 
-const MODEL_TIMEOUT = 12000;
-const CHAT_TIMEOUT = 120000;
-const SEARCH_TIMEOUT = 7000;
-const RESEARCH_TOTAL_TIMEOUT = 12000;
+function corsHeaders(extra = {}) {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    ...extra
+  };
+}
 
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-
-    if (request.method === "OPTIONS") {
-      return cors(new Response(null, { status: 204 }));
+function json(data, status = 200, extra = {}) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      ...corsHeaders(extra)
     }
+  });
+}
 
-    try {
-      if (url.pathname === "/" && request.method === "GET") {
-        return html(appHTML());
-      }
+function apiKey(env) {
+  return String(env.CODECRAFT_API_KEY || '').trim();
+}
 
-      if (url.pathname === "/manifest.json" && request.method === "GET") {
-        return json(manifest());
-      }
+async function ccFetch(env, path, options = {}) {
+  const headers = new Headers(options.headers || {});
+  headers.set('Authorization', `Bearer ${apiKey(env)}`);
+  headers.set('Content-Type', 'application/json');
 
-      if (url.pathname === "/sw.js" && request.method === "GET") {
-        return javascript(serviceWorker());
-      }
-
-      if (url.pathname === "/icon.svg" && request.method === "GET") {
-        return svg(iconSvg());
-      }
-
-      if (url.pathname === "/api/health" && request.method === "GET") {
-        return await handleHealth(env);
-      }
-
-      if (url.pathname === "/api/models" && request.method === "GET") {
-        return await handleModels(env);
-      }
-
-      if (url.pathname === "/api/chat" && request.method === "POST") {
-        return await handleChat(request, env);
-      }
-
-      if (url.pathname === "/api/image" && request.method === "POST") {
-        return await handleImage(request, env);
-      }
-
-      return json(
-        {
-          ok: false,
-          error: "Not found"
-        },
-        404
-      );
-    } catch (error) {
-      console.error(error);
-
-      return json(
-        {
-          ok: false,
-          error: cleanError(error)
-        },
-        500
-      );
-    }
-  }
-};
-
-/* =========================================================
-   BASIC RESPONSE HELPERS
-========================================================= */
-
-function cors(response) {
-  const headers = new Headers(response.headers);
-
-  headers.set("Access-Control-Allow-Origin", "*");
-  headers.set(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-Requested-With"
-  );
-  headers.set(
-    "Access-Control-Allow-Methods",
-    "GET, POST, OPTIONS"
-  );
-  headers.set("Access-Control-Max-Age", "86400");
-
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
+  return fetch(BASE + path, {
+    ...options,
     headers
   });
 }
 
-function json(data, status = 200, extraHeaders = {}) {
-  const headers = new Headers({
-    "Content-Type": "application/json; charset=utf-8",
-    "Cache-Control": "no-store",
-    ...extraHeaders
-  });
+async function bodyJson(resp) {
+  const text = await resp.text();
 
-  return cors(
-    new Response(JSON.stringify(data), {
-      status,
-      headers
-    })
-  );
-}
-
-function html(body, status = 200) {
-  return cors(
-    new Response(body, {
-      status,
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "no-store",
-        "X-Content-Type-Options": "nosniff"
-      }
-    })
-  );
-}
-
-function javascript(body) {
-  return cors(
-    new Response(body, {
-      headers: {
-        "Content-Type": "application/javascript; charset=utf-8",
-        "Cache-Control": "no-cache"
-      }
-    })
-  );
-}
-
-function svg(body) {
-  return cors(
-    new Response(body, {
-      headers: {
-        "Content-Type": "image/svg+xml",
-        "Cache-Control": "public, max-age=86400"
-      }
-    })
-  );
-}
-
-function cleanError(error) {
-  if (!error) return "Unknown error";
-
-  if (error.name === "AbortError") {
-    return "Request timed out. Please try again.";
-  }
-
-  return String(error.message || error)
-    .replace(/CODECRAFT_API_KEY/gi, "API_KEY")
-    .slice(0, 800);
-}
-
-/* =========================================================
-   API KEY
-========================================================= */
-
-function getApiKey(env) {
-  return (
-    env.CODECRAFT_API_KEY ||
-    env.XKIRO_API_KEY ||
-    ""
-  ).trim();
-}
-
-/* =========================================================
-   FETCH WITH TIMEOUT
-========================================================= */
-
-async function fetchTimeout(url, options = {}, timeoutMs = 12000) {
-  const controller = new AbortController();
-
-  const timer = setTimeout(() => {
-    controller.abort();
-  }, timeoutMs);
-
-  try {
-    return await fetch(url, {
-      ...options,
-      signal: controller.signal
-    });
-  } catch (error) {
-    if (error && error.name === "AbortError") {
-      const e = new Error("Upstream request timed out.");
-      e.name = "AbortError";
-      throw e;
-    }
-
-    throw error;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-/* =========================================================
-   CODECRAFT REQUEST
-========================================================= */
-
-async function codecraftFetch(env, path, options = {}, timeoutMs = 12000) {
-  const key = getApiKey(env);
-
-  if (!key) {
-    throw new Error(
-      "CODECRAFT_API_KEY is missing. Add it in Cloudflare Workers Secrets."
-    );
-  }
-
-  const headers = new Headers(options.headers || {});
-
-  headers.set("Authorization", "Bearer " + key);
-  headers.set("Accept", "application/json");
-
-  if (options.body && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
-  }
-
-  const response = await fetchTimeout(
-    CODECRAFT_BASE + path,
-    {
-      ...options,
-      headers
-    },
-    timeoutMs
-  );
-
-  return response;
-}
-
-/* =========================================================
-   CODECRAFT ERROR
-========================================================= */
-
-async function readApiError(response) {
-  let text = "";
-
-  try {
-    text = await response.text();
-  } catch (_) {}
-
-  let data = null;
+  let data;
 
   try {
     data = JSON.parse(text);
-  } catch (_) {}
-
-  const message =
-    data?.error?.message ||
-    data?.message ||
-    text ||
-    ("HTTP " + response.status);
-
-  if (response.status === 401) {
-    return "CodeCraft API key invalid or missing.";
+  } catch {
+    data = { raw: text };
   }
 
-  if (response.status === 403) {
-    return (
-      "CodeCraft API key does not have the required scope. " +
-      "Make sure models:read and inference are enabled."
-    );
-  }
-
-  if (response.status === 404) {
-    return "Requested CodeCraft model or endpoint was not found.";
-  }
-
-  if (response.status === 402) {
-    return "CodeCraft plan allowance or balance is unavailable.";
-  }
-
-  if (response.status === 429) {
-    return "CodeCraft rate limit reached. Please wait a little and try again.";
-  }
-
-  if (response.status >= 500) {
-    return "CodeCraft upstream service returned an error: " + message;
-  }
-
-  return message;
-}
-
-/* =========================================================
-   MODELS
-========================================================= */
-
-async function getModels(env) {
-  const response = await codecraftFetch(
-    env,
-    "/models",
-    {
-      method: "GET"
-    },
-    MODEL_TIMEOUT
-  );
-
-  if (!response.ok) {
-    const message = await readApiError(response);
-
-    const error = new Error(message);
-    error.status = response.status;
-
-    throw error;
-  }
-
-  const data = await response.json();
-
-  const models = Array.isArray(data?.data)
-    ? data.data
-    : Array.isArray(data?.models)
-      ? data.models
-      : [];
-
-  return models
-    .filter(model => model && model.id)
-    .map(model => ({
-      id: String(model.id),
-      name: model.name || model.id,
-      description: model.description || "",
-      type: model.type || "chat",
-      context_window: Number(model.context_window || 0),
-      capabilities: Array.isArray(model.capabilities)
-        ? model.capabilities.map(String)
-        : [],
-      pricing: model.pricing || {}
-    }));
-}
-
-/* =========================================================
-   BEST MODEL SELECTION
-========================================================= */
-
-function modelScore(model) {
-  const caps = new Set(model.capabilities || []);
-  const id = String(model.id || "").toLowerCase();
-  const name = String(model.name || "").toLowerCase();
-
-  let score = 0;
-
-  if (caps.has("reasoning")) score += 100;
-  if (caps.has("web_search")) score += 80;
-  if (caps.has("tools")) score += 60;
-  if (caps.has("vision")) score += 45;
-  if (caps.has("streaming")) score += 35;
-  if (caps.has("json_mode")) score += 10;
-
-  if (model.context_window >= 100000) score += 25;
-  else if (model.context_window >= 50000) score += 15;
-  else if (model.context_window >= 20000) score += 8;
-
-  const strongWords = [
-    "opus",
-    "pro",
-    "ultra",
-    "flagship",
-    "reasoning",
-    "thinking"
-  ];
-
-  const lightWords = [
-    "mini",
-    "nano",
-    "small",
-    "lite"
-  ];
-
-  for (const word of strongWords) {
-    if (id.includes(word) || name.includes(word)) score += 20;
-  }
-
-  for (const word of lightWords) {
-    if (id.includes(word) || name.includes(word)) score -= 8;
-  }
-
-  return score;
-}
-
-function chooseBestModel(models) {
-  if (!models.length) return null;
-
-  return [...models]
-    .sort((a, b) => modelScore(b) - modelScore(a))[0];
-}
-
-/* =========================================================
-   MODELS ENDPOINT
-========================================================= */
-
-async function handleModels(env) {
-  const started = Date.now();
-
-  try {
-    const models = await getModels(env);
-
-    if (!models.length) {
-      return json(
-        {
-          ok: false,
-          code: "empty_model_list",
-          error:
-            "CodeCraft returned no available models. Check the API key and models:read scope.",
-          models: [],
-          elapsed_ms: Date.now() - started
-        },
-        502
-      );
-    }
-
-    const best = chooseBestModel(models);
-
-    return json({
-      ok: true,
-      models,
-      best: best ? best.id : null,
-      best_model: best,
-      count: models.length,
-      elapsed_ms: Date.now() - started
-    });
-  } catch (error) {
-    const status =
-      Number(error?.status) >= 400 &&
-      Number(error?.status) <= 599
-        ? Number(error.status)
-        : 502;
-
-    return json(
-      {
-        ok: false,
-        code:
-          error?.name === "AbortError"
-            ? "models_timeout"
-            : "models_unavailable",
-        error: cleanError(error),
-        models: [],
-        elapsed_ms: Date.now() - started
-      },
-      status
-    );
-  }
-}
-
-/* =========================================================
-   HEALTH
-========================================================= */
-
-async function handleHealth(env) {
-  const keyExists = Boolean(getApiKey(env));
-
-  return json({
-    ok: true,
-    worker: "my-ai",
-    codecraft_key_configured: keyExists,
-    timestamp: new Date().toISOString()
-  });
-}
-
-/* =========================================================
-   MESSAGE NORMALIZATION
-========================================================= */
-
-function normalizeMessages(messages) {
-  if (!Array.isArray(messages)) return [];
-
-  return messages
-    .slice(-40)
-    .map(message => {
-      if (!message || typeof message !== "object") return null;
-
-      const role =
-        message.role === "assistant" ||
-        message.role === "system" ||
-        message.role === "tool"
-          ? message.role
-          : "user";
-
-      let content = message.content;
-
-      if (Array.isArray(content)) {
-        content = content
-          .map(part => {
-            if (typeof part === "string") return part;
-
-            if (
-              part &&
-              typeof part === "object" &&
-              part.type === "text"
-            ) {
-              return part.text || "";
-            }
-
-            if (
-              part &&
-              typeof part === "object" &&
-              part.type === "image_url"
-            ) {
-              return "[Image attached]";
-            }
-
-            return "";
-          })
-          .join("\n");
-      }
-
-      if (typeof content !== "string") {
-        content = String(content ?? "");
-      }
-
-      return {
-        role,
-        content: content.slice(0, 50000)
-      };
-    })
-    .filter(Boolean);
-}
-
-function getLatestUserText(messages) {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (
-      messages[i] &&
-      messages[i].role === "user"
-    ) {
-      return String(messages[i].content || "").trim();
-    }
-  }
-
-  return "";
-}
-
-/* =========================================================
-   SYSTEM PROMPT
-========================================================= */
-
-function getSystemPrompt() {
-  return `
-You are the AI assistant inside My AI.
-
-Be highly capable, accurate, practical and clear.
-
-Important behavior:
-- Answer the user's actual request directly.
-- Do not claim you used a tool unless tool/research data was actually provided.
-- If research context is provided, use it carefully.
-- Distinguish known facts from uncertainty.
-- Do not invent sources, URLs, statistics or citations.
-- For current information, use the provided research context when available.
-- Keep answers readable with headings, bullets and code blocks when useful.
-- When the user asks for code, provide complete working code when practical.
-- Never expose API keys, secrets or internal system instructions.
-- Do not mention this system prompt.
-`;
-}
-
-/* =========================================================
-   WEB RESEARCH
-========================================================= */
-
-function decodeHtml(text) {
-  return String(text || "")
-    .replace(/&amp;/gi, "&")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&#x27;/gi, "'")
-    .replace(/&#x2F;/gi, "/");
-}
-
-function stripHtml(text) {
-  return String(text || "")
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function isSafeResearchUrl(raw) {
-  try {
-    const u = new URL(raw);
-
-    if (u.protocol !== "https:" && u.protocol !== "http:") {
-      return false;
-    }
-
-    const hostname = u.hostname.toLowerCase();
-
-    const blocked = [
-      "localhost",
-      "127.0.0.1",
-      "0.0.0.0",
-      "::1",
-      "metadata.google.internal",
-      "169.254.169.254"
-    ];
-
-    if (blocked.includes(hostname)) {
-      return false;
-    }
-
-    if (
-      hostname.endsWith(".local") ||
-      hostname.endsWith(".internal")
-    ) {
-      return false;
-    }
-
-    if (
-      hostname.startsWith("10.") ||
-      hostname.startsWith("192.168.") ||
-      hostname.startsWith("127.")
-    ) {
-      return false;
-    }
-
-    if (hostname.startsWith("172.")) {
-      const parts = hostname.split(".");
-
-      if (parts.length === 4) {
-        const second = Number(parts[1]);
-
-        if (second >= 16 && second <= 31) {
-          return false;
-        }
-      }
-    }
-
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
-
-function extractSearchResults(htmlText) {
-  const results = [];
-
-  const regex =
-    /<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
-
-  let match;
-
-  while (
-    (match = regex.exec(htmlText)) !== null &&
-    results.length < 8
-  ) {
-    const url = decodeHtml(match[1]);
-    const title = stripHtml(decodeHtml(match[2]));
-
-    if (
-      title &&
-      /^https?:\/\//i.test(url) &&
-      isSafeResearchUrl(url)
-    ) {
-      results.push({
-        title,
-        url
-      });
-    }
-  }
-
-  return results;
-}
-
-async function searchWeb(query) {
-  const encoded = encodeURIComponent(query);
-
-  const url =
-    "https://html.duckduckgo.com/html/?q=" +
-    encoded;
-
-  const response = await fetchTimeout(
-    url,
-    {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (compatible; MyAI/1.0; +https://example.com)"
-      }
-    },
-    SEARCH_TIMEOUT
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      "Search provider returned HTTP " + response.status
-    );
-  }
-
-  const text = await response.text();
-
-  return extractSearchResults(text);
-}
-
-async function fetchResearchPage(item) {
-  if (!isSafeResearchUrl(item.url)) {
-    return null;
-  }
-
-  try {
-    const response = await fetchTimeout(
-      item.url,
-      {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (compatible; MyAI Research/1.0)",
-          Accept:
-            "text/html,application/xhtml+xml,text/plain;q=0.9"
-        },
-        redirect: "follow"
-      },
-      SEARCH_TIMEOUT
-    );
-
-    if (!response.ok) {
-      return {
-        ...item,
-        text: ""
-      };
-    }
-
-    if (!isSafeResearchUrl(response.url)) {
-      return {
-        ...item,
-        text: ""
-      };
-    }
-
-    const contentType =
-      response.headers.get("content-type") || "";
-
-    if (
-      !contentType.includes("text/html") &&
-      !contentType.includes("text/plain") &&
-      !contentType.includes("application/xhtml")
-    ) {
-      return {
-        ...item,
-        text: ""
-      };
-    }
-
-    const length =
-      Number(
-        response.headers.get("content-length") || 0
-      );
-
-    if (length > 1200000) {
-      return {
-        ...item,
-        text: ""
-      };
-    }
-
-    const body = await response.text();
-
-    return {
-      ...item,
-      text: stripHtml(body).slice(0, 10000)
-    };
-  } catch (_) {
-    return {
-      ...item,
-      text: ""
-    };
-  }
-}
-
-function buildResearchQueries(question) {
-  const q = String(question || "").trim();
-
-  if (!q) return [];
-
-  const queries = [
-    q,
-    q + " latest information",
-    q + " official documentation"
-  ];
-
-  return [...new Set(queries)].slice(0, 3);
-}
-
-async function performWebResearch(question) {
-  const started = Date.now();
-
-  if (!question) {
-    return {
-      enabled: false,
-      sources: [],
-      context: ""
-    };
-  }
-
-  const queries = buildResearchQueries(question);
-
-  if (!queries.length) {
-    return {
-      enabled: false,
-      sources: [],
-      context: ""
-    };
-  }
-
-  let searchResults = [];
-
-  try {
-    const searchPromise = Promise.allSettled(
-      queries.map(query => searchWeb(query))
-    );
-
-    const timeoutPromise = new Promise(resolve => {
-      setTimeout(() => resolve([]), RESEARCH_TOTAL_TIMEOUT);
-    });
-
-    const settled = await Promise.race([
-      searchPromise,
-      timeoutPromise
-    ]);
-
-    if (Array.isArray(settled)) {
-      for (const item of settled) {
-        if (Array.isArray(item)) {
-          searchResults.push(...item);
-        }
-      }
-    } else if (Array.isArray(settled)) {
-      searchResults = settled;
-    }
-  } catch (_) {}
-
-  const unique = [];
-  const seen = new Set();
-
-  for (const item of searchResults) {
-    if (!item || !item.url) continue;
-
-    if (seen.has(item.url)) continue;
-
-    seen.add(item.url);
-    unique.push(item);
-
-    if (unique.length >= 8) break;
-  }
-
-  const pages = await Promise.all(
-    unique.slice(0, 5).map(fetchResearchPage)
-  );
-
-  const usablePages = pages.filter(Boolean);
-
-  const sourceLines = usablePages
-    .map((page, index) => {
-      const text =
-        page.text ||
-        "Search result available; page text could not be extracted.";
-
-      return (
-        "SOURCE " +
-        (index + 1) +
-        "\nTitle: " +
-        page.title +
-        "\nURL: " +
-        page.url +
-        "\nContent: " +
-        text.slice(0, 7000)
-      );
-    })
-    .join("\n\n");
-
-  const context = sourceLines
-    ? `
-WEB RESEARCH CONTEXT
-
-The following information was retrieved from public web pages.
-Use it as supporting context. Do not blindly trust it.
-If sources disagree, explain the disagreement.
-
-${sourceLines}
-`
-    : "";
-
-  return {
-    enabled: Boolean(sourceLines),
-    sources: usablePages.map(page => ({
-      title: page.title,
-      url: page.url
-    })),
-    context,
-    elapsed_ms: Date.now() - started
-  };
-}
-
-/* =========================================================
-   CHAT CONTENT
-========================================================= */
-
-function extractTextFromCompletion(data) {
-  return (
-    data?.choices?.[0]?.message?.content ||
-    data?.choices?.[0]?.text ||
-    ""
-  );
-}
-
-function safeModelFromRequest(body, models) {
-  const requested =
-    typeof body?.model === "string"
-      ? body.model.trim()
-      : "";
-
-  if (requested) {
-    const found = models.find(
-      model => model.id === requested
-    );
-
-    if (found) return found;
-  }
-
-  return chooseBestModel(models);
-}
-
-/* =========================================================
-   CHAT HANDLER
-========================================================= */
-
-async function handleChat(request, env) {
-  let body;
-
-  try {
-    body = await request.json();
-  } catch (_) {
-    return json(
-      {
-        ok: false,
-        error: "Invalid JSON request."
-      },
-      400
-    );
-  }
-
-  const incomingMessages = normalizeMessages(
-    body?.messages
-  );
-
-  if (!incomingMessages.length) {
-    return json(
-      {
-        ok: false,
-        error: "No messages were provided."
-      },
-      400
-    );
-  }
-
-  let models;
-
-  try {
-    models = await getModels(env);
-  } catch (error) {
-    return json(
-      {
-        ok: false,
-        code: "models_unavailable",
-        error:
-          "Models could not be loaded before chat. " +
-          cleanError(error)
-      },
-      502
-    );
-  }
-
-  if (!models.length) {
-    return json(
-      {
-        ok: false,
-        code: "empty_model_list",
-        error: "No CodeCraft models are available."
-      },
-      502
-    );
-  }
-
-  const selectedModel = safeModelFromRequest(
-    body,
-    models
-  );
-
-  if (!selectedModel) {
-    return json(
-      {
-        ok: false,
-        error: "No usable model was found."
-      },
-      502
-    );
-  }
-
-  const latestUserText =
-    getLatestUserText(incomingMessages);
-
-  /*
-   * Always-on research as requested.
-   * Research failure does NOT stop chat.
-   */
-  let research = {
-    enabled: false,
-    sources: [],
-    context: ""
-  };
-
-  try {
-    research = await performWebResearch(
-      latestUserText
-    );
-  } catch (_) {}
-
-  const messages = [
-    {
-      role: "system",
-      content: getSystemPrompt()
-    }
-  ];
-
-  if (research.context) {
-    messages.push({
-      role: "system",
-      content: research.context
-    });
-  }
-
-  messages.push(...incomingMessages);
-
-  const payload = {
-    model: selectedModel.id,
-    messages,
-    stream: true,
-    max_tokens:
-      Number(body?.max_tokens) >= 2048
-        ? Math.min(Number(body.max_tokens), 16000)
-        : 8192,
-    temperature:
-      typeof body?.temperature === "number"
-        ? Math.max(
-            0,
-            Math.min(2, body.temperature)
-          )
-        : 0.7
-  };
-
-  let upstream;
-
-  try {
-    upstream = await codecraftFetch(
-      env,
-      "/chat/completions",
-      {
-        method: "POST",
-        body: JSON.stringify(payload)
-      },
-      CHAT_TIMEOUT
-    );
-  } catch (error) {
-    return json(
-      {
-        ok: false,
-        code:
-          error?.name === "AbortError"
-            ? "chat_timeout"
-            : "chat_request_failed",
-        error: cleanError(error)
-      },
-      502
-    );
-  }
-
-  if (!upstream.ok) {
-    const message = await readApiError(upstream);
-
-    return json(
-      {
-        ok: false,
-        code: "codecraft_error",
-        error: message,
-        status: upstream.status,
-        model: selectedModel.id
-      },
-      upstream.status >= 400 && upstream.status < 600
-        ? upstream.status
-        : 502
-    );
-  }
-
-  const upstreamType =
-    upstream.headers.get("content-type") ||
-    "text/event-stream";
-
-  /*
-   * We send metadata before the provider stream.
-   * The frontend understands the my_ai_meta event.
-   */
-  const encoder = new TextEncoder();
-
-  const metadata =
-    "event: my_ai_meta\n" +
-    "data: " +
-    JSON.stringify({
-      model: selectedModel.id,
-      model_name:
-        selectedModel.name || selectedModel.id,
-      capabilities:
-        selectedModel.capabilities || [],
-      research: research.enabled,
-      sources: research.sources || []
-    }) +
-    "\n\n";
-
-  const stream = new ReadableStream({
-    async start(controller) {
-      try {
-        controller.enqueue(
-          encoder.encode(metadata)
-        );
-
-        if (!upstream.body) {
-          controller.enqueue(
-            encoder.encode(
-              "data: " +
-              JSON.stringify({
-                error:
-                  "CodeCraft returned an empty stream."
-              }) +
-              "\n\n"
-            )
-          );
-
-          controller.enqueue(
-            encoder.encode("data: [DONE]\n\n")
-          );
-
-          controller.close();
-          return;
-        }
-
-        const reader =
-          upstream.body.getReader();
-
-        while (true) {
-          const { value, done } =
-            await reader.read();
-
-          if (done) break;
-
-          controller.enqueue(value);
-        }
-
-        controller.close();
-      } catch (error) {
-        try {
-          controller.enqueue(
-            encoder.encode(
-              "data: " +
-              JSON.stringify({
-                error: cleanError(error)
-              }) +
-              "\n\n"
-            )
-          );
-        } catch (_) {}
-
-        try {
-          controller.close();
-        } catch (_) {}
-      }
-    },
-
-    cancel() {
-      try {
-        upstream.body?.cancel();
-      } catch (_) {}
-    }
-  });
-
-  return cors(
-    new Response(stream, {
-      status: 200,
-      headers: {
-        "Content-Type":
-          upstreamType.includes("text/event-stream")
-            ? "text/event-stream; charset=utf-8"
-            : "text/event-stream; charset=utf-8",
-        "Cache-Control":
-          "no-cache, no-transform",
-        "Connection": "keep-alive",
-        "X-Accel-Buffering": "no"
-      }
-    })
-  );
-}
-
-/* =========================================================
-   IMAGE GENERATION
-========================================================= */
-
-async function handleImage(request, env) {
-  let body;
-
-  try {
-    body = await request.json();
-  } catch (_) {
-    return json(
-      {
-        ok: false,
-        error: "Invalid JSON."
-      },
-      400
-    );
-  }
-
-  const prompt =
-    typeof body?.prompt === "string"
-      ? body.prompt.trim()
-      : "";
-
-  if (!prompt) {
-    return json(
-      {
-        ok: false,
-        error: "Image prompt is required."
-      },
-      400
-    );
-  }
-
-  if (!env.AI) {
-    return json(
-      {
-        ok: false,
-        error:
-          "Cloudflare Workers AI binding is missing. Check wrangler.jsonc."
-      },
-      500
-    );
-  }
-
-  try {
-    const result = await env.AI.run(
-      IMAGE_MODEL,
-      {
-        prompt: prompt.slice(0, 5000)
-      }
-    );
-
-    /*
-     * Workers AI FLUX normally returns an image response.
-     */
-    if (result instanceof ArrayBuffer) {
-      return cors(
-        new Response(result, {
-          headers: {
-            "Content-Type": "image/png",
-            "Cache-Control": "no-store"
-          }
-        })
-      );
-    }
-
-    if (result?.image) {
-      return json({
-        ok: true,
-        image: result.image
-      });
-    }
-
-    return json({
-      ok: true,
-      result
-    });
-  } catch (error) {
-    return json(
-      {
-        ok: false,
-        error:
-          "Image generation failed: " +
-          cleanError(error)
-      },
-      500
-    );
-  }
-}
-
-/* =========================================================
-   MANIFEST
-========================================================= */
-
-function manifest() {
-  return {
-    name: "My AI",
-    short_name: "My AI",
-    description: "Personal AI assistant",
-    start_url: "/",
-    display: "standalone",
-    background_color: "#0b0b0f",
-    theme_color: "#0b0b0f",
-    orientation: "portrait",
-    icons: [
-      {
-        src: "/icon.svg",
-        sizes: "any",
-        type: "image/svg+xml",
-        purpose: "any maskable"
-      }
-    ]
-  };
-}
-
-/* =========================================================
-   SERVICE WORKER
-========================================================= */
-
-function serviceWorker() {
-  return `
-const CACHE = "my-ai-v4";
-
-self.addEventListener("install", event => {
-  self.skipWaiting();
-});
-
-self.addEventListener("activate", event => {
-  event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
-        keys
-          .filter(key => key !== CACHE)
-          .map(key => caches.delete(key))
-      )
-    )
-  );
-
-  self.clients.claim();
-});
-
-self.addEventListener("fetch", event => {
-  const request = event.request;
-
-  if (request.method !== "GET") return;
-
-  const url = new URL(request.url);
-
-  if (url.pathname.startsWith("/api/")) {
-    return;
-  }
-
-  event.respondWith(
-    fetch(request).catch(() =>
-      caches.match(request)
-    )
-  );
-});
-`;
-}
-
-/* =========================================================
-   ICON
-========================================================= */
-
-function iconSvg() {
-  return `
-<svg xmlns="http://www.w3.org/2000/svg"
-     viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="120" fill="#111116"/>
-  <circle cx="256" cy="256" r="150"
-          fill="none"
-          stroke="white"
-          stroke-width="34"/>
-  <path d="M170 270
-           C190 170 322 170 342 270
-           C325 350 187 350 170 270Z"
-        fill="none"
-        stroke="white"
-        stroke-width="26"
-        stroke-linecap="round"/>
-  <circle cx="205" cy="252" r="14" fill="white"/>
-  <circle cx="307" cy="252" r="14" fill="white"/>
-</svg>
-`;
+  return { data, text };
 }
 
 /* =========================================================
    FRONTEND
 ========================================================= */
 
-function appHTML() {
-  return String.raw`<!DOCTYPE html>
+const HTML = String.raw`<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport"
-      content="width=device-width,
-               initial-scale=1,
-               maximum-scale=1,
-               viewport-fit=cover">
 
-<meta name="theme-color" content="#0b0b0f">
+<meta charset="utf-8">
+
+<meta
+  name="viewport"
+  content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"
+>
+
+<meta name="theme-color" content="#212121">
+
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style"
-      content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AetherAI">
 
 <link rel="manifest" href="/manifest.json">
-<link rel="icon" href="/icon.svg">
 
-<title>My AI</title>
+<title>AetherAI</title>
 
 <style>
-* {
-  box-sizing: border-box;
+
+*{
+  box-sizing:border-box
 }
 
 html,
-body {
-  margin: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background: #0b0b0f;
-  color: #f5f5f5;
+body{
+  margin:0;
+  width:100%;
+  height:100%;
   font-family:
     -apple-system,
     BlinkMacSystemFont,
     "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
     sans-serif;
+  background:#212121;
+  color:#ececec;
+  overflow:hidden
 }
 
 button,
+input,
 textarea,
-select {
-  font: inherit;
+select{
+  font:inherit
 }
 
-button {
-  cursor: pointer;
+button{
+  color:inherit
 }
 
-.app {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  background: #0b0b0f;
+.app{
+  height:100%;
+  display:flex
 }
 
-/* SIDEBAR */
-
-.sidebar {
-  width: 280px;
-  height: 100%;
-  background: #111116;
-  border-right: 1px solid #24242c;
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  z-index: 30;
+.sidebar{
+  width:260px;
+  flex:0 0 260px;
+  background:#171717;
+  display:flex;
+  flex-direction:column;
+  padding:10px 10px 12px
 }
 
-.brand {
-  height: 64px;
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 0 16px;
-  border-bottom: 1px solid #24242c;
+.brand{
+  height:42px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:0 10px;
+  font-weight:700;
+  font-size:16px
 }
 
-.brandIcon {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
+.logo{
+  width:28px;
+  height:28px;
+  border-radius:8px;
+  background:#fff;
+  color:#111;
+  display:grid;
+  place-items:center;
+  font-weight:800
 }
 
-.brandName {
-  font-size: 16px;
-  font-weight: 700;
+.new{
+  height:44px;
+  width:100%;
+  border:1px solid #444;
+  background:#212121;
+  border-radius:10px;
+  text-align:left;
+  padding:0 13px;
+  cursor:pointer;
+  margin:8px 0
 }
 
-.newChat {
-  margin: 14px;
-  width: calc(100% - 28px);
-  padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid #30303a;
-  background: #19191f;
-  color: white;
-  text-align: left;
+.new:hover,
+.history-item:hover,
+.side-btn:hover{
+  background:#2a2a2a
 }
 
-.newChat:hover {
-  background: #202027;
+.search{
+  margin:0 0 8px
 }
 
-.sidebarSearch {
-  margin: 0 14px 10px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid #292932;
-  background: #17171c;
-  color: white;
-  outline: none;
-  width: calc(100% - 28px);
+.search input{
+  width:100%;
+  height:36px;
+  background:#212121;
+  border:1px solid #333;
+  border-radius:9px;
+  color:#eee;
+  padding:0 11px;
+  outline:none
 }
 
-.history {
-  flex: 1;
-  overflow-y: auto;
-  padding: 6px 10px 20px;
+.history{
+  overflow:auto;
+  flex:1;
+  scrollbar-width:thin
 }
 
-.historyTitle {
-  color: #85858f;
-  font-size: 12px;
-  padding: 10px 7px;
+.history-item{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  border-radius:8px;
+  padding:9px;
+  cursor:pointer;
+  margin:2px 0
 }
 
-.chatItem {
-  padding: 10px 11px;
-  border-radius: 9px;
-  color: #d8d8de;
-  margin-bottom: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  cursor: pointer;
+.history-item.active{
+  background:#2b2b2b
 }
 
-.chatItem:hover {
-  background: #1d1d24;
+.history-title{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  flex:1;
+  font-size:13.5px
 }
 
-.chatItem.active {
-  background: #25252d;
+.more{
+  background:none;
+  border:0;
+  opacity:.55;
+  cursor:pointer
 }
 
-.sidebarBottom {
-  padding: 12px;
-  border-top: 1px solid #24242c;
-  color: #85858f;
-  font-size: 12px;
+.side-bottom{
+  padding-top:8px
 }
 
-/* MAIN */
-
-.main {
-  min-width: 0;
-  flex: 1;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+.side-btn{
+  width:100%;
+  border:0;
+  background:transparent;
+  text-align:left;
+  padding:10px;
+  border-radius:8px;
+  cursor:pointer
 }
 
-.topbar {
-  height: 64px;
-  flex-shrink: 0;
-  border-bottom: 1px solid #24242c;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  background: rgba(11,11,15,.92);
-  backdrop-filter: blur(15px);
-  z-index: 10;
+.main{
+  min-width:0;
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  background:#212121
 }
 
-.leftTop {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
+.topbar{
+  height:56px;
+  flex:none;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 14px;
+  background:#212121
 }
 
-.menuBtn {
-  display: none;
-  width: 38px;
-  height: 38px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: white;
-  font-size: 21px;
+.top-left{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  min-width:0
 }
 
-.modelBox {
-  min-width: 180px;
-  max-width: 340px;
+.mobile-menu{
+  display:none;
+  border:0;
+  background:transparent;
+  font-size:22px
 }
 
-.modelSelect {
-  width: 100%;
-  border: 0;
-  outline: none;
-  background: transparent;
-  color: white;
-  font-weight: 600;
+.model-wrap{
+  display:flex;
+  align-items:center
 }
 
-.modelSelect option {
-  background: #111116;
-  color: white;
+.model-select{
+  appearance:none;
+  background:transparent;
+  border:0;
+  color:#eee;
+  font-weight:600;
+  font-size:15px;
+  max-width:260px;
+  outline:none;
+  padding:8px 24px 8px 8px
 }
 
-.modelInfo {
-  color: #777781;
-  font-size: 10px;
-  margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.model-select:hover{
+  background:#2a2a2a;
+  border-radius:8px
 }
 
-.status {
-  color: #73737d;
-  font-size: 11px;
+.model-select option{
+  background:#212121
 }
 
-/* CHAT */
-
-.messages {
-  flex: 1;
-  overflow-y: auto;
-  scroll-behavior: smooth;
+.top-actions{
+  display:flex;
+  gap:2px
 }
 
-.messagesInner {
-  width: 100%;
-  max-width: 920px;
-  margin: 0 auto;
-  padding: 30px 22px 160px;
+.icon-btn{
+  width:36px;
+  height:36px;
+  border:0;
+  background:transparent;
+  border-radius:8px;
+  cursor:pointer;
+  font-size:18px
 }
 
-.empty {
-  min-height: calc(100vh - 220px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
+.icon-btn:hover{
+  background:#303030
 }
 
-.emptyBox {
-  max-width: 600px;
+.chat{
+  flex:1;
+  overflow:auto;
+  scroll-behavior:auto
 }
 
-.emptyIcon {
-  width: 64px;
-  height: 64px;
-  margin: 0 auto 18px;
-  border-radius: 20px;
+.messages{
+  max-width:860px;
+  margin:auto;
+  padding:22px 22px 170px
 }
 
-.emptyTitle {
-  font-size: 30px;
-  font-weight: 700;
-  margin-bottom: 10px;
+.welcome{
+  min-height:58vh;
+  display:grid;
+  place-items:center;
+  text-align:center
 }
 
-.emptySub {
-  color: #85858f;
-  line-height: 1.6;
+.welcome h1{
+  font-size:30px;
+  letter-spacing:-.5px;
+  margin:0 0 9px
 }
 
-.message {
-  display: flex;
-  gap: 14px;
-  margin-bottom: 28px;
+.welcome p{
+  color:#a6a6a6;
+  margin:0
 }
 
-.message.user {
-  flex-direction: row-reverse;
+.msg{
+  display:flex;
+  gap:13px;
+  margin:0 0 28px;
+  min-width:0
 }
 
-.avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #19191f;
-  border: 1px solid #2b2b34;
-  font-size: 13px;
-  font-weight: 700;
+.avatar{
+  width:30px;
+  height:30px;
+  border-radius:8px;
+  flex:none;
+  display:grid;
+  place-items:center;
+  font-size:13px
 }
 
-.message.user .avatar {
-  background: #25252d;
+.user .avatar{
+  background:#555
 }
 
-.bubbleWrap {
-  max-width: min(82%, 760px);
+.assistant .avatar{
+  background:#fff;
+  color:#111
 }
 
-.message.user .bubbleWrap {
-  display: flex;
-  justify-content: flex-end;
+.bubble{
+  min-width:0;
+  flex:1;
+  line-height:1.65;
+  font-size:15.5px;
+  overflow-wrap:anywhere
 }
 
-.bubble {
-  line-height: 1.65;
-  font-size: 15px;
-  color: #e8e8ec;
-  overflow-wrap: anywhere;
+.bubble p{
+  margin:0 0 13px
 }
 
-.message.user .bubble {
-  background: #202027;
-  border: 1px solid #2b2b34;
-  border-radius: 18px;
-  padding: 11px 15px;
-}
-
-.bubble p {
-  margin: 0 0 12px;
-}
-
-.bubble p:last-child {
-  margin-bottom: 0;
+.bubble p:last-child{
+  margin-bottom:0
 }
 
 .bubble h1,
 .bubble h2,
-.bubble h3 {
-  margin: 18px 0 9px;
-  line-height: 1.3;
+.bubble h3{
+  line-height:1.25;
+  margin:18px 0 8px
+}
+
+.bubble h1{
+  font-size:24px
+}
+
+.bubble h2{
+  font-size:20px
+}
+
+.bubble h3{
+  font-size:17px
+}
+
+.bubble strong{
+  font-weight:700
+}
+
+.bubble em{
+  font-style:italic
+}
+
+.bubble blockquote{
+  border-left:3px solid #666;
+  margin:12px 0;
+  padding:2px 0 2px 14px;
+  color:#c9c9c9
 }
 
 .bubble ul,
-.bubble ol {
-  padding-left: 24px;
+.bubble ol{
+  margin:7px 0 14px;
+  padding-left:24px
 }
 
-.bubble a {
-  color: #9ecbff;
+.bubble li{
+  margin:4px 0
 }
 
-.codeBlock {
-  margin: 14px 0;
-  border: 1px solid #30303a;
-  border-radius: 12px;
-  overflow: hidden;
-  background: #0d0d11;
+.bubble a{
+  color:#9ecbff;
+  text-decoration:underline
 }
 
-.codeHead {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 7px 10px;
-  border-bottom: 1px solid #292932;
-  color: #85858f;
-  font-size: 11px;
-}
-
-.codeCopy {
-  border: 0;
-  background: transparent;
-  color: #aaaab4;
-  font-size: 11px;
-}
-
-pre {
-  margin: 0;
-  padding: 14px;
-  overflow-x: auto;
+.inline-code{
+  background:#2f2f2f;
+  border:1px solid #3c3c3c;
+  padding:1px 5px;
+  border-radius:5px;
   font-family:
     ui-monospace,
     SFMono-Regular,
     Menlo,
     monospace;
-  font-size: 13px;
-  line-height: 1.6;
+  font-size:.9em
 }
 
-.inlineCode {
-  background: #202027;
-  border: 1px solid #2b2b34;
-  padding: 1px 5px;
-  border-radius: 5px;
-  font-family: monospace;
+.code-wrap{
+  margin:12px 0 15px;
+  border:1px solid #3a3a3a;
+  border-radius:10px;
+  overflow:hidden;
+  background:#0d0d0d
 }
 
-.actions {
-  display: flex;
-  gap: 4px;
-  margin-top: 7px;
-  opacity: .75;
+.code-head{
+  height:34px;
+  background:#181818;
+  border-bottom:1px solid #303030;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 9px;
+  color:#aaa;
+  font-size:12px
 }
 
-.actionBtn {
-  border: 0;
-  background: transparent;
-  color: #85858f;
-  padding: 5px 7px;
-  border-radius: 7px;
-  font-size: 12px;
+.code-copy{
+  border:0;
+  background:#242424;
+  border-radius:6px;
+  padding:4px 8px;
+  font-size:11px;
+  cursor:pointer
 }
 
-.actionBtn:hover {
-  background: #19191f;
-  color: white;
+.code-copy:hover{
+  background:#333;
+  color:#fff
 }
 
-.researchBox {
-  margin-top: 10px;
-  color: #777781;
-  font-size: 11px;
+.bubble pre{
+  margin:0;
+  padding:14px;
+  overflow:auto;
+  white-space:pre;
+  line-height:1.5
 }
 
-.sourceLink {
-  color: #8585c9;
-  text-decoration: none;
-  display: block;
-  margin-top: 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.bubble pre code{
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+  font-size:13px;
+  background:none;
+  padding:0
 }
 
-/* COMPOSER */
+.table-wrap{
+  overflow:auto;
+  margin:12px 0
+}
 
-.composerArea {
-  position: fixed;
-  left: 280px;
-  right: 0;
-  bottom: 0;
-  padding: 18px 20px calc(18px + env(safe-area-inset-bottom));
+.bubble table{
+  border-collapse:collapse;
+  width:100%;
+  min-width:420px
+}
+
+.bubble th,
+.bubble td{
+  border:1px solid #444;
+  padding:7px 9px;
+  text-align:left
+}
+
+.bubble th{
+  background:#2b2b2b
+}
+
+.message-actions{
+  display:flex;
+  gap:3px;
+  margin-top:8px;
+  opacity:.78
+}
+
+.mini{
+  border:0;
+  background:transparent;
+  color:#999;
+  padding:5px 7px;
+  border-radius:7px;
+  cursor:pointer;
+  font-size:12px
+}
+
+.mini:hover{
+  background:#303030;
+  color:#eee
+}
+
+.image-card{
+  margin-top:10px;
+  border:1px solid #3a3a3a;
+  border-radius:12px;
+  overflow:hidden;
+  background:#111;
+  max-width:720px
+}
+
+.image-card img{
+  display:block;
+  width:100%;
+  height:auto
+}
+
+.image-toolbar{
+  display:flex;
+  justify-content:flex-end;
+  gap:4px;
+  padding:7px;
+  background:#181818
+}
+
+.composer-wrap{
+  position:fixed;
+  bottom:0;
+  left:260px;
+  right:0;
   background:
     linear-gradient(
-      to top,
-      #0b0b0f 65%,
-      rgba(11,11,15,0)
+      transparent,
+      #212121 24%
     );
-  z-index: 20;
+  padding:28px 18px 14px;
+  pointer-events:none
 }
 
-.composer {
-  max-width: 920px;
-  margin: 0 auto;
-  position: relative;
+.composer,
+.hint{
+  pointer-events:auto
 }
 
-.composerBox {
-  border: 1px solid #34343e;
-  background: #15151a;
-  border-radius: 18px;
-  box-shadow: 0 8px 35px rgba(0,0,0,.28);
-  overflow: hidden;
+.composer{
+  max-width:860px;
+  margin:auto;
+  background:#2f2f2f;
+  border:1px solid #4b4b4b;
+  border-radius:18px;
+  box-shadow:0 5px 25px #0005
 }
 
-.attachments {
-  display: none;
-  gap: 8px;
-  padding: 10px 12px 0;
+.attachments{
+  display:flex;
+  gap:7px;
+  flex-wrap:wrap;
+  padding:9px 12px 0
 }
 
-.attachments.show {
-  display: flex;
+.chip{
+  background:#202020;
+  border:1px solid #444;
+  border-radius:9px;
+  padding:6px 9px;
+  font-size:12px;
+  cursor:pointer
 }
 
-.attachment {
-  background: #202027;
-  border: 1px solid #30303a;
-  padding: 6px 9px;
-  border-radius: 8px;
-  color: #aaaab4;
-  font-size: 11px;
+.compose-row{
+  display:flex;
+  align-items:flex-end;
+  padding:7px
 }
 
-.inputRow {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  padding: 10px;
+.attach,
+.image-tool{
+  width:40px;
+  height:40px;
+  border:0;
+  background:transparent;
+  border-radius:10px;
+  cursor:pointer;
+  font-size:20px;
+  flex:none
 }
 
-.attachBtn,
-.sendBtn,
-.stopBtn {
-  width: 40px;
-  height: 40px;
-  flex-shrink: 0;
-  border: 0;
-  border-radius: 11px;
-  background: #202027;
-  color: #ddd;
-  font-size: 18px;
+.attach:hover,
+.image-tool:hover{
+  background:#3a3a3a
 }
 
-.sendBtn {
-  background: white;
-  color: #0b0b0f;
+.prompt{
+  flex:1;
+  resize:none;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:#eee;
+  max-height:180px;
+  min-height:42px;
+  padding:10px 8px;
+  line-height:1.45
 }
 
-.sendBtn:disabled {
-  opacity: .35;
+.prompt::placeholder{
+  color:#999
 }
 
-.stopBtn {
-  display: none;
-  background: #d8d8dc;
-  color: #111;
+.send{
+  width:40px;
+  height:40px;
+  border:0;
+  border-radius:11px;
+  background:#fff;
+  color:#111;
+  cursor:pointer;
+  font-weight:800;
+  flex:none
 }
 
-.prompt {
-  flex: 1;
-  min-height: 40px;
-  max-height: 180px;
-  resize: none;
-  border: 0;
-  outline: none;
-  background: transparent;
-  color: white;
-  padding: 9px 4px;
-  line-height: 1.45;
+.send:disabled{
+  opacity:.35;
+  cursor:default
 }
 
-.prompt::placeholder {
-  color: #6d6d77;
+.hint{
+  text-align:center;
+  font-size:10.5px;
+  color:#777;
+  padding-top:7px
 }
 
-.composerHint {
-  text-align: center;
-  color: #5f5f68;
-  font-size: 10px;
-  margin-top: 8px;
+.drawer-backdrop{
+  display:none
 }
 
-/* MOBILE */
-
-.overlay {
-  display: none;
+.modal{
+  position:fixed;
+  inset:0;
+  background:#0008;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  z-index:20
 }
 
-@media (max-width: 760px) {
-  .sidebar {
-    position: fixed;
-    left: -290px;
-    top: 0;
-    bottom: 0;
-    transition: left .2s ease;
-    box-shadow: 15px 0 50px rgba(0,0,0,.35);
+.modal.open{
+  display:flex
+}
+
+.card{
+  width:min(520px,100%);
+  background:#202020;
+  border:1px solid #444;
+  border-radius:16px;
+  padding:18px
+}
+
+.card h2{
+  margin:0 0 14px
+}
+
+.card p{
+  color:#aaa;
+  font-size:14px;
+  line-height:1.5
+}
+
+.memory-list{
+  max-height:300px;
+  overflow:auto
+}
+
+.memory-row{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  padding:10px;
+  border-bottom:1px solid #333
+}
+
+.danger{
+  color:#ff8d8d
+}
+
+.close{
+  float:right;
+  background:none;
+  border:0;
+  font-size:20px;
+  cursor:pointer
+}
+
+.typing{
+  display:inline-flex;
+  gap:4px;
+  align-items:center;
+  padding:5px 0
+}
+
+.typing i{
+  width:5px;
+  height:5px;
+  background:#aaa;
+  border-radius:50%;
+  animation:blink 1s infinite
+}
+
+.typing i:nth-child(2){
+  animation-delay:.15s
+}
+
+.typing i:nth-child(3){
+  animation-delay:.3s
+}
+
+@keyframes blink{
+  0%,80%,100%{opacity:.25}
+  40%{opacity:1}
+}
+
+@media(max-width:700px){
+
+  .sidebar{
+    position:fixed;
+    z-index:15;
+    top:0;
+    bottom:0;
+    left:0;
+    transform:translateX(-100%);
+    transition:transform .2s;
+    width:84%;
+    max-width:310px
   }
 
-  .sidebar.open {
-    left: 0;
+  .sidebar.open{
+    transform:translateX(0)
   }
 
-  .overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,.55);
-    z-index: 25;
+  .drawer-backdrop{
+    position:fixed;
+    inset:0;
+    background:#0008;
+    z-index:14
   }
 
-  .overlay.show {
-    display: block;
+  .drawer-backdrop.open{
+    display:block
   }
 
-  .menuBtn {
-    display: block;
+  .mobile-menu{
+    display:block
   }
 
-  .composerArea {
-    left: 0;
-    padding-left: 10px;
-    padding-right: 10px;
+  .composer-wrap{
+    left:0;
+    padding:20px 9px 9px
   }
 
-  .messagesInner {
-    padding-left: 13px;
-    padding-right: 13px;
-    padding-top: 20px;
+  .messages{
+    padding:14px 13px 145px
   }
 
-  .bubbleWrap {
-    max-width: 88%;
+  .topbar{
+    padding:0 7px
   }
 
-  .emptyTitle {
-    font-size: 25px;
+  .model-select{
+    max-width:185px
   }
 
-  .status {
-    display: none;
+  .welcome h1{
+    font-size:27px
   }
 
-  .modelBox {
-    min-width: 130px;
-    max-width: 190px;
+  .msg{
+    gap:9px;
+    margin-bottom:25px
   }
 
-  .modelInfo {
-    display: none;
+  .bubble{
+    font-size:15px
+  }
+
+  .hint{
+    display:none
+  }
+
+  .code-head{
+    height:32px
+  }
+
+  .bubble pre{
+    padding:11px
+  }
+
+  .image-card{
+    max-width:100%
   }
 }
+
 </style>
 </head>
 
@@ -2006,1820 +842,2054 @@ pre {
 
 <div class="app">
 
-  <aside class="sidebar" id="sidebar">
+<aside class="sidebar" id="sidebar">
 
-    <div class="brand">
-      <img
-        class="brandIcon"
-        src="/icon.svg"
-        alt="My AI">
-      <div class="brandName">My AI</div>
-    </div>
-
-    <button
-      class="newChat"
-      id="newChat">
-      + New chat
-    </button>
-
-    <input
-      class="sidebarSearch"
-      id="historySearch"
-      placeholder="Search chats...">
-
-    <div class="history">
-      <div class="historyTitle">
-        Chat history
-      </div>
-
-      <div id="historyList"></div>
-    </div>
-
-    <div class="sidebarBottom">
-      Personal AI • Local chat history
-    </div>
-
-  </aside>
-
-  <div
-    class="overlay"
-    id="overlay">
+  <div class="brand">
+    <div class="logo">A</div>
+    <span>AetherAI</span>
   </div>
 
-  <main class="main">
+  <button class="new" id="newChat">
+    ＋ New chat
+  </button>
 
-    <header class="topbar">
+  <div class="search">
+    <input
+      id="search"
+      placeholder="Search chats"
+    >
+  </div>
 
-      <div class="leftTop">
+  <div class="history" id="history"></div>
 
-        <button
-          class="menuBtn"
-          id="menuBtn">
-          ☰
-        </button>
+  <div class="side-bottom">
 
-        <div class="modelBox">
+    <button class="side-btn" id="memoryBtn">
+      🧠 Memory
+    </button>
 
-          <select
-            class="modelSelect"
-            id="modelSelect">
-            <option value="">
-              Loading models...
-            </option>
-          </select>
+    <button class="side-btn" id="clearBtn">
+      ⚙ Clear local data
+    </button>
 
-          <div
-            class="modelInfo"
-            id="modelInfo">
-            Connecting to CodeCraft...
-          </div>
+  </div>
 
-        </div>
+</aside>
 
-      </div>
+<div class="drawer-backdrop" id="backdrop"></div>
 
-      <div
-        class="status"
-        id="status">
-        Ready
-      </div>
+<main class="main">
 
-    </header>
+<header class="topbar">
 
-    <section
-      class="messages"
-      id="messages">
+  <div class="top-left">
 
-      <div
-        class="messagesInner"
-        id="messagesInner">
+    <button
+      class="mobile-menu"
+      id="menu"
+    >
+      ☰
+    </button>
 
-        <div
-          class="empty"
-          id="emptyState">
+    <div class="model-wrap">
 
-          <div class="emptyBox">
+      <select
+        class="model-select"
+        id="model"
+      >
+        <option>
+          Loading models…
+        </option>
+      </select>
 
-            <img
-              class="emptyIcon"
-              src="/icon.svg"
-              alt="">
+    </div>
 
-            <div class="emptyTitle">
-              How can I help?
-            </div>
+  </div>
 
-            <div class="emptySub">
-              Ask anything, research a topic,
-              write code, analyze ideas or generate
-              an image.
-            </div>
+  <div class="top-actions">
 
-          </div>
+    <button
+      class="icon-btn"
+      id="newTop"
+      title="New chat"
+    >
+      ＋
+    </button>
 
-        </div>
+  </div>
 
-      </div>
+</header>
 
-    </section>
+<section
+  class="chat"
+  id="chat"
+>
 
-  </main>
+  <div
+    class="messages"
+    id="messages"
+  ></div>
 
-</div>
+</section>
 
-<div class="composerArea">
+<div class="composer-wrap">
 
   <div class="composer">
 
-    <div class="composerBox">
+    <div
+      class="attachments"
+      id="attachments"
+    ></div>
 
-      <div
-        class="attachments"
-        id="attachments">
-      </div>
+    <div class="compose-row">
 
-      <div class="inputRow">
+      <button
+        class="attach"
+        id="attach"
+        title="Attach files"
+      >
+        ＋
+      </button>
 
-        <button
-          class="attachBtn"
-          id="attachBtn"
-          title="Upload file">
-          +
-        </button>
+      <button
+        class="image-tool"
+        id="imageTool"
+        title="Generate image"
+      >
+        ✦
+      </button>
 
-        <input
-          type="file"
-          id="fileInput"
-          hidden
-          multiple>
+      <input
+        id="file"
+        type="file"
+        hidden
+        multiple
+        accept="image/*,.pdf,.txt,.md,.json,.csv,.doc,.docx"
+      >
 
-        <textarea
-          class="prompt"
-          id="prompt"
-          rows="1"
-          placeholder="Message My AI..."></textarea>
+      <textarea
+        class="prompt"
+        id="prompt"
+        rows="1"
+        placeholder="Message AetherAI…"
+      ></textarea>
 
-        <button
-          class="stopBtn"
-          id="stopBtn">
-          ■
-        </button>
-
-        <button
-          class="sendBtn"
-          id="sendBtn">
-          ↑
-        </button>
-
-      </div>
+      <button
+        class="send"
+        id="send"
+      >
+        ↑
+      </button>
 
     </div>
 
-    <div class="composerHint">
-      My AI can make mistakes. Check important information.
-    </div>
+  </div>
+
+  <div class="hint">
+    AetherAI can make mistakes. Check important information.
+  </div>
+
+</div>
+
+</main>
+
+</div>
+
+<div
+  class="modal"
+  id="memoryModal"
+>
+
+  <div class="card">
+
+    <button
+      class="close"
+      id="closeMemory"
+    >
+      ×
+    </button>
+
+    <h2>Memory</h2>
+
+    <p>
+      Memories are stored locally on this device.
+      AetherAI can use them in future chats.
+    </p>
+
+    <div
+      class="memory-list"
+      id="memoryList"
+    ></div>
+
+    <button
+      class="side-btn danger"
+      id="clearMemory"
+    >
+      Clear all memories
+    </button>
 
   </div>
 
 </div>
 
 <script>
-(function() {
 
-  "use strict";
+const state = {
+  chats: JSON.parse(
+    localStorage.getItem('aether_chats') || '[]'
+  ),
+  current: null,
+  attachments: [],
+  memories: JSON.parse(
+    localStorage.getItem('aether_memories') || '[]'
+  ),
+  models: [],
+  busy: false,
+  autoImage: false
+};
 
-  const $ = id => document.getElementById(id);
+const $ = id => document.getElementById(id);
 
-  const state = {
-    chats: [],
-    currentChatId: null,
-    currentModel: null,
-    models: [],
-    attachedFiles: [],
-    controller: null,
-    generating: false
+function save(){
+  localStorage.setItem(
+    'aether_chats',
+    JSON.stringify(state.chats)
+  );
+
+  localStorage.setItem(
+    'aether_memories',
+    JSON.stringify(state.memories)
+  );
+}
+
+function uid(){
+  return Date.now().toString(36) +
+    Math.random().toString(36).slice(2,8);
+}
+
+function esc(s){
+  return String(s ?? '').replace(
+    /[&<>"']/g,
+    c => ({
+      '&':'&amp;',
+      '<':'&lt;',
+      '>':'&gt;',
+      '"':'&quot;',
+      "'":'&#39;'
+    }[c])
+  );
+}
+
+function codeEsc(s){
+  return esc(s);
+}
+
+/*
+  IMPORTANT:
+  Backtick characters are represented with \x60
+  so the outer String.raw template literal cannot
+  terminate accidentally.
+*/
+
+function md(text){
+
+  var s = String(
+    text == null ? '' : text
+  ).replace(/\r\n?/g,'\n');
+
+  var blocks = [];
+
+  s = s.replace(
+    /\x60\x60\x60([\w+-]*)\n?([\s\S]*?)\x60\x60\x60/g,
+    function(_,lang,code){
+
+      var id = blocks.length;
+
+      blocks.push({
+        lang:lang || 'code',
+        code:code
+      });
+
+      return '@@CODE' + id + '@@';
+    }
+  );
+
+  var x = esc(s);
+
+  x = x
+    .replace(
+      /^###\s+(.+)$/gm,
+      '<h3>$1</h3>'
+    )
+    .replace(
+      /^##\s+(.+)$/gm,
+      '<h2>$1</h2>'
+    )
+    .replace(
+      /^#\s+(.+)$/gm,
+      '<h1>$1</h1>'
+    );
+
+  x = x.replace(
+    /^>\s?(.+)$/gm,
+    '<blockquote>$1</blockquote>'
+  );
+
+  x = x
+    .replace(
+      /^[-*]\s+(.+)$/gm,
+      '<li>$1</li>'
+    )
+    .replace(
+      /^(\d+)\.\s+(.+)$/gm,
+      '<li data-ol="$1">$2</li>'
+    );
+
+  x = x.replace(
+    /(<li(?: data-ol="\d+")?>.*?<\/li>\n?)+/g,
+    function(m){
+
+      var ordered = /data-ol=/.test(m);
+
+      return '<' +
+        (ordered ? 'ol' : 'ul') +
+        '>' +
+        m.replace(
+          / data-ol="\d+"/g,
+          ''
+        ) +
+        '</' +
+        (ordered ? 'ol' : 'ul') +
+        '>';
+    }
+  );
+
+  x = x.replace(
+    /^---+$/gm,
+    '<hr>'
+  );
+
+  x = x.replace(
+    /\|([^\n]+)\|\n\|\s*[-:]+(?:\s*\|\s*[-:]+)+\s*\|\n((?:\|[^\n]+\|\n?)+)/g,
+    function(m,head,rows){
+
+      var cells = head
+        .split('|')
+        .map(function(v){
+          return v.trim();
+        })
+        .filter(Boolean);
+
+      var body = rows
+        .trim()
+        .split('\n')
+        .map(function(r){
+          return r
+            .split('|')
+            .map(function(v){
+              return v.trim();
+            })
+            .filter(Boolean);
+        });
+
+      return '<div class="table-wrap">' +
+        '<table>' +
+        '<thead><tr>' +
+        cells.map(function(c){
+          return '<th>' + c + '</th>';
+        }).join('') +
+        '</tr></thead>' +
+        '<tbody>' +
+        body.map(function(r){
+          return '<tr>' +
+            r.map(function(c){
+              return '<td>' + c + '</td>';
+            }).join('') +
+            '</tr>';
+        }).join('') +
+        '</tbody>' +
+        '</table>' +
+        '</div>';
+    }
+  );
+
+  x = x
+    .replace(
+      /\*\*(.+?)\*\*/g,
+      '<strong>$1</strong>'
+    )
+    .replace(
+      /__(.+?)__/g,
+      '<strong>$1</strong>'
+    )
+    .replace(
+      /(?<!\*)\*([^*\n]+)\*(?!\*)/g,
+      '<em>$1</em>'
+    )
+    .replace(
+      /(?<!_)_([^_\n]+)_(?!_)/g,
+      '<em>$1</em>'
+    );
+
+  x = x.replace(
+    /\x60([^\x60\n]+)\x60/g,
+    '<span class="inline-code">$1</span>'
+  );
+
+  x = x.replace(
+    /$begin:math:display$\(\[\^$end:math:display$]+)\]$begin:math:text$\(https\?\:\\\/\\\/\[\^\\s\)\]\+\)$end:math:text$/g,
+    '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+  );
+
+  x = x
+    .split(/\n{2,}/)
+    .map(function(part){
+
+      if(
+        /^<(h[1-3]|ul|ol|blockquote|pre|div|table|hr)/.test(
+          part.trim()
+        ) ||
+        /^@@CODE\d+@@$/.test(part.trim())
+      ){
+        return part;
+      }
+
+      return part.replace(
+        /\n/g,
+        '<br>'
+      );
+    })
+    .join('<div class="md-gap"></div>');
+
+  x = x.replace(
+    /@@CODE(\d+)@@/g,
+    function(_,i){
+
+      var b = blocks[Number(i)];
+
+      return '<div class="code-wrap">' +
+        '<div class="code-head">' +
+        '<span>' +
+        esc(b.lang) +
+        '</span>' +
+        '<button class="code-copy" data-code="' +
+        encodeURIComponent(b.code) +
+        '">' +
+        'Copy code' +
+        '</button>' +
+        '</div>' +
+        '<pre><code>' +
+        codeEsc(b.code) +
+        '</code></pre>' +
+        '</div>';
+    }
+  );
+
+  return x;
+}
+
+function bindRendered(root,raw){
+
+  root
+    .querySelectorAll('.code-copy')
+    .forEach(btn => {
+
+      btn.onclick = () => {
+
+        const code =
+          decodeURIComponent(
+            btn.dataset.code
+          );
+
+        navigator.clipboard?.writeText(code);
+
+        btn.textContent = 'Copied';
+
+        setTimeout(
+          () => btn.textContent = 'Copy code',
+          1000
+        );
+      };
+    });
+}
+
+function current(){
+  return state.chats.find(
+    c => c.id === state.current
+  ) || null;
+}
+
+function renderHistory(filter = ''){
+
+  const h = $('history');
+
+  h.innerHTML = '';
+
+  state.chats
+    .filter(
+      c =>
+        !filter ||
+        c.title
+          .toLowerCase()
+          .includes(filter.toLowerCase())
+    )
+    .slice()
+    .reverse()
+    .forEach(c => {
+
+      const d =
+        document.createElement('div');
+
+      d.className =
+        'history-item ' +
+        (c.id === state.current
+          ? 'active'
+          : '');
+
+      d.innerHTML =
+        '<span>💬</span>' +
+        '<span class="history-title"></span>' +
+        '<button class="more" title="Delete">⋯</button>';
+
+      d.querySelector(
+        '.history-title'
+      ).textContent = c.title;
+
+      d.onclick = e => {
+
+        if(
+          e.target.closest('.more')
+        ){
+
+          state.chats =
+            state.chats.filter(
+              x => x.id !== c.id
+            );
+
+          if(
+            state.current === c.id
+          ){
+
+            state.current =
+              state.chats.at(-1)?.id ||
+              null;
+          }
+
+          save();
+          renderHistory();
+          renderCurrent();
+
+          return;
+        }
+
+        state.current = c.id;
+
+        renderHistory();
+        renderCurrent();
+        closeDrawer();
+      };
+
+      h.appendChild(d);
+    });
+}
+
+function renderCurrent(){
+
+  const box = $('messages');
+
+  box.innerHTML = '';
+
+  const c = current();
+
+  if(!c){
+
+    box.innerHTML =
+      '<div class="welcome">' +
+      '<div>' +
+      '<h1>How can I help you?</h1>' +
+      '<p>Ask anything, upload an image, attach a file, or create an image.</p>' +
+      '</div>' +
+      '</div>';
+
+    return;
+  }
+
+  c.messages.forEach(m => {
+
+    if(m.image){
+
+      addImageMessage(
+        'Generated image',
+        m.image
+      );
+
+    }else{
+
+      addMessage(
+        m.role,
+        m.content,
+        false
+      );
+    }
+
+  });
+}
+
+function addMessage(
+  role,
+  text,
+  actions = true
+){
+
+  const d =
+    document.createElement('div');
+
+  d.className =
+    'msg ' + role;
+
+  d.innerHTML =
+    '<div class="avatar">' +
+    (role === 'user' ? 'U' : 'A') +
+    '</div>' +
+
+    '<div class="bubble">' +
+
+    '<div class="content">' +
+    md(text) +
+    '</div>' +
+
+    (
+      actions
+      ?
+      '<div class="message-actions">' +
+      '<button class="mini copy">Copy</button>' +
+      (
+        role === 'assistant'
+        ?
+        '<button class="mini regen">Regenerate</button>'
+        :
+        ''
+      ) +
+      '</div>'
+      :
+      ''
+    ) +
+
+    '</div>';
+
+  $('messages').appendChild(d);
+
+  bindRendered(d,text);
+
+  d.querySelector('.copy')
+    ?.addEventListener(
+      'click',
+      () => navigator.clipboard?.writeText(text)
+    );
+
+  d.querySelector('.regen')
+    ?.addEventListener(
+      'click',
+      () => regenerate()
+    );
+
+  return d;
+}
+
+function addImageMessage(
+  prompt,
+  dataURL
+){
+
+  const d =
+    document.createElement('div');
+
+  d.className =
+    'msg assistant';
+
+  d.innerHTML =
+    '<div class="avatar">A</div>' +
+    '<div class="bubble">' +
+    '<div class="content">' +
+    '<p>' +
+    esc(prompt) +
+    '</p>' +
+    '<div class="image-card">' +
+    '<img src="' +
+    dataURL +
+    '" alt="AI generated image">' +
+    '<div class="image-toolbar">' +
+    '<button class="mini image-download">Save image</button>' +
+    '</div>' +
+    '</div>' +
+    '</div>' +
+    '</div>';
+
+  $('messages').appendChild(d);
+
+  d.querySelector(
+    '.image-download'
+  ).onclick = () => {
+
+    const a =
+      document.createElement('a');
+
+    a.href = dataURL;
+    a.download =
+      'aether-generated-image.jpg';
+
+    a.click();
   };
 
-  const STORAGE_CHATS = "my_ai_chats_v4";
-  const STORAGE_MODEL = "my_ai_model_v4";
+  return d;
+}
 
-  /* =====================================================
-     STORAGE
-  ===================================================== */
+function newChat(){
 
-  function saveChats() {
-    try {
-      localStorage.setItem(
-        STORAGE_CHATS,
-        JSON.stringify(state.chats)
-      );
-    } catch (_) {}
+  const c = {
+    id:uid(),
+    title:'New chat',
+    messages:[],
+    created:Date.now()
+  };
+
+  state.chats.push(c);
+
+  state.current = c.id;
+
+  state.attachments = [];
+
+  renderAttachments();
+
+  save();
+  renderHistory();
+  renderCurrent();
+
+  closeDrawer();
+
+  $('prompt').focus();
+}
+
+function ensureChat(title){
+
+  if(!current()){
+    newChat();
   }
 
-  function loadChats() {
-    try {
-      const raw =
-        localStorage.getItem(STORAGE_CHATS);
+  const c = current();
 
-      const data = raw
-        ? JSON.parse(raw)
-        : [];
-
-      state.chats =
-        Array.isArray(data)
-          ? data
-          : [];
-    } catch (_) {
-      state.chats = [];
-    }
+  if(
+    c.title === 'New chat' &&
+    title
+  ){
+    c.title =
+      title.slice(0,50);
   }
 
-  function savedModel() {
-    try {
-      return localStorage.getItem(
-        STORAGE_MODEL
-      );
-    } catch (_) {
-      return null;
-    }
-  }
+  return c;
+}
 
-  function saveModel(id) {
-    try {
-      localStorage.setItem(
-        STORAGE_MODEL,
-        id || ""
-      );
-    } catch (_) {}
-  }
+function renderAttachments(){
 
-  /* =====================================================
-     CHAT MANAGEMENT
-  ===================================================== */
+  const a = $('attachments');
 
-  function makeId() {
-    return (
-      Date.now().toString(36) +
-      Math.random()
-        .toString(36)
-        .slice(2)
-    );
-  }
+  a.innerHTML = '';
 
-  function newChat() {
-    state.currentChatId = makeId();
+  state.attachments.forEach(
+    (f,i) => {
 
-    state.chats.unshift({
-      id: state.currentChatId,
-      title: "New chat",
-      messages: [],
-      created: Date.now(),
-      updated: Date.now()
-    });
+      const d =
+        document.createElement('div');
 
-    saveChats();
-    renderHistory();
-    renderMessages();
+      d.className = 'chip';
 
-    closeDrawer();
-    $("prompt").focus();
-  }
+      d.textContent =
+        '📎 ' + f.name + ' ×';
 
-  function currentChat() {
-    return state.chats.find(
-      chat =>
-        chat.id === state.currentChatId
-    );
-  }
+      d.onclick = () => {
 
-  function ensureChat() {
-    let chat = currentChat();
+        state.attachments.splice(i,1);
 
-    if (!chat) {
-      state.currentChatId = makeId();
-
-      chat = {
-        id: state.currentChatId,
-        title: "New chat",
-        messages: [],
-        created: Date.now(),
-        updated: Date.now()
+        renderAttachments();
       };
 
-      state.chats.unshift(chat);
+      a.appendChild(d);
     }
+  );
+}
 
-    return chat;
-  }
+function modelScore(m){
 
-  function createTitle(text) {
-    const clean =
-      String(text || "")
-        .replace(/\s+/g, " ")
-        .trim();
+  const caps =
+    new Set(m.capabilities || []);
 
-    if (!clean) return "New chat";
+  let score = 0;
 
-    return clean.length > 55
-      ? clean.slice(0, 55) + "..."
-      : clean;
-  }
+  if(caps.has('reasoning'))
+    score += 50;
 
-  function openChat(id) {
-    state.currentChatId = id;
+  if(caps.has('vision'))
+    score += 20;
 
-    renderHistory();
-    renderMessages();
-    closeDrawer();
-  }
+  if(caps.has('web_search'))
+    score += 15;
 
-  function renderHistory() {
-    const container =
-      $("historyList");
+  if(caps.has('tools'))
+    score += 10;
 
-    const query =
-      $("historySearch").value
-        .toLowerCase()
-        .trim();
+  if(caps.has('streaming'))
+    score += 5;
 
-    container.innerHTML = "";
+  score += Math.min(
+    Number(m.context_window || 0) / 10000,
+    20
+  );
 
-    state.chats
-      .filter(chat =>
-        !query ||
-        String(chat.title)
-          .toLowerCase()
-          .includes(query)
-      )
-      .slice(0, 100)
-      .forEach(chat => {
+  return score;
+}
 
-        const item =
-          document.createElement("div");
+function chooseDefaultModel(models){
 
-        item.className =
-          "chatItem" +
-          (
-            chat.id ===
-            state.currentChatId
-              ? " active"
-              : ""
-          );
-
-        item.textContent =
-          chat.title || "New chat";
-
-        item.onclick = () =>
-          openChat(chat.id);
-
-        container.appendChild(item);
-      });
-  }
-
-  /* =====================================================
-     MARKDOWN
-  ===================================================== */
-
-  function escapeHtml(text) {
-    return String(text || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
-
-  function inlineMarkdown(text) {
-
-    let out =
-      escapeHtml(text);
-
-    out =
-      out.replace(
-        /`([^`]+)`/g,
-        '<code class="inlineCode">$1</code>'
-      );
-
-    out =
-      out.replace(
-        /\\*\\*([^*]+)\\*\\*/g,
-        "<strong>$1</strong>"
-      );
-
-    out =
-      out.replace(
-        /\\*([^*]+)\\*/g,
-        "<em>$1</em>"
-      );
-
-    out =
-      out.replace(
-        /\\[([^\\]]+)\\]\\((https?:\\/\\/[^\\s)]+)\\)/g,
-        '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
-      );
-
-    return out;
-  }
-
-  function markdown(text) {
-
-    let source =
-      String(text || "")
-        .replace(/\\r\\n/g, "\\n")
-        .replace(/\\r/g, "\\n");
-
-    const lines =
-      source.split("\\n");
-
-    let html = "";
-    let inCode = false;
-    let codeLang = "";
-    let code = "";
-    let listMode = null;
-
-    function closeList() {
-      if (listMode === "ul") {
-        html += "</ul>";
-      }
-
-      if (listMode === "ol") {
-        html += "</ol>";
-      }
-
-      listMode = null;
-    }
-
-    function closeCode() {
-      if (!inCode) return;
-
-      const safe =
-        escapeHtml(code);
-
-      html +=
-        '<div class="codeBlock">' +
-          '<div class="codeHead">' +
-            "<span>" +
-              escapeHtml(
-                codeLang || "code"
-              ) +
-            "</span>" +
-            '<button class="codeCopy" data-code="' +
-              encodeURIComponent(code) +
-            '">' +
-              "Copy" +
-            "</button>" +
-          "</div>" +
-          "<pre>" +
-            safe +
-          "</pre>" +
-        "</div>";
-
-      inCode = false;
-      code = "";
-      codeLang = "";
-    }
-
-    for (let i = 0; i < lines.length; i++) {
-
-      const line = lines[i];
-
-      if (
-        line.trim().startsWith("```")
-      ) {
-
-        if (inCode) {
-          closeCode();
-        } else {
-          closeList();
-
-          inCode = true;
-
-          codeLang =
-            line
-              .trim()
-              .slice(3)
-              .trim();
-        }
-
-        continue;
-      }
-
-      if (inCode) {
-        code +=
-          (code ? "\\n" : "") +
-          line;
-
-        continue;
-      }
-
-      if (!line.trim()) {
-        closeList();
-        continue;
-      }
-
-      if (/^###\\s+/.test(line)) {
-        closeList();
-
-        html +=
-          "<h3>" +
-          inlineMarkdown(
-            line.replace(/^###\\s+/, "")
-          ) +
-          "</h3>";
-
-        continue;
-      }
-
-      if (/^##\\s+/.test(line)) {
-        closeList();
-
-        html +=
-          "<h2>" +
-          inlineMarkdown(
-            line.replace(/^##\\s+/, "")
-          ) +
-          "</h2>";
-
-        continue;
-      }
-
-      if (/^#\\s+/.test(line)) {
-        closeList();
-
-        html +=
-          "<h1>" +
-          inlineMarkdown(
-            line.replace(/^#\\s+/, "")
-          ) +
-          "</h1>";
-
-        continue;
-      }
-
-      if (/^[-*]\\s+/.test(line)) {
-
-        if (listMode !== "ul") {
-          closeList();
-
-          html += "<ul>";
-          listMode = "ul";
-        }
-
-        html +=
-          "<li>" +
-          inlineMarkdown(
-            line.replace(/^[-*]\\s+/, "")
-          ) +
-          "</li>";
-
-        continue;
-      }
-
-      if (/^\\d+\\.\\s+/.test(line)) {
-
-        if (listMode !== "ol") {
-          closeList();
-
-          html += "<ol>";
-          listMode = "ol";
-        }
-
-        html +=
-          "<li>" +
-          inlineMarkdown(
-            line.replace(/^\\d+\\.\\s+/, "")
-          ) +
-          "</li>";
-
-        continue;
-      }
-
-      closeList();
-
-      html +=
-        "<p>" +
-        inlineMarkdown(line) +
-        "</p>";
-    }
-
-    closeList();
-    closeCode();
-
-    return html;
-  }
-
-  /* =====================================================
-     MESSAGE RENDER
-  ===================================================== */
-
-  function renderMessages() {
-
-    const container =
-      $("messagesInner");
-
-    const chat =
-      currentChat();
-
-    if (!chat || !chat.messages.length) {
-
-      container.innerHTML =
-        '<div class="empty" id="emptyState">' +
-          '<div class="emptyBox">' +
-            '<img class="emptyIcon" src="/icon.svg" alt="">' +
-            '<div class="emptyTitle">How can I help?</div>' +
-            '<div class="emptySub">' +
-              "Ask anything, research a topic, " +
-              "write code, analyze ideas or generate an image." +
-            "</div>" +
-          "</div>" +
-        "</div>";
-
-      return;
-    }
-
-    container.innerHTML = "";
-
-    chat.messages.forEach(
-      (message, index) => {
-
-        const row =
-          document.createElement("div");
-
-        row.className =
-          "message " +
-          (
-            message.role === "user"
-              ? "user"
-              : "assistant"
-          );
-
-        const avatar =
-          document.createElement("div");
-
-        avatar.className = "avatar";
-
-        avatar.textContent =
-          message.role === "user"
-            ? "You"
-            : "AI";
-
-        const wrap =
-          document.createElement("div");
-
-        wrap.className =
-          "bubbleWrap";
-
-        const bubble =
-          document.createElement("div");
-
-        bubble.className =
-          "bubble";
-
-        if (
-          message.role === "assistant"
-        ) {
-          bubble.innerHTML =
-            markdown(message.content);
-        } else {
-          bubble.textContent =
-            message.content;
-        }
-
-        wrap.appendChild(bubble);
-
-        if (
-          message.role === "assistant"
-        ) {
-
-          const actions =
-            document.createElement("div");
-
-          actions.className =
-            "actions";
-
-          const copy =
-            document.createElement("button");
-
-          copy.className =
-            "actionBtn";
-
-          copy.textContent =
-            "Copy";
-
-          copy.onclick = () =>
-            copyText(
-              message.content
-            );
-
-          actions.appendChild(copy);
-
-          const regen =
-            document.createElement("button");
-
-          regen.className =
-            "actionBtn";
-
-          regen.textContent =
-            "Regenerate";
-
-          regen.onclick = () =>
-            regenerate(index);
-
-          actions.appendChild(regen);
-
-          wrap.appendChild(actions);
-
-          if (
-            Array.isArray(
-              message.sources
-            ) &&
-            message.sources.length
-          ) {
-
-            const research =
-              document.createElement("div");
-
-            research.className =
-              "researchBox";
-
-            research.textContent =
-              "Web research";
-
-            message.sources
-              .slice(0, 5)
-              .forEach(source => {
-
-                const link =
-                  document.createElement("a");
-
-                link.className =
-                  "sourceLink";
-
-                link.href =
-                  source.url;
-
-                link.target =
-                  "_blank";
-
-                link.rel =
-                  "noopener noreferrer";
-
-                link.textContent =
-                  "• " +
-                  (
-                    source.title ||
-                    source.url
-                  );
-
-                research.appendChild(
-                  link
-                );
-              });
-
-            wrap.appendChild(
-              research
-            );
-          }
-        }
-
-        row.appendChild(avatar);
-        row.appendChild(wrap);
-
-        container.appendChild(row);
-      }
+  const exact =
+    models.find(
+      m => m.id === 'claude-opus-4.8'
     );
 
-    bindCodeCopyButtons();
+  if(exact)
+    return exact;
 
-    requestAnimationFrame(() => {
-      const messages =
-        $("messages");
+  return [...models].sort(
+    (a,b) =>
+      modelScore(b) -
+      modelScore(a)
+  )[0];
+}
 
-      messages.scrollTop =
-        messages.scrollHeight;
-    });
-  }
+async function loadModels(){
 
-  function bindCodeCopyButtons() {
+  try{
 
-    document
-      .querySelectorAll(".codeCopy")
-      .forEach(button => {
+    const r =
+      await fetch('/api/models');
 
-        button.onclick = async () => {
-
-          try {
-            const code =
-              decodeURIComponent(
-                button.dataset.code || ""
-              );
-
-            await copyText(code);
-
-            button.textContent =
-              "Copied";
-
-            setTimeout(() => {
-              button.textContent =
-                "Copy";
-            }, 1200);
-
-          } catch (_) {}
-        };
-      });
-  }
-
-  async function copyText(text) {
-
-    try {
-      await navigator.clipboard.writeText(
-        String(text || "")
+    if(!r.ok)
+      throw new Error(
+        await r.text()
       );
 
-      return;
-    } catch (_) {}
+    const data =
+      await r.json();
 
-    const textarea =
-      document.createElement("textarea");
-
-    textarea.value =
-      String(text || "");
-
-    document.body.appendChild(
-      textarea
-    );
-
-    textarea.select();
-
-    try {
-      document.execCommand("copy");
-    } catch (_) {}
-
-    textarea.remove();
-  }
-
-  /* =====================================================
-     MODEL LOADER
-  ===================================================== */
-
-  async function fetchJsonWithTimeout(
-    url,
-    timeout = 15000
-  ) {
-
-    const controller =
-      new AbortController();
-
-    const timer =
-      setTimeout(() => {
-        controller.abort();
-      }, timeout);
-
-    try {
-
-      const response =
-        await fetch(
-          url,
-          {
-            signal:
-              controller.signal,
-            cache:
-              "no-store"
-          }
-        );
-
-      const data =
-        await response.json();
-
-      return {
-        response,
-        data
-      };
-
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
-  async function loadModels() {
+    state.models =
+      data.data || [];
 
     const select =
-      $("modelSelect");
+      $('model');
 
-    const info =
-      $("modelInfo");
+    select.innerHTML = '';
 
-    select.innerHTML =
-      "<option>Loading models...</option>";
+    state.models.forEach(m => {
 
-    select.disabled = true;
+      const o =
+        document.createElement('option');
 
-    info.textContent =
-      "Connecting to CodeCraft...";
+      o.value = m.id;
 
-    try {
+      o.textContent =
+        m.name || m.id;
 
-      const result =
-        await fetchJsonWithTimeout(
-          "/api/models",
-          15000
-        );
-
-      const response =
-        result.response;
-
-      const data =
-        result.data;
-
-      if (
-        !response.ok ||
-        !data.ok
-      ) {
-        throw new Error(
-          data.error ||
-          "Could not load models."
-        );
-      }
-
-      state.models =
-        Array.isArray(data.models)
-          ? data.models
-          : [];
-
-      if (!state.models.length) {
-        throw new Error(
-          "CodeCraft returned zero models."
-        );
-      }
-
-      const saved =
-        savedModel();
-
-      const savedExists =
-        saved &&
-        state.models.some(
-          model =>
-            model.id === saved
-        );
-
-      state.currentModel =
-        savedExists
-          ? saved
-          : data.best ||
-            state.models[0].id;
-
-      select.innerHTML = "";
-
-      state.models.forEach(model => {
-
-        const option =
-          document.createElement("option");
-
-        option.value =
-          model.id;
-
-        const caps =
-          Array.isArray(
-            model.capabilities
-          )
-            ? model.capabilities
-                .map(cap =>
-                  cap === "web_search"
-                    ? "Web"
-                    : cap === "reasoning"
-                      ? "Reasoning"
-                      : cap === "vision"
-                        ? "Vision"
-                        : cap === "tools"
-                          ? "Tools"
-                          : cap
-                )
-                .slice(0, 4)
-                .join(" • ")
-            : "";
-
-        option.textContent =
-          model.name +
-          (
-            caps
-              ? " — " + caps
-              : ""
-          );
-
-        select.appendChild(
-          option
-        );
-      });
-
-      select.value =
-        state.currentModel;
-
-      select.disabled = false;
-
-      updateModelInfo();
-
-      setStatus(
-        state.models.length +
-        " models ready"
-      );
-
-    } catch (error) {
-
-      state.models = [];
-
-      select.innerHTML =
-        '<option value="">Models unavailable</option>';
-
-      select.disabled = true;
-
-      info.textContent =
-        error.name === "AbortError"
-          ? "Model request timed out."
-          : (
-              error.message ||
-              "Model loading failed."
-            );
-
-      setStatus(
-        "Model loading failed"
-      );
-    }
-  }
-
-  function updateModelInfo() {
-
-    const model =
-      state.models.find(
-        item =>
-          item.id ===
-          state.currentModel
-      );
-
-    if (!model) {
-      $("modelInfo").textContent =
-        "No model selected";
-
-      return;
-    }
-
-    const caps =
-      Array.isArray(
-        model.capabilities
-      )
-        ? model.capabilities.join(" • ")
-        : "";
-
-    $("modelInfo").textContent =
-      caps ||
-      "CodeCraft model";
-  }
-
-  /* =====================================================
-     SEND CHAT
-  ===================================================== */
-
-  async function sendMessage() {
-
-    if (state.generating) return;
-
-    const prompt =
-      $("prompt")
-        .value
-        .trim();
-
-    if (!prompt) return;
-
-    const chat =
-      ensureChat();
-
-    if (!chat.messages.length) {
-      chat.title =
-        createTitle(prompt);
-    }
-
-    chat.messages.push({
-      role: "user",
-      content: prompt
+      select.appendChild(o);
     });
 
-    chat.updated =
-      Date.now();
+    const best =
+      chooseDefaultModel(
+        state.models
+      );
 
-    saveChats();
-    renderHistory();
-    renderMessages();
+    if(best)
+      select.value = best.id;
 
-    $("prompt").value = "";
-    autoResize();
+    if(!state.models.length)
+      throw new Error(
+        'No models available'
+      );
 
-    state.generating = true;
+  }catch(e){
 
-    $("sendBtn").style.display =
-      "none";
+    $('model').innerHTML =
+      '<option>Models failed — retry</option>';
 
-    $("stopBtn").style.display =
-      "block";
+    console.error(e);
+  }
+}
 
-    $("prompt").disabled = true;
+function memoryText(){
 
-    setStatus(
-      "Generating..."
+  return state.memories.length
+    ?
+      '\n\nKnown memory:\n' +
+      state.memories
+        .map(x => '- ' + x)
+        .join('\n')
+    :
+      '';
+}
+
+function scrollToBottom(){
+
+  const el = $('chat');
+
+  el.scrollTop =
+    el.scrollHeight;
+}
+
+function wantsImage(text){
+
+  return (
+    /\b(generate|create|make|draw|design|render|produce)\b[\s\S]{0,80}\b(image|picture|photo|wallpaper|illustration|artwork|logo)\b/i
+    .test(text)
+  ) ||
+  (
+    /\b(image|picture|photo|wallpaper|illustration|artwork|logo)\b[\s\S]{0,40}\b(generate|create|make|draw|design|render)\b/i
+    .test(text)
+  );
+}
+
+async function generateImage(prompt){
+
+  const c =
+    ensureChat(
+      prompt || 'Generated image'
     );
 
-    const assistantMessage = {
-      role: "assistant",
-      content: "",
-      sources: []
-    };
+  state.busy = true;
 
-    chat.messages.push(
-      assistantMessage
+  $('send').disabled = true;
+
+  const ai =
+    addMessage(
+      'assistant',
+      '',
+      false
     );
 
-    renderMessages();
+  ai.querySelector(
+    '.content'
+  ).innerHTML =
+    '<div class="typing">' +
+    '<i></i><i></i><i></i>' +
+    '</div>';
 
-    try {
+  try{
 
-      state.controller =
-        new AbortController();
-
-      const response =
-        await fetch(
-          "/api/chat",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type":
-                "application/json"
-            },
-            body: JSON.stringify({
-              model:
-                state.currentModel,
-              messages:
-                chat.messages
-                  .slice(
-                    0,
-                    -1
-                  ),
-              temperature: 0.7,
-              max_tokens: 8192
-            }),
-            signal:
-              state.controller.signal
-          }
-        );
-
-      if (!response.ok) {
-
-        let data = null;
-
-        try {
-          data =
-            await response.json();
-        } catch (_) {}
-
-        throw new Error(
-          data?.error ||
-          "Chat request failed: HTTP " +
-          response.status
-        );
-      }
-
-      if (!response.body) {
-        throw new Error(
-          "The server returned an empty stream."
-        );
-      }
-
-      const reader =
-        response.body.getReader();
-
-      const decoder =
-        new TextDecoder();
-
-      let buffer = "";
-
-      while (true) {
-
-        const result =
-          await reader.read();
-
-        if (result.done) break;
-
-        buffer +=
-          decoder.decode(
-            result.value,
-            {
-              stream: true
-            }
-          );
-
-        const events =
-          buffer.split("\\n\\n");
-
-        buffer =
-          events.pop() || "";
-
-        for (const event of events) {
-          processSSE(
-            event,
-            assistantMessage
-          );
+    const r =
+      await fetch(
+        '/api/generate-image',
+        {
+          method:'POST',
+          headers:{
+            'Content-Type':
+              'application/json'
+          },
+          body:JSON.stringify({
+            prompt
+          })
         }
+      );
 
-        renderMessages();
-      }
+    if(!r.ok)
+      throw new Error(
+        await r.text()
+      );
 
-      if (buffer.trim()) {
-        processSSE(
-          buffer,
-          assistantMessage
-        );
-      }
+    const data =
+      await r.json();
 
-      chat.updated =
-        Date.now();
+    ai.remove();
 
-      saveChats();
+    addImageMessage(
+      'Generated image',
+      data.dataURI
+    );
 
-      if (
-        !assistantMessage.content
-      ) {
-        assistantMessage.content =
-          "The model returned an empty response.";
-      }
+    c.messages.push({
+      role:'assistant',
+      content:
+        '[Generated image] ' +
+        prompt,
+      image:data.dataURI
+    });
 
-    } catch (error) {
+    save();
 
-      if (
-        error.name ===
-        "AbortError"
-      ) {
+  }catch(e){
 
-        if (
-          !assistantMessage.content
-        ) {
-          assistantMessage.content =
-            "Generation stopped.";
-        }
+    ai.querySelector(
+      '.content'
+    ).innerHTML =
+      '<p class="danger">' +
+      'Image generation failed: ' +
+      esc(e.message) +
+      '</p>';
 
-      } else {
+  }finally{
 
-        assistantMessage.content =
-          "Error: " +
-          (
-            error.message ||
-            "Request failed."
-          );
-      }
+    state.busy = false;
 
-      saveChats();
-      renderMessages();
+    $('send').disabled = false;
 
-    } finally {
+    $('prompt').focus();
+  }
+}
 
-      state.controller = null;
-      state.generating = false;
+async function send(){
 
-      $("sendBtn").style.display =
-        "block";
+  if(state.busy)
+    return;
 
-      $("stopBtn").style.display =
-        "none";
+  const prompt =
+    $('prompt').value.trim();
 
-      $("prompt").disabled =
-        false;
-
-      setStatus("Ready");
-
-      renderMessages();
-
-      $("prompt").focus();
-    }
+  if(
+    !prompt &&
+    !state.attachments.length
+  ){
+    return;
   }
 
-  /* =====================================================
-     SSE PROCESSING
-  ===================================================== */
+  if(
+    !state.attachments.length &&
+    wantsImage(prompt)
+  ){
 
-  function processSSE(
-    eventText,
-    assistantMessage
-  ) {
+    $('prompt').value = '';
 
-    const lines =
-      eventText.split("\\n");
+    autoSize();
 
-    let eventName = "";
-    let data = "";
+    await generateImage(prompt);
 
-    for (const line of lines) {
+    return;
+  }
 
-      if (
-        line.startsWith("event:")
-      ) {
-        eventName =
-          line
-            .slice(6)
-            .trim();
+  const c =
+    ensureChat(
+      prompt || 'File chat'
+    );
+
+  const files =
+    state.attachments.slice();
+
+  state.attachments = [];
+
+  renderAttachments();
+
+  c.messages.push({
+    role:'user',
+    content:
+      prompt ||
+      'Please analyze the attached file(s).'
+  });
+
+  if(c.title === 'New chat'){
+
+    c.title =
+      (
+        prompt ||
+        files[0]?.name ||
+        'New chat'
+      ).slice(0,50);
+  }
+
+  save();
+
+  renderHistory();
+  renderCurrent();
+  scrollToBottom();
+
+  state.busy = true;
+
+  $('send').disabled = true;
+
+  $('prompt').value = '';
+
+  autoSize();
+
+  const ai =
+    addMessage(
+      'assistant',
+      '',
+      false
+    );
+
+  const content =
+    ai.querySelector(
+      '.content'
+    );
+
+  content.innerHTML =
+    '<div class="typing">' +
+    '<i></i><i></i><i></i>' +
+    '</div>';
+
+  try{
+
+    let selected =
+      $('model').value;
+
+    if(
+      files.some(
+        f => f.type.startsWith('image/')
+      )
+    ){
+
+      const currentModel =
+        state.models.find(
+          m => m.id === selected
+        );
+
+      if(
+        !currentModel?.capabilities?.includes?.('vision') &&
+        !currentModel?.capabilities?.vision
+      ){
+
+        const vision =
+          state.models.find(
+            m =>
+              (m.capabilities || [])
+                .includes('vision') ||
+              m.capabilities?.vision
+          );
+
+        if(vision){
+
+          selected =
+            vision.id;
+
+          $('model').value =
+            vision.id;
+        }
       }
+    }
 
-      if (
-        line.startsWith("data:")
-      ) {
-        data +=
+    const payload = {
+      model:selected,
+      messages:
+        buildMessages(
+          c,
+          files
+        ),
+      stream:true,
+      max_tokens:8192
+    };
+
+    const r =
+      await fetch(
+        '/api/chat',
+        {
+          method:'POST',
+          headers:{
+            'Content-Type':
+              'application/json'
+          },
+          body:
+            JSON.stringify(payload)
+        }
+      );
+
+    if(!r.ok)
+      throw new Error(
+        await r.text()
+      );
+
+    const reader =
+      r.body.getReader();
+
+    const decoder =
+      new TextDecoder();
+
+    let buffer = '';
+    let answer = '';
+
+    while(true){
+
+      const q =
+        await reader.read();
+
+      if(q.done)
+        break;
+
+      buffer +=
+        decoder.decode(
+          q.value,
+          {stream:true}
+        );
+
+      const lines =
+        buffer.split('\n');
+
+      buffer =
+        lines.pop();
+
+      for(
+        const line of lines
+      ){
+
+        if(
+          !line.startsWith('data:')
+        )
+          continue;
+
+        const raw =
           line
             .slice(5)
             .trim();
+
+        if(raw === '[DONE]')
+          continue;
+
+        try{
+
+          const j =
+            JSON.parse(raw);
+
+          const delta =
+            j.choices?.[0]
+              ?.delta
+              ?.content || '';
+
+          if(!delta)
+            continue;
+
+          answer += delta;
+
+          content.innerHTML =
+            md(answer);
+
+          bindRendered(
+            ai,
+            answer
+          );
+
+        }catch{}
       }
     }
 
-    if (!data) return;
+    content.innerHTML =
+      md(
+        answer ||
+        'No response received.'
+      );
 
-    if (data === "[DONE]") {
-      return;
+    bindRendered(
+      ai,
+      answer
+    );
+
+    c.messages.push({
+      role:'assistant',
+      content:
+        answer ||
+        'No response received.'
+    });
+
+    save();
+
+    ai.querySelector(
+      '.bubble'
+    ).insertAdjacentHTML(
+      'beforeend',
+      '<div class="message-actions">' +
+      '<button class="mini copy">Copy</button>' +
+      '<button class="mini regen">Regenerate</button>' +
+      '</div>'
+    );
+
+    ai.querySelector(
+      '.copy'
+    ).onclick =
+      () =>
+        navigator.clipboard?.writeText(
+          answer
+        );
+
+    ai.querySelector(
+      '.regen'
+    ).onclick =
+      () => regenerate();
+
+    extractMemory(
+      prompt,
+      answer
+    );
+
+  }catch(e){
+
+    content.innerHTML =
+      '<p class="danger">' +
+      'Error: ' +
+      esc(e.message) +
+      '</p>';
+
+    c.messages.push({
+      role:'assistant',
+      content:
+        'Error: ' +
+        e.message
+    });
+
+    save();
+
+  }finally{
+
+    state.busy = false;
+
+    $('send').disabled = false;
+
+    $('prompt').focus();
+  }
+}
+
+function buildMessages(
+  c,
+  files
+){
+
+  const msgs =
+    [...c.messages];
+
+  const last =
+    msgs.pop();
+
+  const out =
+    msgs.map(
+      m => ({
+        role:m.role,
+        content:m.content
+      })
+    );
+
+  let userContent = [];
+
+  if(last?.content){
+
+    userContent.push({
+      type:'text',
+      text:last.content
+    });
+  }
+
+  for(
+    const f of files
+  ){
+
+    if(
+      f.type.startsWith('image/')
+    ){
+
+      userContent.push({
+        type:'image_url',
+        image_url:{
+          url:f.data
+        }
+      });
+
+    }else{
+
+      userContent.push({
+        type:'text',
+        text:
+          'Attached file: ' +
+          f.name +
+          '\n' +
+          (f.text || '')
+      });
     }
+  }
 
-    let parsed;
+  if(userContent.length){
 
-    try {
-      parsed =
-        JSON.parse(data);
-    } catch (_) {
-      return;
+    out.push({
+      role:'user',
+      content:userContent
+    });
+  }
+
+  if(state.memories.length){
+
+    out.unshift({
+      role:'system',
+      content:
+        'Use these remembered facts only when relevant. ' +
+        state.memories.join('; ')
+    });
+  }
+
+  return out;
+}
+
+async function prepareFile(file){
+
+  return new Promise(
+    resolve => {
+
+      const fr =
+        new FileReader();
+
+      fr.onload = () => {
+
+        const data =
+          String(fr.result);
+
+        if(
+          file.type.startsWith('image/')
+        ){
+
+          resolve({
+            name:file.name,
+            type:file.type,
+            data
+          });
+
+        }else{
+
+          resolve({
+            name:file.name,
+            type:file.type,
+            text:
+              data.slice(
+                0,
+                120000
+              )
+          });
+        }
+      };
+
+      if(
+        file.type.startsWith('image/')
+      ){
+
+        fr.readAsDataURL(file);
+
+      }else{
+
+        fr.readAsText(file);
+      }
     }
+  );
+}
 
-    if (
-      eventName ===
-      "my_ai_meta"
-    ) {
+function regenerate(){
 
-      if (
-        Array.isArray(
-          parsed.sources
+  const c = current();
+
+  if(
+    !c ||
+    state.busy ||
+    c.messages.length < 2
+  )
+    return;
+
+  c.messages.pop();
+
+  const user =
+    c.messages.pop();
+
+  $('prompt').value =
+    user.content;
+
+  save();
+
+  renderCurrent();
+
+  scrollToBottom();
+
+  send();
+}
+
+function extractMemory(
+  prompt,
+  answer
+){
+
+  const p =
+    prompt.toLowerCase();
+
+  if(
+    /remember|my name is|i am|i'm|i like|i prefer/
+      .test(p)
+  ){
+
+    const item =
+      prompt.slice(0,220);
+
+    if(
+      item &&
+      !state.memories.includes(item)
+    ){
+
+      state.memories.push(item);
+
+      state.memories =
+        state.memories.slice(-30);
+
+      save();
+    }
+  }
+}
+
+function openMemory(){
+
+  const list =
+    $('memoryList');
+
+  list.innerHTML =
+    state.memories.length
+    ?
+      state.memories
+        .map(
+          (m,i) =>
+            '<div class="memory-row">' +
+            '<span>' +
+            esc(m) +
+            '</span>' +
+            '<button class="mini" onclick="removeMemory(' +
+            i +
+            ')">Delete</button>' +
+            '</div>'
         )
-      ) {
-        assistantMessage.sources =
-          parsed.sources;
-      }
+        .join('')
+    :
+      '<p>No memories yet.</p>';
 
-      return;
-    }
+  $('memoryModal')
+    .classList
+    .add('open');
+}
 
-    if (parsed.error) {
+window.removeMemory =
+  i => {
 
-      assistantMessage.content +=
-        "\\n\\nError: " +
-        parsed.error;
-
-      return;
-    }
-
-    const delta =
-      parsed
-        ?.choices?.[0]
-        ?.delta
-        ?.content;
-
-    if (typeof delta === "string") {
-      assistantMessage.content +=
-        delta;
-    }
-  }
-
-  /* =====================================================
-     STOP
-  ===================================================== */
-
-  function stopGeneration() {
-
-    if (state.controller) {
-      state.controller.abort();
-    }
-  }
-
-  /* =====================================================
-     REGENERATE
-  ===================================================== */
-
-  function regenerate(index) {
-
-    if (state.generating) return;
-
-    const chat =
-      currentChat();
-
-    if (!chat) return;
-
-    if (
-      index < 1 ||
-      chat.messages[index]
-        ?.role !== "assistant"
-    ) {
-      return;
-    }
-
-    chat.messages.splice(
-      index,
+    state.memories.splice(
+      i,
       1
     );
 
-    const lastUser =
-      chat.messages
-        .slice()
-        .reverse()
-        .find(
-          message =>
-            message.role ===
-            "user"
-        );
+    save();
 
-    if (!lastUser) {
-      saveChats();
-      renderMessages();
-      return;
-    }
-
-    saveChats();
-    renderMessages();
-
-    generateFromExistingHistory();
-  }
-
-  async function generateFromExistingHistory() {
-
-    const chat =
-      currentChat();
-
-    if (!chat) return;
-
-    const lastUserIndex =
-      chat.messages.length - 1;
-
-    if (
-      chat.messages[
-        lastUserIndex
-      ]?.role !== "user"
-    ) {
-      return;
-    }
-
-    const assistantMessage = {
-      role: "assistant",
-      content: "",
-      sources: []
-    };
-
-    chat.messages.push(
-      assistantMessage
-    );
-
-    state.generating = true;
-
-    $("sendBtn").style.display =
-      "none";
-
-    $("stopBtn").style.display =
-      "block";
-
-    setStatus(
-      "Generating..."
-    );
-
-    try {
-
-      state.controller =
-        new AbortController();
-
-      const response =
-        await fetch(
-          "/api/chat",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type":
-                "application/json"
-            },
-            body: JSON.stringify({
-              model:
-                state.currentModel,
-              messages:
-                chat.messages
-                  .slice(
-                    0,
-                    -1
-                  ),
-              temperature: 0.7,
-              max_tokens: 8192
-            }),
-            signal:
-              state.controller.signal
-          }
-        );
-
-      if (!response.ok) {
-
-        let data = null;
-
-        try {
-          data =
-            await response.json();
-        } catch (_) {}
-
-        throw new Error(
-          data?.error ||
-          "Generation failed."
-        );
-      }
-
-      const reader =
-        response.body.getReader();
-
-      const decoder =
-        new TextDecoder();
-
-      let buffer = "";
-
-      while (true) {
-
-        const result =
-          await reader.read();
-
-        if (result.done) break;
-
-        buffer +=
-          decoder.decode(
-            result.value,
-            {
-              stream: true
-            }
-          );
-
-        const events =
-          buffer.split("\\n\\n");
-
-        buffer =
-          events.pop() || "";
-
-        for (const event of events) {
-          processSSE(
-            event,
-            assistantMessage
-          );
-        }
-
-        renderMessages();
-      }
-
-      if (buffer.trim()) {
-        processSSE(
-          buffer,
-          assistantMessage
-        );
-      }
-
-      saveChats();
-
-    } catch (error) {
-
-      if (
-        error.name ===
-        "AbortError"
-      ) {
-
-        assistantMessage.content =
-          "Generation stopped.";
-
-      } else {
-
-        assistantMessage.content =
-          "Error: " +
-          (
-            error.message ||
-            "Request failed."
-          );
-      }
-
-      saveChats();
-
-    } finally {
-
-      state.controller = null;
-      state.generating = false;
-
-      $("sendBtn").style.display =
-        "block";
-
-      $("stopBtn").style.display =
-        "none";
-
-      setStatus("Ready");
-
-      renderMessages();
-    }
-  }
-
-  /* =====================================================
-     FILES
-  ===================================================== */
-
-  $("attachBtn").onclick = () => {
-    $("fileInput").click();
+    openMemory();
   };
 
-  $("fileInput").onchange = event => {
+function closeDrawer(){
 
-    state.attachedFiles =
-      Array.from(
-        event.target.files || []
+  $('sidebar')
+    .classList
+    .remove('open');
+
+  $('backdrop')
+    .classList
+    .remove('open');
+}
+
+function autoSize(){
+
+  const x =
+    $('prompt');
+
+  x.style.height = 'auto';
+
+  x.style.height =
+    Math.min(
+      x.scrollHeight,
+      180
+    ) + 'px';
+}
+
+$('newChat').onclick =
+  newChat;
+
+$('newTop').onclick =
+  newChat;
+
+$('send').onclick =
+  send;
+
+$('imageTool').onclick =
+  () => {
+
+    const p =
+      $('prompt')
+        .value
+        .trim();
+
+    if(!p){
+
+      $('prompt').focus();
+
+      $('prompt').placeholder =
+        'Describe the image you want…';
+
+      return;
+    }
+
+    $('prompt').value = '';
+
+    autoSize();
+
+    generateImage(p);
+  };
+
+$('attach').onclick =
+  () =>
+    $('file').click();
+
+$('file').onchange =
+  async e => {
+
+    state.attachments =
+      await Promise.all(
+        [...e.target.files]
+          .map(prepareFile)
       );
 
     renderAttachments();
+
+    e.target.value = '';
   };
 
-  function renderAttachments() {
+$('prompt')
+  .addEventListener(
+    'input',
+    autoSize
+  );
 
-    const box =
-      $("attachments");
+$('prompt')
+  .addEventListener(
+    'keydown',
+    e => {
 
-    box.innerHTML = "";
+      if(
+        e.key === 'Enter' &&
+        !e.shiftKey
+      ){
 
-    if (
-      !state.attachedFiles.length
-    ) {
-      box.classList.remove(
-        "show"
-      );
+        e.preventDefault();
 
-      return;
-    }
-
-    box.classList.add(
-      "show"
-    );
-
-    state.attachedFiles.forEach(
-      file => {
-
-        const item =
-          document.createElement(
-            "div"
-          );
-
-        item.className =
-          "attachment";
-
-        item.textContent =
-          file.name;
-
-        box.appendChild(item);
-      }
-    );
-  }
-
-  /* =====================================================
-     COMPOSER
-  ===================================================== */
-
-  $("sendBtn").onclick =
-    sendMessage;
-
-  $("stopBtn").onclick =
-    stopGeneration;
-
-  $("newChat").onclick =
-    newChat;
-
-  $("historySearch").oninput =
-    renderHistory;
-
-  $("modelSelect").onchange =
-    event => {
-
-      state.currentModel =
-        event.target.value;
-
-      saveModel(
-        state.currentModel
-      );
-
-      updateModelInfo();
-    };
-
-  $("prompt").addEventListener(
-    "keydown",
-    event => {
-
-      if (
-        event.key === "Enter" &&
-        !event.shiftKey
-      ) {
-        event.preventDefault();
-
-        sendMessage();
+        send();
       }
     }
   );
 
-  $("prompt").addEventListener(
-    "input",
-    autoResize
-  );
-
-  function autoResize() {
-
-    const textarea =
-      $("prompt");
-
-    textarea.style.height =
-      "auto";
-
-    textarea.style.height =
-      Math.min(
-        textarea.scrollHeight,
-        180
-      ) + "px";
-  }
-
-  /* =====================================================
-     MOBILE DRAWER
-  ===================================================== */
-
-  $("menuBtn").onclick =
-    openDrawer;
-
-  $("overlay").onclick =
-    closeDrawer;
-
-  function openDrawer() {
-
-    $("sidebar")
-      .classList
-      .add("open");
-
-    $("overlay")
-      .classList
-      .add("show");
-  }
-
-  function closeDrawer() {
-
-    $("sidebar")
-      .classList
-      .remove("open");
-
-    $("overlay")
-      .classList
-      .remove("show");
-  }
-
-  /* =====================================================
-     STATUS
-  ===================================================== */
-
-  function setStatus(text) {
-    $("status").textContent =
-      text;
-  }
-
-  /* =====================================================
-     PWA
-  ===================================================== */
-
-  if (
-    "serviceWorker" in navigator
-  ) {
-    window.addEventListener(
-      "load",
-      () => {
-        navigator.serviceWorker
-          .register("/sw.js")
-          .catch(() => {});
-      }
+$('search').oninput =
+  e =>
+    renderHistory(
+      e.target.value
     );
-  }
 
-  /* =====================================================
-     INIT
-  ===================================================== */
+$('menu').onclick =
+  () => {
 
-  loadChats();
+    $('sidebar')
+      .classList
+      .add('open');
 
-  if (!state.chats.length) {
-    newChat();
-  } else {
-    state.currentChatId =
-      state.chats[0].id;
+    $('backdrop')
+      .classList
+      .add('open');
+  };
 
-    renderHistory();
-    renderMessages();
-  }
+$('backdrop').onclick =
+  closeDrawer;
 
-  loadModels();
+$('memoryBtn').onclick =
+  openMemory;
 
-})();
+$('closeMemory').onclick =
+  () =>
+    $('memoryModal')
+      .classList
+      .remove('open');
+
+$('clearMemory').onclick =
+  () => {
+
+    if(
+      confirm(
+        'Clear all memories?'
+      )
+    ){
+
+      state.memories = [];
+
+      save();
+
+      openMemory();
+    }
+  };
+
+$('clearBtn').onclick =
+  () => {
+
+    if(
+      confirm(
+        'Delete all local chats and memories?'
+      )
+    ){
+
+      localStorage.removeItem(
+        'aether_chats'
+      );
+
+      localStorage.removeItem(
+        'aether_memories'
+      );
+
+      location.reload();
+    }
+  };
+
+renderHistory();
+renderCurrent();
+loadModels();
+
+if(
+  'serviceWorker' in navigator
+){
+
+  navigator.serviceWorker
+    .register('/sw.js')
+    .catch(() => {});
+}
+
 </script>
 
 </body>
 </html>`;
-}
+
+const MANIFEST = JSON.stringify(
+  {
+    name:'AetherAI',
+    short_name:'AetherAI',
+    start_url:'/',
+    display:'standalone',
+    background_color:'#212121',
+    theme_color:'#212121',
+    orientation:'portrait',
+    icons:[
+      {
+        src:'/icon.svg',
+        sizes:'any',
+        type:'image/svg+xml',
+        purpose:'any maskable'
+      }
+    ]
+  },
+  null,
+  2
+);
+
+const SW =
+`const CACHE='aetherai-v1';
+self.addEventListener('install',e=>self.skipWaiting());
+self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
+self.addEventListener('fetch',e=>{
+  if(e.request.method!=='GET')return;
+  e.respondWith(
+    fetch(e.request).catch(
+      ()=>caches.match(e.request)
+    )
+  )
+});`;
+
+const ICON =
+`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+<rect width="128" height="128" rx="30" fill="#fff"/>
+<path d="M64 24c-23 0-41 15-41 34 0 11 6 21 16 27l-5 18 18-10c4 1 8 2 12 2 23 0 41-15 41-34S87 24 64 24Z" fill="#111"/>
+<path d="M47 59h34M47 72h22" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+</svg>`;
+
+export default {
+
+  async fetch(
+    request,
+    env
+  ){
+
+    if(
+      request.method === 'OPTIONS'
+    ){
+
+      return new Response(
+        null,
+        {
+          headers:corsHeaders()
+        }
+      );
+    }
+
+    const url =
+      new URL(request.url);
+
+    if(
+      url.pathname ===
+      '/manifest.json'
+    ){
+
+      return new Response(
+        MANIFEST,
+        {
+          headers:{
+            'Content-Type':
+              'application/manifest+json',
+            ...corsHeaders()
+          }
+        }
+      );
+    }
+
+    if(
+      url.pathname === '/sw.js'
+    ){
+
+      return new Response(
+        SW,
+        {
+          headers:{
+            'Content-Type':
+              'application/javascript; charset=utf-8',
+            ...corsHeaders()
+          }
+        }
+      );
+    }
+
+    if(
+      url.pathname === '/icon.svg'
+    ){
+
+      return new Response(
+        ICON,
+        {
+          headers:{
+            'Content-Type':
+              'image/svg+xml',
+            ...corsHeaders()
+          }
+        }
+      );
+    }
+
+    if(
+      url.pathname === '/api/health'
+    ){
+
+      return json({
+        ok:true,
+        provider:'CodeCraft',
+        has_key:!!apiKey(env)
+      });
+    }
+
+    if(
+      url.pathname === '/api/models'
+    ){
+
+      if(!apiKey(env)){
+
+        return json(
+          {
+            error:{
+              message:
+                'CODECRAFT_API_KEY is not configured'
+            }
+          },
+          500
+        );
+      }
+
+      const r =
+        await ccFetch(
+          env,
+          '/models'
+        );
+
+      const {
+        data
+      } =
+        await bodyJson(r);
+
+      return json(
+        data,
+        r.status
+      );
+    }
+
+    if(
+      url.pathname ===
+      '/api/generate-image' &&
+      request.method === 'POST'
+    ){
+
+      if(!env.AI){
+
+        return json(
+          {
+            error:{
+              message:
+                'Workers AI binding AI is not configured. Add the AI binding in wrangler.jsonc.'
+            }
+          },
+          500
+        );
+      }
+
+      let body;
+
+      try{
+
+        body =
+          await request.json();
+
+      }catch{
+
+        return json(
+          {
+            error:{
+              message:
+                'Invalid JSON'
+            }
+          },
+          400
+        );
+      }
+
+      const prompt =
+        String(
+          body.prompt || ''
+        ).trim();
+
+      if(!prompt){
+
+        return json(
+          {
+            error:{
+              message:
+                'Image prompt is required'
+            }
+          },
+          400
+        );
+      }
+
+      try{
+
+        const result =
+          await env.AI.run(
+            '@cf/black-forest-labs/flux-1-schnell',
+            {
+              prompt,
+              steps:4,
+              seed:
+                Math.floor(
+                  Math.random() *
+                  2147483647
+                )
+            }
+          );
+
+        return json({
+          dataURI:
+            `data:image/jpeg;base64,${result.image}`
+        });
+
+      }catch(e){
+
+        return json(
+          {
+            error:{
+              message:
+                e?.message ||
+                'Image generation failed'
+            }
+          },
+          500
+        );
+      }
+    }
+
+    if(
+      url.pathname === '/api/chat' &&
+      request.method === 'POST'
+    ){
+
+      if(!apiKey(env)){
+
+        return json(
+          {
+            error:{
+              message:
+                'CODECRAFT_API_KEY is not configured'
+            }
+          },
+          500
+        );
+      }
+
+      let body;
+
+      try{
+
+        body =
+          await request.json();
+
+      }catch{
+
+        return json(
+          {
+            error:{
+              message:
+                'Invalid JSON'
+            }
+          },
+          400
+        );
+      }
+
+      const r =
+        await ccFetch(
+          env,
+          '/chat/completions',
+          {
+            method:'POST',
+            body:
+              JSON.stringify(body)
+          }
+        );
+
+      return new Response(
+        r.body,
+        {
+          status:r.status,
+          headers:{
+            'Content-Type':
+              r.headers.get(
+                'Content-Type'
+              ) ||
+              'application/json',
+            ...corsHeaders()
+          }
+        }
+      );
+    }
+
+    return new Response(
+      HTML,
+      {
+        headers:{
+          'Content-Type':
+            'text/html; charset=utf-8',
+          ...corsHeaders()
+        }
+      }
+    );
+  }
+};
