@@ -1,3 +1,4 @@
+
 const CODECRAFT_BASE = "https://codecraftapi.com/v1";
 const IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
 
