@@ -1,10 +1,14 @@
-const BASE = 'https://www.codecraftapi.com/v1';
+const BASE = "https://www.codecraftapi.com/v1";
+
+/* =========================================================
+   BASIC HELPERS
+========================================================= */
 
 function corsHeaders(extra = {}) {
   return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
     ...extra
   };
 }
@@ -13,39 +17,60 @@ function json(data, status = 200, extra = {}) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
-      'Content-Type': 'application/json; charset=utf-8',
+      "Content-Type": "application/json; charset=utf-8",
       ...corsHeaders(extra)
     }
   });
 }
 
 function apiKey(env) {
-  return String(env.CODECRAFT_API_KEY || '').trim();
+  return String(env.CODECRAFT_API_KEY || "").trim();
 }
 
-async function ccFetch(env, path, options = {}) {
+async function codecraftFetch(env, path, options = {}) {
   const headers = new Headers(options.headers || {});
-  headers.set('Authorization', `Bearer ${apiKey(env)}`);
-  headers.set('Content-Type', 'application/json');
 
-  return fetch(BASE + path, {
-    ...options,
-    headers
-  });
+  headers.set(
+    "Authorization",
+    `Bearer ${apiKey(env)}`
+  );
+
+  headers.set(
+    "Content-Type",
+    "application/json"
+  );
+
+  headers.set(
+    "Accept",
+    "application/json"
+  );
+
+  return fetch(
+    BASE + path,
+    {
+      ...options,
+      headers
+    }
+  );
 }
 
-async function bodyJson(resp) {
-  const text = await resp.text();
+async function readJSON(response) {
+  const text = await response.text();
 
   let data;
 
   try {
     data = JSON.parse(text);
   } catch {
-    data = { raw: text };
+    data = {
+      raw: text
+    };
   }
 
-  return { data, text };
+  return {
+    data,
+    text
+  };
 }
 
 /* =========================================================
@@ -53,30 +78,49 @@ async function bodyJson(resp) {
 ========================================================= */
 
 const HTML = String.raw`<!doctype html>
+
 <html lang="en">
+
 <head>
 
 <meta charset="utf-8">
 
 <meta
   name="viewport"
-  content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"
+  content="width=device-width,initial-scale=1,viewport-fit=cover"
 >
 
-<meta name="theme-color" content="#212121">
+<meta
+  name="theme-color"
+  content="#212121"
+>
 
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="AetherAI">
+<meta
+  name="apple-mobile-web-app-capable"
+  content="yes"
+>
 
-<link rel="manifest" href="/manifest.json">
+<meta
+  name="apple-mobile-web-app-status-bar-style"
+  content="black-translucent"
+>
+
+<meta
+  name="apple-mobile-web-app-title"
+  content="AetherAI"
+>
+
+<link
+  rel="manifest"
+  href="/manifest.json"
+>
 
 <title>AetherAI</title>
 
 <style>
 
 *{
-  box-sizing:border-box
+  box-sizing:border-box;
 }
 
 html,
@@ -84,34 +128,36 @@ body{
   margin:0;
   width:100%;
   height:100%;
+  overflow:hidden;
+  background:#212121;
+  color:#ececec;
   font-family:
     -apple-system,
     BlinkMacSystemFont,
     "Segoe UI",
     Roboto,
-    Helvetica,
     Arial,
     sans-serif;
-  background:#212121;
-  color:#ececec;
-  overflow:hidden
 }
 
 button,
 input,
 textarea,
 select{
-  font:inherit
+  font:inherit;
 }
 
 button{
-  color:inherit
+  color:inherit;
 }
 
 .app{
+  width:100%;
   height:100%;
-  display:flex
+  display:flex;
 }
+
+/* SIDEBAR */
 
 .sidebar{
   width:260px;
@@ -119,118 +165,126 @@ button{
   background:#171717;
   display:flex;
   flex-direction:column;
-  padding:10px 10px 12px
+  padding:10px;
 }
 
 .brand{
-  height:42px;
+  height:44px;
   display:flex;
   align-items:center;
   gap:10px;
-  padding:0 10px;
+  padding:0 8px;
   font-weight:700;
-  font-size:16px
 }
 
 .logo{
-  width:28px;
-  height:28px;
-  border-radius:8px;
+  width:30px;
+  height:30px;
+  border-radius:9px;
   background:#fff;
   color:#111;
   display:grid;
   place-items:center;
-  font-weight:800
+  font-weight:800;
 }
 
-.new{
-  height:44px;
+.new-chat{
+  margin:8px 0;
   width:100%;
-  border:1px solid #444;
-  background:#212121;
+  height:44px;
   border-radius:10px;
+  border:1px solid #444;
+  background:#222;
   text-align:left;
-  padding:0 13px;
+  padding:0 12px;
   cursor:pointer;
-  margin:8px 0
 }
 
-.new:hover,
-.history-item:hover,
-.side-btn:hover{
-  background:#2a2a2a
+.new-chat:hover{
+  background:#2d2d2d;
 }
 
 .search{
-  margin:0 0 8px
+  margin-bottom:8px;
 }
 
 .search input{
   width:100%;
   height:36px;
-  background:#212121;
   border:1px solid #333;
-  border-radius:9px;
+  background:#222;
   color:#eee;
-  padding:0 11px;
-  outline:none
+  border-radius:9px;
+  padding:0 10px;
+  outline:none;
 }
 
 .history{
-  overflow:auto;
   flex:1;
-  scrollbar-width:thin
+  overflow:auto;
 }
 
 .history-item{
   display:flex;
   align-items:center;
-  gap:7px;
-  border-radius:8px;
+  gap:8px;
   padding:9px;
+  margin:2px 0;
+  border-radius:8px;
   cursor:pointer;
-  margin:2px 0
+}
+
+.history-item:hover{
+  background:#292929;
 }
 
 .history-item.active{
-  background:#2b2b2b
+  background:#303030;
 }
 
 .history-title{
+  flex:1;
+  min-width:0;
+  white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
-  white-space:nowrap;
-  flex:1;
-  font-size:13.5px
+  font-size:13px;
 }
 
-.more{
+.delete-chat{
   background:none;
   border:0;
-  opacity:.55;
-  cursor:pointer
+  color:#888;
+  cursor:pointer;
 }
 
 .side-bottom{
-  padding-top:8px
+  padding-top:8px;
 }
 
 .side-btn{
   width:100%;
   border:0;
-  background:transparent;
+  background:none;
   text-align:left;
   padding:10px;
   border-radius:8px;
-  cursor:pointer
+  cursor:pointer;
 }
+
+.side-btn:hover{
+  background:#292929;
+}
+
+/* MAIN */
 
 .main{
   min-width:0;
   flex:1;
+  height:100%;
   display:flex;
   flex-direction:column;
-  background:#212121
+  background:#212121;
 }
 
 .topbar{
@@ -239,484 +293,346 @@ button{
   display:flex;
   align-items:center;
   justify-content:space-between;
-  padding:0 14px;
-  background:#212121
+  padding:0 12px;
 }
 
 .top-left{
   display:flex;
   align-items:center;
-  gap:5px;
-  min-width:0
+  min-width:0;
 }
 
 .mobile-menu{
   display:none;
+  width:38px;
+  height:38px;
   border:0;
-  background:transparent;
-  font-size:22px
-}
-
-.model-wrap{
-  display:flex;
-  align-items:center
+  background:none;
+  font-size:21px;
 }
 
 .model-select{
-  appearance:none;
+  max-width:300px;
   background:transparent;
-  border:0;
   color:#eee;
-  font-weight:600;
-  font-size:15px;
-  max-width:260px;
+  border:0;
   outline:none;
-  padding:8px 24px 8px 8px
+  padding:8px;
+  font-weight:600;
+  border-radius:8px;
 }
 
 .model-select:hover{
-  background:#2a2a2a;
-  border-radius:8px
+  background:#2c2c2c;
 }
 
 .model-select option{
-  background:#212121
+  background:#222;
+  color:#eee;
 }
 
-.top-actions{
-  display:flex;
-  gap:2px
+/* ERROR */
+
+.model-error{
+  max-width:700px;
+  margin:8px auto 0;
+  padding:10px 14px;
+  border:1px solid #684040;
+  background:#321f1f;
+  border-radius:10px;
+  color:#ffb5b5;
+  font-size:13px;
+  display:none;
 }
 
-.icon-btn{
-  width:36px;
-  height:36px;
-  border:0;
-  background:transparent;
-  border-radius:8px;
+.model-error.show{
+  display:block;
+}
+
+.model-error button{
+  margin-left:8px;
+  border:1px solid #765050;
+  background:#452828;
+  border-radius:7px;
+  padding:4px 8px;
   cursor:pointer;
-  font-size:18px
 }
 
-.icon-btn:hover{
-  background:#303030
-}
+/* CHAT */
 
 .chat{
   flex:1;
   overflow:auto;
-  scroll-behavior:auto
 }
 
 .messages{
-  max-width:860px;
+  max-width:900px;
   margin:auto;
-  padding:22px 22px 170px
+  padding:20px 20px 170px;
 }
 
 .welcome{
-  min-height:58vh;
+  min-height:60vh;
   display:grid;
   place-items:center;
-  text-align:center
+  text-align:center;
 }
 
 .welcome h1{
   font-size:30px;
-  letter-spacing:-.5px;
-  margin:0 0 9px
+  margin:0 0 8px;
 }
 
 .welcome p{
-  color:#a6a6a6;
-  margin:0
+  color:#999;
+  margin:0;
 }
 
-.msg{
+.message{
   display:flex;
-  gap:13px;
-  margin:0 0 28px;
-  min-width:0
+  gap:12px;
+  margin-bottom:28px;
 }
 
 .avatar{
   width:30px;
   height:30px;
-  border-radius:8px;
   flex:none;
+  border-radius:8px;
   display:grid;
   place-items:center;
-  font-size:13px
+  font-size:13px;
 }
 
 .user .avatar{
-  background:#555
+  background:#555;
 }
 
 .assistant .avatar{
   background:#fff;
-  color:#111
+  color:#111;
 }
 
-.bubble{
+.content{
   min-width:0;
   flex:1;
+  font-size:15px;
   line-height:1.65;
-  font-size:15.5px;
-  overflow-wrap:anywhere
+  overflow-wrap:anywhere;
 }
 
-.bubble p{
-  margin:0 0 13px
+.content p{
+  margin:0 0 12px;
 }
 
-.bubble p:last-child{
-  margin-bottom:0
-}
-
-.bubble h1,
-.bubble h2,
-.bubble h3{
+.content h1,
+.content h2,
+.content h3{
   line-height:1.25;
-  margin:18px 0 8px
 }
 
-.bubble h1{
-  font-size:24px
-}
-
-.bubble h2{
-  font-size:20px
-}
-
-.bubble h3{
-  font-size:17px
-}
-
-.bubble strong{
-  font-weight:700
-}
-
-.bubble em{
-  font-style:italic
-}
-
-.bubble blockquote{
-  border-left:3px solid #666;
-  margin:12px 0;
-  padding:2px 0 2px 14px;
-  color:#c9c9c9
-}
-
-.bubble ul,
-.bubble ol{
-  margin:7px 0 14px;
-  padding-left:24px
-}
-
-.bubble li{
-  margin:4px 0
-}
-
-.bubble a{
-  color:#9ecbff;
-  text-decoration:underline
-}
-
-.inline-code{
-  background:#2f2f2f;
-  border:1px solid #3c3c3c;
-  padding:1px 5px;
-  border-radius:5px;
-  font-family:
-    ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    monospace;
-  font-size:.9em
-}
-
-.code-wrap{
-  margin:12px 0 15px;
-  border:1px solid #3a3a3a;
+.content pre{
+  background:#101010;
+  border:1px solid #3b3b3b;
   border-radius:10px;
-  overflow:hidden;
-  background:#0d0d0d
-}
-
-.code-head{
-  height:34px;
-  background:#181818;
-  border-bottom:1px solid #303030;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  padding:0 9px;
-  color:#aaa;
-  font-size:12px
-}
-
-.code-copy{
-  border:0;
-  background:#242424;
-  border-radius:6px;
-  padding:4px 8px;
-  font-size:11px;
-  cursor:pointer
-}
-
-.code-copy:hover{
-  background:#333;
-  color:#fff
-}
-
-.bubble pre{
-  margin:0;
-  padding:14px;
+  padding:13px;
   overflow:auto;
-  white-space:pre;
-  line-height:1.5
 }
 
-.bubble pre code{
+.content code{
   font-family:
     ui-monospace,
     SFMono-Regular,
     Menlo,
     Consolas,
     monospace;
-  font-size:13px;
-  background:none;
-  padding:0
 }
 
-.table-wrap{
-  overflow:auto;
-  margin:12px 0
+.inline-code{
+  background:#303030;
+  border-radius:5px;
+  padding:2px 5px;
 }
 
-.bubble table{
-  border-collapse:collapse;
-  width:100%;
-  min-width:420px
-}
-
-.bubble th,
-.bubble td{
-  border:1px solid #444;
-  padding:7px 9px;
-  text-align:left
-}
-
-.bubble th{
-  background:#2b2b2b
-}
-
-.message-actions{
+.actions{
+  margin-top:7px;
   display:flex;
-  gap:3px;
-  margin-top:8px;
-  opacity:.78
+  gap:4px;
 }
 
-.mini{
+.action{
   border:0;
-  background:transparent;
-  color:#999;
+  background:none;
+  color:#888;
   padding:5px 7px;
   border-radius:7px;
   cursor:pointer;
-  font-size:12px
+  font-size:12px;
 }
 
-.mini:hover{
+.action:hover{
   background:#303030;
-  color:#eee
+  color:#eee;
+}
+
+.danger{
+  color:#ff9999;
 }
 
 .image-card{
-  margin-top:10px;
-  border:1px solid #3a3a3a;
+  max-width:700px;
+  border:1px solid #3b3b3b;
   border-radius:12px;
   overflow:hidden;
   background:#111;
-  max-width:720px
 }
 
 .image-card img{
   display:block;
   width:100%;
-  height:auto
+  height:auto;
 }
 
-.image-toolbar{
-  display:flex;
-  justify-content:flex-end;
-  gap:4px;
-  padding:7px;
-  background:#181818
-}
+/* COMPOSER */
 
-.composer-wrap{
+.composer-area{
   position:fixed;
-  bottom:0;
   left:260px;
   right:0;
+  bottom:0;
+  padding:25px 16px 12px;
   background:
     linear-gradient(
       transparent,
-      #212121 24%
+      #212121 30%
     );
-  padding:28px 18px 14px;
-  pointer-events:none
-}
-
-.composer,
-.hint{
-  pointer-events:auto
 }
 
 .composer{
-  max-width:860px;
+  max-width:900px;
   margin:auto;
   background:#2f2f2f;
   border:1px solid #4b4b4b;
   border-radius:18px;
-  box-shadow:0 5px 25px #0005
+  box-shadow:0 5px 25px #0005;
 }
 
 .attachments{
   display:flex;
   gap:7px;
   flex-wrap:wrap;
-  padding:9px 12px 0
+  padding:8px 10px 0;
 }
 
-.chip{
+.attachment{
   background:#202020;
   border:1px solid #444;
-  border-radius:9px;
-  padding:6px 9px;
+  border-radius:8px;
+  padding:5px 8px;
   font-size:12px;
-  cursor:pointer
+  cursor:pointer;
 }
 
 .compose-row{
   display:flex;
   align-items:flex-end;
-  padding:7px
+  padding:7px;
 }
 
-.attach,
-.image-tool{
+.tool{
   width:40px;
   height:40px;
+  flex:none;
   border:0;
-  background:transparent;
-  border-radius:10px;
-  cursor:pointer;
+  background:none;
+  border-radius:9px;
   font-size:20px;
-  flex:none
+  cursor:pointer;
 }
 
-.attach:hover,
-.image-tool:hover{
-  background:#3a3a3a
+.tool:hover{
+  background:#3b3b3b;
 }
 
 .prompt{
   flex:1;
+  min-height:42px;
+  max-height:180px;
   resize:none;
   border:0;
-  outline:0;
-  background:transparent;
+  outline:none;
+  background:none;
   color:#eee;
-  max-height:180px;
-  min-height:42px;
   padding:10px 8px;
-  line-height:1.45
+  line-height:1.45;
 }
 
 .prompt::placeholder{
-  color:#999
+  color:#999;
 }
 
 .send{
   width:40px;
   height:40px;
+  flex:none;
   border:0;
   border-radius:11px;
   background:#fff;
   color:#111;
   cursor:pointer;
   font-weight:800;
-  flex:none
 }
 
 .send:disabled{
   opacity:.35;
-  cursor:default
 }
 
 .hint{
+  max-width:900px;
+  margin:auto;
   text-align:center;
-  font-size:10.5px;
+  font-size:10px;
   color:#777;
-  padding-top:7px
+  padding-top:6px;
 }
 
-.drawer-backdrop{
-  display:none
-}
+/* MEMORY MODAL */
 
 .modal{
   position:fixed;
   inset:0;
-  background:#0008;
+  background:#0009;
   display:none;
   align-items:center;
   justify-content:center;
   padding:20px;
-  z-index:20
+  z-index:50;
 }
 
 .modal.open{
-  display:flex
+  display:flex;
 }
 
-.card{
+.modal-card{
   width:min(520px,100%);
+  max-height:80vh;
+  overflow:auto;
   background:#202020;
   border:1px solid #444;
   border-radius:16px;
-  padding:18px
+  padding:18px;
 }
 
-.card h2{
-  margin:0 0 14px
-}
-
-.card p{
-  color:#aaa;
-  font-size:14px;
-  line-height:1.5
-}
-
-.memory-list{
-  max-height:300px;
-  overflow:auto
+.modal-card h2{
+  margin-top:0;
 }
 
 .memory-row{
+  padding:9px 0;
+  border-bottom:1px solid #333;
   display:flex;
+  gap:8px;
   justify-content:space-between;
-  gap:10px;
-  padding:10px;
-  border-bottom:1px solid #333
-}
-
-.danger{
-  color:#ff8d8d
 }
 
 .close{
@@ -724,132 +640,89 @@ button{
   background:none;
   border:0;
   font-size:20px;
-  cursor:pointer
+  cursor:pointer;
 }
 
-.typing{
-  display:inline-flex;
-  gap:4px;
-  align-items:center;
-  padding:5px 0
-}
-
-.typing i{
-  width:5px;
-  height:5px;
-  background:#aaa;
-  border-radius:50%;
-  animation:blink 1s infinite
-}
-
-.typing i:nth-child(2){
-  animation-delay:.15s
-}
-
-.typing i:nth-child(3){
-  animation-delay:.3s
-}
-
-@keyframes blink{
-  0%,80%,100%{opacity:.25}
-  40%{opacity:1}
-}
+/* MOBILE */
 
 @media(max-width:700px){
 
   .sidebar{
     position:fixed;
-    z-index:15;
+    z-index:40;
     top:0;
     bottom:0;
     left:0;
+    width:85%;
+    max-width:310px;
     transform:translateX(-100%);
     transition:transform .2s;
-    width:84%;
-    max-width:310px
   }
 
   .sidebar.open{
-    transform:translateX(0)
-  }
-
-  .drawer-backdrop{
-    position:fixed;
-    inset:0;
-    background:#0008;
-    z-index:14
-  }
-
-  .drawer-backdrop.open{
-    display:block
+    transform:translateX(0);
   }
 
   .mobile-menu{
-    display:block
+    display:block;
   }
 
-  .composer-wrap{
+  .backdrop{
+    position:fixed;
+    inset:0;
+    background:#0008;
+    z-index:39;
+    display:none;
+  }
+
+  .backdrop.open{
+    display:block;
+  }
+
+  .composer-area{
     left:0;
-    padding:20px 9px 9px
+    padding:20px 8px 8px;
   }
 
   .messages{
-    padding:14px 13px 145px
-  }
-
-  .topbar{
-    padding:0 7px
+    padding:12px 12px 145px;
   }
 
   .model-select{
-    max-width:185px
+    max-width:190px;
   }
 
   .welcome h1{
-    font-size:27px
+    font-size:27px;
   }
 
-  .msg{
+  .message{
     gap:9px;
-    margin-bottom:25px
-  }
-
-  .bubble{
-    font-size:15px
-  }
-
-  .hint{
-    display:none
-  }
-
-  .code-head{
-    height:32px
-  }
-
-  .bubble pre{
-    padding:11px
-  }
-
-  .image-card{
-    max-width:100%
   }
 }
 
 </style>
+
 </head>
 
 <body>
 
 <div class="app">
 
-<aside class="sidebar" id="sidebar">
+<aside
+  class="sidebar"
+  id="sidebar"
+>
 
   <div class="brand">
     <div class="logo">A</div>
     <span>AetherAI</span>
   </div>
 
-  <button class="new" id="newChat">
+  <button
+    class="new-chat"
+    id="newChat"
+  >
     ＋ New chat
   </button>
 
@@ -860,15 +733,24 @@ button{
     >
   </div>
 
-  <div class="history" id="history"></div>
+  <div
+    class="history"
+    id="history"
+  ></div>
 
   <div class="side-bottom">
 
-    <button class="side-btn" id="memoryBtn">
+    <button
+      class="side-btn"
+      id="memoryBtn"
+    >
       🧠 Memory
     </button>
 
-    <button class="side-btn" id="clearBtn">
+    <button
+      class="side-btn"
+      id="clearBtn"
+    >
       ⚙ Clear local data
     </button>
 
@@ -876,7 +758,10 @@ button{
 
 </aside>
 
-<div class="drawer-backdrop" id="backdrop"></div>
+<div
+  class="backdrop"
+  id="backdrop"
+></div>
 
 <main class="main">
 
@@ -891,34 +776,34 @@ button{
       ☰
     </button>
 
-    <div class="model-wrap">
-
-      <select
-        class="model-select"
-        id="model"
-      >
-        <option>
-          Loading models…
-        </option>
-      </select>
-
-    </div>
-
-  </div>
-
-  <div class="top-actions">
-
-    <button
-      class="icon-btn"
-      id="newTop"
-      title="New chat"
+    <select
+      id="model"
+      class="model-select"
     >
-      ＋
-    </button>
+
+      <option value="">
+        Loading models…
+      </option>
+
+    </select>
 
   </div>
+
+  <button
+    class="tool"
+    id="newTop"
+    title="New chat"
+  >
+    ＋
+  </button>
 
 </header>
+
+<div
+  class="model-error"
+  id="modelError"
+>
+</div>
 
 <section
   class="chat"
@@ -932,7 +817,7 @@ button{
 
 </section>
 
-<div class="composer-wrap">
+<div class="composer-area">
 
   <div class="composer">
 
@@ -944,15 +829,15 @@ button{
     <div class="compose-row">
 
       <button
-        class="attach"
+        class="tool"
         id="attach"
-        title="Attach files"
+        title="Attach"
       >
         ＋
       </button>
 
       <button
-        class="image-tool"
+        class="tool"
         id="imageTool"
         title="Generate image"
       >
@@ -960,16 +845,16 @@ button{
       </button>
 
       <input
-        id="file"
         type="file"
+        id="file"
         hidden
         multiple
-        accept="image/*,.pdf,.txt,.md,.json,.csv,.doc,.docx"
+        accept="image/*,.txt,.md,.json,.csv,.pdf"
       >
 
       <textarea
-        class="prompt"
         id="prompt"
+        class="prompt"
         rows="1"
         placeholder="Message AetherAI…"
       ></textarea>
@@ -1000,7 +885,7 @@ button{
   id="memoryModal"
 >
 
-  <div class="card">
+  <div class="modal-card">
 
     <button
       class="close"
@@ -1011,15 +896,7 @@ button{
 
     <h2>Memory</h2>
 
-    <p>
-      Memories are stored locally on this device.
-      AetherAI can use them in future chats.
-    </p>
-
-    <div
-      class="memory-list"
-      id="memoryList"
-    ></div>
+    <div id="memoryList"></div>
 
     <button
       class="side-btn danger"
@@ -1034,405 +911,382 @@ button{
 
 <script>
 
+"use strict";
+
+/* =========================================================
+   STATE
+========================================================= */
+
 const state = {
-  chats: JSON.parse(
-    localStorage.getItem('aether_chats') || '[]'
-  ),
-  current: null,
-  attachments: [],
-  memories: JSON.parse(
-    localStorage.getItem('aether_memories') || '[]'
-  ),
-  models: [],
-  busy: false,
-  autoImage: false
+
+  chats:
+    JSON.parse(
+      localStorage.getItem(
+        "aether_chats"
+      ) || "[]"
+    ),
+
+  current:null,
+
+  attachments:[],
+
+  memories:
+    JSON.parse(
+      localStorage.getItem(
+        "aether_memories"
+      ) || "[]"
+    ),
+
+  models:[],
+
+  busy:false
+
 };
 
-const $ = id => document.getElementById(id);
+/* =========================================================
+   HELPERS
+========================================================= */
 
-function save(){
-  localStorage.setItem(
-    'aether_chats',
-    JSON.stringify(state.chats)
-  );
-
-  localStorage.setItem(
-    'aether_memories',
-    JSON.stringify(state.memories)
-  );
-}
+const $ =
+  id => document.getElementById(id);
 
 function uid(){
-  return Date.now().toString(36) +
-    Math.random().toString(36).slice(2,8);
+
+  return (
+    Date.now().toString(36) +
+    Math.random()
+      .toString(36)
+      .slice(2,8)
+  );
 }
 
-function esc(s){
-  return String(s ?? '').replace(
+function save(){
+
+  localStorage.setItem(
+    "aether_chats",
+    JSON.stringify(
+      state.chats
+    )
+  );
+
+  localStorage.setItem(
+    "aether_memories",
+    JSON.stringify(
+      state.memories
+    )
+  );
+}
+
+function esc(value){
+
+  return String(
+    value ?? ""
+  ).replace(
     /[&<>"']/g,
     c => ({
-      '&':'&amp;',
-      '<':'&lt;',
-      '>':'&gt;',
-      '"':'&quot;',
-      "'":'&#39;'
+      "&":"&amp;",
+      "<":"&lt;",
+      ">":"&gt;",
+      '"':"&quot;",
+      "'":"&#39;"
     }[c])
   );
 }
 
-function codeEsc(s){
-  return esc(s);
-}
+/* =========================================================
+   SIMPLE MARKDOWN
+========================================================= */
 
-/*
-  IMPORTANT:
-  Backtick characters are represented with \x60
-  so the outer String.raw template literal cannot
-  terminate accidentally.
-*/
+function markdown(text){
 
-function md(text){
-
-  var s = String(
-    text == null ? '' : text
-  ).replace(/\r\n?/g,'\n');
-
-  var blocks = [];
-
-  s = s.replace(
-    /\x60\x60\x60([\w+-]*)\n?([\s\S]*?)\x60\x60\x60/g,
-    function(_,lang,code){
-
-      var id = blocks.length;
-
-      blocks.push({
-        lang:lang || 'code',
-        code:code
-      });
-
-      return '@@CODE' + id + '@@';
-    }
-  );
-
-  var x = esc(s);
-
-  x = x
-    .replace(
-      /^###\s+(.+)$/gm,
-      '<h3>$1</h3>'
-    )
-    .replace(
-      /^##\s+(.+)$/gm,
-      '<h2>$1</h2>'
-    )
-    .replace(
-      /^#\s+(.+)$/gm,
-      '<h1>$1</h1>'
+  let s =
+    String(
+      text ?? ""
+    ).replace(
+      /\r\n?/g,
+      "\n"
     );
 
-  x = x.replace(
-    /^>\s?(.+)$/gm,
-    '<blockquote>$1</blockquote>'
-  );
+  const blocks = [];
 
-  x = x
-    .replace(
-      /^[-*]\s+(.+)$/gm,
-      '<li>$1</li>'
-    )
-    .replace(
-      /^(\d+)\.\s+(.+)$/gm,
-      '<li data-ol="$1">$2</li>'
-    );
+  s =
+    s.replace(
+      /\x60\x60\x60([\w+-]*)\n?([\s\S]*?)\x60\x60\x60/g,
+      (_,lang,code) => {
 
-  x = x.replace(
-    /(<li(?: data-ol="\d+")?>.*?<\/li>\n?)+/g,
-    function(m){
+        const id =
+          blocks.length;
 
-      var ordered = /data-ol=/.test(m);
-
-      return '<' +
-        (ordered ? 'ol' : 'ul') +
-        '>' +
-        m.replace(
-          / data-ol="\d+"/g,
-          ''
-        ) +
-        '</' +
-        (ordered ? 'ol' : 'ul') +
-        '>';
-    }
-  );
-
-  x = x.replace(
-    /^---+$/gm,
-    '<hr>'
-  );
-
-  x = x.replace(
-    /\|([^\n]+)\|\n\|\s*[-:]+(?:\s*\|\s*[-:]+)+\s*\|\n((?:\|[^\n]+\|\n?)+)/g,
-    function(m,head,rows){
-
-      var cells = head
-        .split('|')
-        .map(function(v){
-          return v.trim();
-        })
-        .filter(Boolean);
-
-      var body = rows
-        .trim()
-        .split('\n')
-        .map(function(r){
-          return r
-            .split('|')
-            .map(function(v){
-              return v.trim();
-            })
-            .filter(Boolean);
+        blocks.push({
+          lang:
+            lang || "code",
+          code
         });
 
-      return '<div class="table-wrap">' +
-        '<table>' +
-        '<thead><tr>' +
-        cells.map(function(c){
-          return '<th>' + c + '</th>';
-        }).join('') +
-        '</tr></thead>' +
-        '<tbody>' +
-        body.map(function(r){
-          return '<tr>' +
-            r.map(function(c){
-              return '<td>' + c + '</td>';
-            }).join('') +
-            '</tr>';
-        }).join('') +
-        '</tbody>' +
-        '</table>' +
-        '</div>';
-    }
-  );
-
-  x = x
-    .replace(
-      /\*\*(.+?)\*\*/g,
-      '<strong>$1</strong>'
-    )
-    .replace(
-      /__(.+?)__/g,
-      '<strong>$1</strong>'
-    )
-    .replace(
-      /(?<!\*)\*([^*\n]+)\*(?!\*)/g,
-      '<em>$1</em>'
-    )
-    .replace(
-      /(?<!_)_([^_\n]+)_(?!_)/g,
-      '<em>$1</em>'
+        return (
+          "@@CODE" +
+          id +
+          "@@"
+        );
+      }
     );
 
-  x = x.replace(
-    /\x60([^\x60\n]+)\x60/g,
-    '<span class="inline-code">$1</span>'
-  );
+  let x = esc(s);
 
-  x = x.replace(
-    /$begin:math:display$\(\[\^$end:math:display$]+)\]$begin:math:text$\(https\?\:\\\/\\\/\[\^\\s\)\]\+\)$end:math:text$/g,
-    '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
-  );
+  x =
+    x.replace(
+      /^###\s+(.+)$/gm,
+      "<h3>$1</h3>"
+    );
 
-  x = x
-    .split(/\n{2,}/)
-    .map(function(part){
+  x =
+    x.replace(
+      /^##\s+(.+)$/gm,
+      "<h2>$1</h2>"
+    );
 
-      if(
-        /^<(h[1-3]|ul|ol|blockquote|pre|div|table|hr)/.test(
-          part.trim()
-        ) ||
-        /^@@CODE\d+@@$/.test(part.trim())
-      ){
-        return part;
+  x =
+    x.replace(
+      /^#\s+(.+)$/gm,
+      "<h1>$1</h1>"
+    );
+
+  x =
+    x.replace(
+      /\*\*(.+?)\*\*/g,
+      "<strong>$1</strong>"
+    );
+
+  x =
+    x.replace(
+      /\x60([^\x60\n]+)\x60/g,
+      '<span class="inline-code">$1</span>'
+    );
+
+  x =
+    x.replace(
+      /$begin:math:display$\(\[\^$end:math:display$]+)\]$begin:math:text$\(https\?\:\\\/\\\/\[\^\\s\)\]\+\)$end:math:text$/g,
+      '<a href="$2" target="_blank" rel="noopener">$1</a>'
+    );
+
+  x =
+    x.replace(
+      /^[-*]\s+(.+)$/gm,
+      "• $1"
+    );
+
+  x =
+    x.replace(
+      /\n/g,
+      "<br>"
+    );
+
+  x =
+    x.replace(
+      /@@CODE(\d+)@@/g,
+      (_,i) => {
+
+        const b =
+          blocks[
+            Number(i)
+          ];
+
+        return (
+          '<pre><code>' +
+          esc(b.code) +
+          "</code></pre>"
+        );
       }
-
-      return part.replace(
-        /\n/g,
-        '<br>'
-      );
-    })
-    .join('<div class="md-gap"></div>');
-
-  x = x.replace(
-    /@@CODE(\d+)@@/g,
-    function(_,i){
-
-      var b = blocks[Number(i)];
-
-      return '<div class="code-wrap">' +
-        '<div class="code-head">' +
-        '<span>' +
-        esc(b.lang) +
-        '</span>' +
-        '<button class="code-copy" data-code="' +
-        encodeURIComponent(b.code) +
-        '">' +
-        'Copy code' +
-        '</button>' +
-        '</div>' +
-        '<pre><code>' +
-        codeEsc(b.code) +
-        '</code></pre>' +
-        '</div>';
-    }
-  );
+    );
 
   return x;
 }
 
-function bindRendered(root,raw){
+/* =========================================================
+   CHAT HISTORY
+========================================================= */
 
-  root
-    .querySelectorAll('.code-copy')
-    .forEach(btn => {
+function currentChat(){
 
-      btn.onclick = () => {
-
-        const code =
-          decodeURIComponent(
-            btn.dataset.code
-          );
-
-        navigator.clipboard?.writeText(code);
-
-        btn.textContent = 'Copied';
-
-        setTimeout(
-          () => btn.textContent = 'Copy code',
-          1000
-        );
-      };
-    });
-}
-
-function current(){
   return state.chats.find(
-    c => c.id === state.current
+    c =>
+      c.id ===
+      state.current
   ) || null;
 }
 
-function renderHistory(filter = ''){
+function newChat(){
 
-  const h = $('history');
+  const chat = {
 
-  h.innerHTML = '';
+    id:uid(),
+
+    title:"New chat",
+
+    messages:[],
+
+    created:Date.now()
+
+  };
+
+  state.chats.push(chat);
+
+  state.current =
+    chat.id;
+
+  state.attachments = [];
+
+  save();
+
+  renderHistory();
+
+  renderCurrent();
+
+  closeDrawer();
+
+  $("prompt").focus();
+}
+
+function renderHistory(
+  filter = ""
+){
+
+  const box =
+    $("history");
+
+  box.innerHTML = "";
 
   state.chats
+    .slice()
+    .reverse()
     .filter(
       c =>
         !filter ||
         c.title
           .toLowerCase()
-          .includes(filter.toLowerCase())
+          .includes(
+            filter.toLowerCase()
+          )
     )
-    .slice()
-    .reverse()
-    .forEach(c => {
+    .forEach(chat => {
 
-      const d =
-        document.createElement('div');
+      const row =
+        document.createElement(
+          "div"
+        );
 
-      d.className =
-        'history-item ' +
-        (c.id === state.current
-          ? 'active'
-          : '');
+      row.className =
+        "history-item" +
+        (
+          chat.id ===
+          state.current
+          ? " active"
+          : ""
+        );
 
-      d.innerHTML =
+      row.innerHTML =
         '<span>💬</span>' +
         '<span class="history-title"></span>' +
-        '<button class="more" title="Delete">⋯</button>';
+        '<button class="delete-chat">×</button>';
 
-      d.querySelector(
-        '.history-title'
-      ).textContent = c.title;
+      row.querySelector(
+        ".history-title"
+      ).textContent =
+        chat.title;
 
-      d.onclick = e => {
-
-        if(
-          e.target.closest('.more')
-        ){
-
-          state.chats =
-            state.chats.filter(
-              x => x.id !== c.id
-            );
+      row.onclick =
+        event => {
 
           if(
-            state.current === c.id
+            event.target
+              .closest(
+                ".delete-chat"
+              )
           ){
 
-            state.current =
-              state.chats.at(-1)?.id ||
-              null;
+            state.chats =
+              state.chats.filter(
+                c =>
+                  c.id !==
+                  chat.id
+              );
+
+            if(
+              state.current ===
+              chat.id
+            ){
+
+              state.current =
+                state.chats.at(-1)
+                  ?.id || null;
+            }
+
+            save();
+
+            renderHistory();
+
+            renderCurrent();
+
+            return;
           }
 
-          save();
+          state.current =
+            chat.id;
+
           renderHistory();
+
           renderCurrent();
 
-          return;
-        }
+          closeDrawer();
+        };
 
-        state.current = c.id;
-
-        renderHistory();
-        renderCurrent();
-        closeDrawer();
-      };
-
-      h.appendChild(d);
+      box.appendChild(row);
     });
 }
 
 function renderCurrent(){
 
-  const box = $('messages');
+  const box =
+    $("messages");
 
-  box.innerHTML = '';
+  box.innerHTML = "";
 
-  const c = current();
+  const chat =
+    currentChat();
 
-  if(!c){
+  if(!chat){
 
     box.innerHTML =
       '<div class="welcome">' +
-      '<div>' +
-      '<h1>How can I help you?</h1>' +
-      '<p>Ask anything, upload an image, attach a file, or create an image.</p>' +
-      '</div>' +
-      '</div>';
+      "<div>" +
+      "<h1>How can I help you?</h1>" +
+      "<p>Ask anything, upload a file, or create an image.</p>" +
+      "</div>" +
+      "</div>";
 
     return;
   }
 
-  c.messages.forEach(m => {
+  chat.messages.forEach(
+    message => {
 
-    if(m.image){
+      if(message.image){
 
-      addImageMessage(
-        'Generated image',
-        m.image
-      );
+        addImageMessage(
+          message.image
+        );
 
-    }else{
+      }else{
 
-      addMessage(
-        m.role,
-        m.content,
-        false
-      );
+        addMessage(
+          message.role,
+          message.content,
+          false
+        );
+      }
+
     }
-
-  });
+  );
 }
 
 function addMessage(
@@ -1441,591 +1295,1272 @@ function addMessage(
   actions = true
 ){
 
-  const d =
-    document.createElement('div');
+  const row =
+    document.createElement(
+      "div"
+    );
 
-  d.className =
-    'msg ' + role;
+  row.className =
+    "message " +
+    role;
 
-  d.innerHTML =
+  row.innerHTML =
     '<div class="avatar">' +
-    (role === 'user' ? 'U' : 'A') +
-    '</div>' +
-
-    '<div class="bubble">' +
+    (
+      role === "user"
+        ? "U"
+        : "A"
+    ) +
+    "</div>" +
 
     '<div class="content">' +
-    md(text) +
-    '</div>' +
+    markdown(text) +
 
     (
       actions
-      ?
-      '<div class="message-actions">' +
-      '<button class="mini copy">Copy</button>' +
-      (
-        role === 'assistant'
         ?
-        '<button class="mini regen">Regenerate</button>'
+          '<div class="actions">' +
+          '<button class="action copy">Copy</button>' +
+          (
+            role === "assistant"
+              ?
+                '<button class="action regenerate">Regenerate</button>'
+              :
+                ""
+          ) +
+          "</div>"
         :
-        ''
-      ) +
-      '</div>'
-      :
-      ''
+          ""
     ) +
 
-    '</div>';
+    "</div>";
 
-  $('messages').appendChild(d);
+  $("messages")
+    .appendChild(row);
 
-  bindRendered(d,text);
+  if(actions){
 
-  d.querySelector('.copy')
-    ?.addEventListener(
-      'click',
-      () => navigator.clipboard?.writeText(text)
+    row.querySelector(
+      ".copy"
+    )?.addEventListener(
+      "click",
+      () =>
+        navigator
+          .clipboard
+          ?.writeText(
+            text
+          )
     );
 
-  d.querySelector('.regen')
-    ?.addEventListener(
-      'click',
-      () => regenerate()
+    row.querySelector(
+      ".regenerate"
+    )?.addEventListener(
+      "click",
+      regenerate
     );
+  }
 
-  return d;
+  return row;
 }
 
 function addImageMessage(
-  prompt,
   dataURL
 ){
 
-  const d =
-    document.createElement('div');
+  const row =
+    document.createElement(
+      "div"
+    );
 
-  d.className =
-    'msg assistant';
+  row.className =
+    "message assistant";
 
-  d.innerHTML =
+  row.innerHTML =
     '<div class="avatar">A</div>' +
-    '<div class="bubble">' +
     '<div class="content">' +
-    '<p>' +
-    esc(prompt) +
-    '</p>' +
     '<div class="image-card">' +
     '<img src="' +
     dataURL +
-    '" alt="AI generated image">' +
-    '<div class="image-toolbar">' +
-    '<button class="mini image-download">Save image</button>' +
-    '</div>' +
-    '</div>' +
-    '</div>' +
-    '</div>';
+    '" alt="Generated image">' +
+    "</div>" +
+    "</div>";
 
-  $('messages').appendChild(d);
-
-  d.querySelector(
-    '.image-download'
-  ).onclick = () => {
-
-    const a =
-      document.createElement('a');
-
-    a.href = dataURL;
-    a.download =
-      'aether-generated-image.jpg';
-
-    a.click();
-  };
-
-  return d;
+  $("messages")
+    .appendChild(row);
 }
 
-function newChat(){
+/* =========================================================
+   MODEL SELECTION
+========================================================= */
 
-  const c = {
-    id:uid(),
-    title:'New chat',
-    messages:[],
-    created:Date.now()
-  };
-
-  state.chats.push(c);
-
-  state.current = c.id;
-
-  state.attachments = [];
-
-  renderAttachments();
-
-  save();
-  renderHistory();
-  renderCurrent();
-
-  closeDrawer();
-
-  $('prompt').focus();
-}
-
-function ensureChat(title){
-
-  if(!current()){
-    newChat();
-  }
-
-  const c = current();
-
-  if(
-    c.title === 'New chat' &&
-    title
-  ){
-    c.title =
-      title.slice(0,50);
-  }
-
-  return c;
-}
-
-function renderAttachments(){
-
-  const a = $('attachments');
-
-  a.innerHTML = '';
-
-  state.attachments.forEach(
-    (f,i) => {
-
-      const d =
-        document.createElement('div');
-
-      d.className = 'chip';
-
-      d.textContent =
-        '📎 ' + f.name + ' ×';
-
-      d.onclick = () => {
-
-        state.attachments.splice(i,1);
-
-        renderAttachments();
-      };
-
-      a.appendChild(d);
-    }
-  );
-}
-
-function modelScore(m){
+function modelScore(model){
 
   const caps =
-    new Set(m.capabilities || []);
+    new Set(
+      Array.isArray(
+        model.capabilities
+      )
+        ? model.capabilities
+        : []
+    );
 
   let score = 0;
 
-  if(caps.has('reasoning'))
+  if(
+    caps.has("reasoning")
+  )
     score += 50;
 
-  if(caps.has('vision'))
+  if(
+    caps.has("vision")
+  )
     score += 20;
 
-  if(caps.has('web_search'))
+  if(
+    caps.has("web_search")
+  )
     score += 15;
 
-  if(caps.has('tools'))
+  if(
+    caps.has("tools")
+  )
     score += 10;
 
-  if(caps.has('streaming'))
+  if(
+    caps.has("streaming")
+  )
     score += 5;
 
   score += Math.min(
-    Number(m.context_window || 0) / 10000,
+    Number(
+      model.context_window ||
+      0
+    ) / 10000,
     20
   );
 
   return score;
 }
 
-function chooseDefaultModel(models){
+function chooseDefaultModel(
+  models
+){
 
-  const exact =
+  const preferred =
     models.find(
-      m => m.id === 'claude-opus-4.8'
+      m =>
+        m.id ===
+        "claude-opus-4.8"
     );
 
-  if(exact)
-    return exact;
+  if(preferred)
+    return preferred;
 
-  return [...models].sort(
-    (a,b) =>
-      modelScore(b) -
-      modelScore(a)
-  )[0];
+  return [...models]
+    .sort(
+      (a,b) =>
+        modelScore(b) -
+        modelScore(a)
+    )[0];
 }
 
-async function loadModels(){
+/* =========================================================
+   MODEL ERROR HANDLING
+========================================================= */
+
+async function fetchJSONWithTimeout(
+  url,
+  timeout = 12000
+){
+
+  const controller =
+    new AbortController();
+
+  const timer =
+    setTimeout(
+      () =>
+        controller.abort(),
+      timeout
+    );
 
   try{
 
-    const r =
-      await fetch('/api/models');
-
-    if(!r.ok)
-      throw new Error(
-        await r.text()
-      );
-
-    const data =
-      await r.json();
-
-    state.models =
-      data.data || [];
-
-    const select =
-      $('model');
-
-    select.innerHTML = '';
-
-    state.models.forEach(m => {
-
-      const o =
-        document.createElement('option');
-
-      o.value = m.id;
-
-      o.textContent =
-        m.name || m.id;
-
-      select.appendChild(o);
-    });
-
-    const best =
-      chooseDefaultModel(
-        state.models
-      );
-
-    if(best)
-      select.value = best.id;
-
-    if(!state.models.length)
-      throw new Error(
-        'No models available'
-      );
-
-  }catch(e){
-
-    $('model').innerHTML =
-      '<option>Models failed — retry</option>';
-
-    console.error(e);
-  }
-}
-
-function memoryText(){
-
-  return state.memories.length
-    ?
-      '\n\nKnown memory:\n' +
-      state.memories
-        .map(x => '- ' + x)
-        .join('\n')
-    :
-      '';
-}
-
-function scrollToBottom(){
-
-  const el = $('chat');
-
-  el.scrollTop =
-    el.scrollHeight;
-}
-
-function wantsImage(text){
-
-  return (
-    /\b(generate|create|make|draw|design|render|produce)\b[\s\S]{0,80}\b(image|picture|photo|wallpaper|illustration|artwork|logo)\b/i
-    .test(text)
-  ) ||
-  (
-    /\b(image|picture|photo|wallpaper|illustration|artwork|logo)\b[\s\S]{0,40}\b(generate|create|make|draw|design|render)\b/i
-    .test(text)
-  );
-}
-
-async function generateImage(prompt){
-
-  const c =
-    ensureChat(
-      prompt || 'Generated image'
-    );
-
-  state.busy = true;
-
-  $('send').disabled = true;
-
-  const ai =
-    addMessage(
-      'assistant',
-      '',
-      false
-    );
-
-  ai.querySelector(
-    '.content'
-  ).innerHTML =
-    '<div class="typing">' +
-    '<i></i><i></i><i></i>' +
-    '</div>';
-
-  try{
-
-    const r =
+    const response =
       await fetch(
-        '/api/generate-image',
+        url,
         {
-          method:'POST',
-          headers:{
-            'Content-Type':
-              'application/json'
-          },
-          body:JSON.stringify({
-            prompt
-          })
+          method:"GET",
+          cache:"no-store",
+          signal:
+            controller.signal
         }
       );
 
-    if(!r.ok)
-      throw new Error(
-        await r.text()
+    const text =
+      await response.text();
+
+    let data;
+
+    try{
+
+      data =
+        JSON.parse(text);
+
+    }catch{
+
+      data = {
+        raw:text
+      };
+    }
+
+    if(!response.ok){
+
+      const error =
+        data?.error || {};
+
+      const err =
+        new Error(
+          error.message ||
+          data?.message ||
+          data?.raw ||
+          (
+            "HTTP " +
+            response.status
+          )
+        );
+
+      err.status =
+        response.status;
+
+      err.code =
+        error.code || "";
+
+      err.type =
+        error.type || "";
+
+      throw err;
+    }
+
+    return data;
+
+  }finally{
+
+    clearTimeout(timer);
+  }
+}
+
+function modelErrorMessage(
+  error
+){
+
+  if(
+    error?.name ===
+    "AbortError"
+  ){
+
+    return (
+      "CodeCraft /models request timed out after 12 seconds."
+    );
+  }
+
+  switch(
+    Number(
+      error?.status
+    )
+  ){
+
+    case 401:
+
+      return (
+        "CodeCraft 401 — API key is missing, invalid, or revoked."
       );
 
-    const data =
-      await r.json();
+    case 403:
 
-    ai.remove();
+      return (
+        "CodeCraft 403 — API key needs the models:read scope."
+      );
+
+    case 402:
+
+      return (
+        "CodeCraft 402 — account allowance/balance is unavailable."
+      );
+
+    case 404:
+
+      return (
+        "CodeCraft 404 — /v1/models endpoint or resource was not found."
+      );
+
+    case 429:
+
+      return (
+        "CodeCraft 429 — rate limit reached. Try again shortly."
+      );
+
+    case 502:
+
+      return (
+        "CodeCraft 502 — upstream provider/API error."
+      );
+
+    default:
+
+      return (
+        "Models error" +
+        (
+          error?.status
+            ? " (HTTP " +
+              error.status +
+              ")"
+            : ""
+        ) +
+        ": " +
+        (
+          error?.message ||
+          String(error)
+        )
+      );
+  }
+}
+
+function showModelError(
+  message
+){
+
+  const box =
+    $("modelError");
+
+  box.innerHTML =
+    "<span>" +
+    esc(message) +
+    "</span>" +
+
+    '<button id="retryModels">' +
+    "Retry" +
+    "</button>";
+
+  box.classList.add(
+    "show"
+  );
+
+  $("retryModels").onclick =
+    () =>
+      loadModels(
+        true
+      );
+}
+
+function hideModelError(){
+
+  $("modelError")
+    .classList
+    .remove("show");
+}
+
+function populateModels(
+  models,
+  cached = false
+){
+
+  const select =
+    $("model");
+
+  select.innerHTML = "";
+
+  models.forEach(
+    model => {
+
+      const option =
+        document.createElement(
+          "option"
+        );
+
+      option.value =
+        model.id;
+
+      option.textContent =
+        (
+          model.name ||
+          model.id
+        ) +
+        (
+          cached
+            ? " (cached)"
+            : ""
+        );
+
+      select.appendChild(
+        option
+      );
+    }
+  );
+
+  const best =
+    chooseDefaultModel(
+      models
+    );
+
+  if(best){
+
+    select.value =
+      best.id;
+  }
+
+  select.title =
+    cached
+      ? "Using cached models"
+      : (
+          models.length +
+          " models loaded"
+        );
+}
+
+/* =========================================================
+   MAIN MODEL LOADER
+========================================================= */
+
+async function loadModels(
+  manualRetry = false
+){
+
+  const select =
+    $("model");
+
+  hideModelError();
+
+  select.disabled = true;
+
+  select.innerHTML =
+    "<option>Loading models…</option>";
+
+  /*
+    First try:
+    live CodeCraft API
+  */
+
+  let lastError =
+    null;
+
+  for(
+    let attempt = 1;
+    attempt <= 3;
+    attempt++
+  ){
+
+    try{
+
+      const data =
+        await fetchJSONWithTimeout(
+          "/api/models",
+          12000
+        );
+
+      if(
+        !Array.isArray(
+          data?.data
+        )
+      ){
+
+        throw new Error(
+          "CodeCraft returned an invalid response: data[] is missing."
+        );
+      }
+
+      if(
+        data.data.length === 0
+      ){
+
+        throw new Error(
+          "CodeCraft returned 0 models. Check the API key and models:read scope."
+        );
+      }
+
+      state.models =
+        data.data;
+
+      /*
+        Cache successful model list
+      */
+
+      localStorage.setItem(
+        "aether_models",
+        JSON.stringify(
+          data.data
+        )
+      );
+
+      populateModels(
+        data.data,
+        false
+      );
+
+      select.disabled =
+        false;
+
+      hideModelError();
+
+      return true;
+
+    }catch(error){
+
+      lastError =
+        error;
+
+      console.error(
+        "AetherAI model attempt",
+        attempt,
+        error
+      );
+
+      /*
+        Wait before retrying.
+      */
+
+      if(
+        attempt < 3
+      ){
+
+        await new Promise(
+          resolve =>
+            setTimeout(
+              resolve,
+              attempt * 1000
+            )
+        );
+      }
+    }
+  }
+
+  /*
+    Live API failed.
+    Try cached models.
+  */
+
+  try{
+
+    const cached =
+      JSON.parse(
+        localStorage.getItem(
+          "aether_models"
+        ) || "[]"
+      );
+
+    if(
+      Array.isArray(cached) &&
+      cached.length > 0
+    ){
+
+      state.models =
+        cached;
+
+      populateModels(
+        cached,
+        true
+      );
+
+      select.disabled =
+        false;
+
+      showModelError(
+        "Live model list failed. Using cached models. " +
+        modelErrorMessage(
+          lastError
+        )
+      );
+
+      return false;
+    }
+
+  }catch(error){
+
+    console.error(
+      "Cached model list error",
+      error
+    );
+  }
+
+  /*
+    No cache either.
+    Show exact error.
+  */
+
+  select.disabled =
+    false;
+
+  select.innerHTML =
+    '<option value="">⚠ Models unavailable</option>';
+
+  showModelError(
+    modelErrorMessage(
+      lastError
+    )
+  );
+
+  return false;
+}
+
+/* =========================================================
+   FILES
+========================================================= */
+
+async function readFile(
+  file
+){
+
+  return new Promise(
+    resolve => {
+
+      const reader =
+        new FileReader();
+
+      reader.onload =
+        () => {
+
+          const result =
+            String(
+              reader.result
+            );
+
+          if(
+            file.type.startsWith(
+              "image/"
+            )
+          ){
+
+            resolve({
+              name:file.name,
+              type:file.type,
+              data:result
+            });
+
+          }else{
+
+            resolve({
+              name:file.name,
+              type:file.type,
+              text:
+                result.slice(
+                  0,
+                  120000
+                )
+            });
+          }
+        };
+
+      if(
+        file.type.startsWith(
+          "image/"
+        )
+      ){
+
+        reader.readAsDataURL(
+          file
+        );
+
+      }else{
+
+        reader.readAsText(
+          file
+        );
+      }
+    }
+  );
+}
+
+function renderAttachments(){
+
+  const box =
+    $("attachments");
+
+  box.innerHTML = "";
+
+  state.attachments.forEach(
+    (file,index) => {
+
+      const item =
+        document.createElement(
+          "div"
+        );
+
+      item.className =
+        "attachment";
+
+      item.textContent =
+        "📎 " +
+        file.name +
+        " ×";
+
+      item.onclick =
+        () => {
+
+          state.attachments
+            .splice(
+              index,
+              1
+            );
+
+          renderAttachments();
+        };
+
+      box.appendChild(
+        item
+      );
+    }
+  );
+}
+
+/* =========================================================
+   IMAGE GENERATION
+========================================================= */
+
+function wantsImage(
+  text
+){
+
+  return (
+    /\b(generate|create|make|draw|design|render|produce)\b[\s\S]{0,80}\b(image|picture|photo|wallpaper|illustration|artwork|logo)\b/i
+      .test(text)
+    ||
+    /\b(image|picture|photo|wallpaper|illustration|artwork|logo)\b[\s\S]{0,40}\b(generate|create|make|draw|design|render)\b/i
+      .test(text)
+  );
+}
+
+async function generateImage(
+  prompt
+){
+
+  const chat =
+    ensureChat(
+      prompt
+    );
+
+  state.busy =
+    true;
+
+  $("send").disabled =
+    true;
+
+  const loading =
+    addMessage(
+      "assistant",
+      "Generating image…",
+      false
+    );
+
+  try{
+
+    const response =
+      await fetch(
+        "/api/generate-image",
+        {
+          method:"POST",
+          headers:{
+            "Content-Type":
+              "application/json"
+          },
+          body:
+            JSON.stringify({
+              prompt
+            })
+        }
+      );
+
+    const text =
+      await response.text();
+
+    let data;
+
+    try{
+
+      data =
+        JSON.parse(text);
+
+    }catch{
+
+      data = {
+        raw:text
+      };
+    }
+
+    if(!response.ok){
+
+      throw new Error(
+        data?.error?.message ||
+        data?.message ||
+        text ||
+        (
+          "HTTP " +
+          response.status
+        )
+      );
+    }
+
+    loading.remove();
 
     addImageMessage(
-      'Generated image',
       data.dataURI
     );
 
-    c.messages.push({
-      role:'assistant',
+    chat.messages.push({
+      role:"assistant",
       content:
-        '[Generated image] ' +
+        "[Generated image] " +
         prompt,
-      image:data.dataURI
+      image:
+        data.dataURI
     });
 
     save();
 
-  }catch(e){
+  }catch(error){
 
-    ai.querySelector(
-      '.content'
+    loading.querySelector(
+      ".content"
     ).innerHTML =
       '<p class="danger">' +
-      'Image generation failed: ' +
-      esc(e.message) +
-      '</p>';
+      "Image generation failed: " +
+      esc(
+        error.message
+      ) +
+      "</p>";
 
   }finally{
 
-    state.busy = false;
+    state.busy =
+      false;
 
-    $('send').disabled = false;
+    $("send").disabled =
+      false;
 
-    $('prompt').focus();
+    $("prompt").focus();
   }
+}
+
+/* =========================================================
+   CHAT
+========================================================= */
+
+function ensureChat(
+  title
+){
+
+  if(
+    !currentChat()
+  ){
+
+    newChat();
+  }
+
+  const chat =
+    currentChat();
+
+  if(
+    chat.title ===
+    "New chat" &&
+    title
+  ){
+
+    chat.title =
+      title.slice(
+        0,
+        50
+      );
+  }
+
+  return chat;
+}
+
+function buildMessages(
+  chat,
+  files
+){
+
+  const messages =
+    chat.messages
+      .map(
+        message => ({
+          role:
+            message.role,
+          content:
+            message.content
+        })
+      );
+
+  const last =
+    messages.pop();
+
+  const output =
+    messages;
+
+  const userParts = [];
+
+  if(
+    last?.content
+  ){
+
+    userParts.push({
+      type:"text",
+      text:last.content
+    });
+  }
+
+  for(
+    const file of files
+  ){
+
+    if(
+      file.type.startsWith(
+        "image/"
+      )
+    ){
+
+      userParts.push({
+        type:"image_url",
+        image_url:{
+          url:file.data
+        }
+      });
+
+    }else{
+
+      userParts.push({
+        type:"text",
+        text:
+          "Attached file: " +
+          file.name +
+          "\n\n" +
+          (
+            file.text ||
+            ""
+          )
+      });
+    }
+  }
+
+  if(
+    userParts.length
+  ){
+
+    output.push({
+      role:"user",
+      content:userParts
+    });
+  }
+
+  if(
+    state.memories.length
+  ){
+
+    output.unshift({
+      role:"system",
+      content:
+        "Relevant remembered information: " +
+        state.memories.join(
+          "; "
+        )
+    });
+  }
+
+  return output;
 }
 
 async function send(){
 
-  if(state.busy)
+  if(
+    state.busy
+  )
     return;
 
   const prompt =
-    $('prompt').value.trim();
+    $("prompt")
+      .value
+      .trim();
 
   if(
     !prompt &&
     !state.attachments.length
-  ){
+  )
     return;
-  }
 
   if(
+    prompt &&
     !state.attachments.length &&
     wantsImage(prompt)
   ){
 
-    $('prompt').value = '';
+    $("prompt").value =
+      "";
 
     autoSize();
 
-    await generateImage(prompt);
+    await generateImage(
+      prompt
+    );
 
     return;
   }
 
-  const c =
+  /*
+    If model list is unavailable,
+    stop before sending a broken
+    request.
+  */
+
+  if(
+    !state.models.length
+  ){
+
+    showModelError(
+      "No model is available. Fix the model/API error above, then tap Retry."
+    );
+
+    return;
+  }
+
+  const chat =
     ensureChat(
-      prompt || 'File chat'
+      prompt ||
+      "File chat"
     );
 
   const files =
     state.attachments.slice();
 
-  state.attachments = [];
+  state.attachments =
+    [];
 
   renderAttachments();
 
-  c.messages.push({
-    role:'user',
+  chat.messages.push({
+    role:"user",
     content:
       prompt ||
-      'Please analyze the attached file(s).'
+      "Please analyze the attached file(s)."
   });
 
-  if(c.title === 'New chat'){
+  if(
+    chat.title ===
+    "New chat"
+  ){
 
-    c.title =
+    chat.title =
       (
         prompt ||
         files[0]?.name ||
-        'New chat'
-      ).slice(0,50);
+        "New chat"
+      ).slice(
+        0,
+        50
+      );
   }
 
   save();
 
   renderHistory();
+
   renderCurrent();
-  scrollToBottom();
 
-  state.busy = true;
+  state.busy =
+    true;
 
-  $('send').disabled = true;
+  $("send").disabled =
+    true;
 
-  $('prompt').value = '';
+  $("prompt").value =
+    "";
 
   autoSize();
 
-  const ai =
+  const assistant =
     addMessage(
-      'assistant',
-      '',
+      "assistant",
+      "Thinking…",
       false
     );
 
   const content =
-    ai.querySelector(
-      '.content'
+    assistant.querySelector(
+      ".content"
     );
-
-  content.innerHTML =
-    '<div class="typing">' +
-    '<i></i><i></i><i></i>' +
-    '</div>';
 
   try{
 
-    let selected =
-      $('model').value;
+    let modelID =
+      $("model").value;
 
-    if(
+    /*
+      Automatically choose vision model
+      if an image is attached.
+    */
+
+    const hasImage =
       files.some(
-        f => f.type.startsWith('image/')
-      )
-    ){
+        file =>
+          file.type.startsWith(
+            "image/"
+          )
+      );
+
+    if(hasImage){
 
       const currentModel =
         state.models.find(
-          m => m.id === selected
+          model =>
+            model.id ===
+            modelID
+        );
+
+      const currentCaps =
+        currentModel?.capabilities ||
+        [];
+
+      const currentHasVision =
+        Array.isArray(
+          currentCaps
+        ) &&
+        currentCaps.includes(
+          "vision"
         );
 
       if(
-        !currentModel?.capabilities?.includes?.('vision') &&
-        !currentModel?.capabilities?.vision
+        !currentHasVision
       ){
 
-        const vision =
+        const visionModel =
           state.models.find(
-            m =>
-              (m.capabilities || [])
-                .includes('vision') ||
-              m.capabilities?.vision
+            model =>
+              Array.isArray(
+                model.capabilities
+              ) &&
+              model.capabilities.includes(
+                "vision"
+              )
           );
 
-        if(vision){
+        if(
+          visionModel
+        ){
 
-          selected =
-            vision.id;
+          modelID =
+            visionModel.id;
 
-          $('model').value =
-            vision.id;
+          $("model").value =
+            visionModel.id;
         }
       }
     }
 
     const payload = {
-      model:selected,
+
+      model:
+        modelID,
+
       messages:
         buildMessages(
-          c,
+          chat,
           files
         ),
+
       stream:true,
+
       max_tokens:8192
     };
 
-    const r =
+    const response =
       await fetch(
-        '/api/chat',
+        "/api/chat",
         {
-          method:'POST',
+          method:"POST",
           headers:{
-            'Content-Type':
-              'application/json'
+            "Content-Type":
+              "application/json"
           },
           body:
-            JSON.stringify(payload)
+            JSON.stringify(
+              payload
+            )
         }
       );
 
-    if(!r.ok)
+    if(
+      !response.ok
+    ){
+
+      const text =
+        await response.text();
+
+      let data;
+
+      try{
+
+        data =
+          JSON.parse(text);
+
+      }catch{
+
+        data = {
+          raw:text
+        };
+      }
+
       throw new Error(
-        await r.text()
+        data?.error?.message ||
+        data?.message ||
+        data?.raw ||
+        (
+          "HTTP " +
+          response.status
+        )
       );
+    }
+
+    if(
+      !response.body
+    ){
+
+      throw new Error(
+        "CodeCraft returned an empty response body."
+      );
+    }
 
     const reader =
-      r.body.getReader();
+      response.body
+        .getReader();
 
     const decoder =
       new TextDecoder();
 
-    let buffer = '';
-    let answer = '';
+    let buffer =
+      "";
+
+    let answer =
+      "";
 
     while(true){
 
-      const q =
+      const chunk =
         await reader.read();
 
-      if(q.done)
+      if(
+        chunk.done
+      )
         break;
 
       buffer +=
         decoder.decode(
-          q.value,
-          {stream:true}
+          chunk.value,
+          {
+            stream:true
+          }
         );
 
       const lines =
-        buffer.split('\n');
+        buffer.split(
+          "\n"
+        );
 
       buffer =
         lines.pop();
@@ -2035,7 +2570,9 @@ async function send(){
       ){
 
         if(
-          !line.startsWith('data:')
+          !line.startsWith(
+            "data:"
+          )
         )
           continue;
 
@@ -2044,293 +2581,172 @@ async function send(){
             .slice(5)
             .trim();
 
-        if(raw === '[DONE]')
+        if(
+          raw ===
+          "[DONE]"
+        )
           continue;
 
         try{
 
-          const j =
-            JSON.parse(raw);
+          const data =
+            JSON.parse(
+              raw
+            );
 
           const delta =
-            j.choices?.[0]
+            data
+              ?.choices?.[0]
               ?.delta
-              ?.content || '';
+              ?.content ||
+            "";
 
           if(!delta)
             continue;
 
-          answer += delta;
+          answer +=
+            delta;
 
           content.innerHTML =
-            md(answer);
+            markdown(
+              answer
+            );
 
-          bindRendered(
-            ai,
-            answer
-          );
+          $("chat")
+            .scrollTop =
+            $("chat")
+              .scrollHeight;
 
-        }catch{}
+        }catch{
+
+          /*
+            Ignore malformed individual
+            SSE chunks.
+          */
+        }
       }
     }
 
+    if(
+      !answer
+    ){
+
+      answer =
+        "The model returned an empty response.";
+    }
+
     content.innerHTML =
-      md(
-        answer ||
-        'No response received.'
+      markdown(
+        answer
       );
 
-    bindRendered(
-      ai,
-      answer
-    );
-
-    c.messages.push({
-      role:'assistant',
-      content:
-        answer ||
-        'No response received.'
+    chat.messages.push({
+      role:"assistant",
+      content:answer
     });
 
     save();
 
-    ai.querySelector(
-      '.bubble'
-    ).insertAdjacentHTML(
-      'beforeend',
-      '<div class="message-actions">' +
-      '<button class="mini copy">Copy</button>' +
-      '<button class="mini regen">Regenerate</button>' +
-      '</div>'
+    const actions =
+      document.createElement(
+        "div"
+      );
+
+    actions.className =
+      "actions";
+
+    actions.innerHTML =
+      '<button class="action">Copy</button>' +
+      '<button class="action">Regenerate</button>';
+
+    content.appendChild(
+      actions
     );
 
-    ai.querySelector(
-      '.copy'
-    ).onclick =
-      () =>
-        navigator.clipboard?.writeText(
-          answer
-        );
+    actions
+      .children[0]
+      .onclick =
+        () =>
+          navigator
+            .clipboard
+            ?.writeText(
+              answer
+            );
 
-    ai.querySelector(
-      '.regen'
-    ).onclick =
-      () => regenerate();
+    actions
+      .children[1]
+      .onclick =
+        regenerate;
 
     extractMemory(
-      prompt,
-      answer
+      prompt
     );
 
-  }catch(e){
+  }catch(error){
 
     content.innerHTML =
       '<p class="danger">' +
-      'Error: ' +
-      esc(e.message) +
-      '</p>';
+      "Error: " +
+      esc(
+        error.message
+      ) +
+      "</p>";
 
-    c.messages.push({
-      role:'assistant',
+    chat.messages.push({
+      role:"assistant",
       content:
-        'Error: ' +
-        e.message
+        "Error: " +
+        error.message
     });
 
     save();
 
   }finally{
 
-    state.busy = false;
+    state.busy =
+      false;
 
-    $('send').disabled = false;
+    $("send").disabled =
+      false;
 
-    $('prompt').focus();
+    $("prompt").focus();
   }
 }
 
-function buildMessages(
-  c,
-  files
-){
-
-  const msgs =
-    [...c.messages];
-
-  const last =
-    msgs.pop();
-
-  const out =
-    msgs.map(
-      m => ({
-        role:m.role,
-        content:m.content
-      })
-    );
-
-  let userContent = [];
-
-  if(last?.content){
-
-    userContent.push({
-      type:'text',
-      text:last.content
-    });
-  }
-
-  for(
-    const f of files
-  ){
-
-    if(
-      f.type.startsWith('image/')
-    ){
-
-      userContent.push({
-        type:'image_url',
-        image_url:{
-          url:f.data
-        }
-      });
-
-    }else{
-
-      userContent.push({
-        type:'text',
-        text:
-          'Attached file: ' +
-          f.name +
-          '\n' +
-          (f.text || '')
-      });
-    }
-  }
-
-  if(userContent.length){
-
-    out.push({
-      role:'user',
-      content:userContent
-    });
-  }
-
-  if(state.memories.length){
-
-    out.unshift({
-      role:'system',
-      content:
-        'Use these remembered facts only when relevant. ' +
-        state.memories.join('; ')
-    });
-  }
-
-  return out;
-}
-
-async function prepareFile(file){
-
-  return new Promise(
-    resolve => {
-
-      const fr =
-        new FileReader();
-
-      fr.onload = () => {
-
-        const data =
-          String(fr.result);
-
-        if(
-          file.type.startsWith('image/')
-        ){
-
-          resolve({
-            name:file.name,
-            type:file.type,
-            data
-          });
-
-        }else{
-
-          resolve({
-            name:file.name,
-            type:file.type,
-            text:
-              data.slice(
-                0,
-                120000
-              )
-          });
-        }
-      };
-
-      if(
-        file.type.startsWith('image/')
-      ){
-
-        fr.readAsDataURL(file);
-
-      }else{
-
-        fr.readAsText(file);
-      }
-    }
-  );
-}
-
-function regenerate(){
-
-  const c = current();
-
-  if(
-    !c ||
-    state.busy ||
-    c.messages.length < 2
-  )
-    return;
-
-  c.messages.pop();
-
-  const user =
-    c.messages.pop();
-
-  $('prompt').value =
-    user.content;
-
-  save();
-
-  renderCurrent();
-
-  scrollToBottom();
-
-  send();
-}
+/* =========================================================
+   MEMORY
+========================================================= */
 
 function extractMemory(
-  prompt,
-  answer
+  prompt
 ){
 
-  const p =
+  const lower =
     prompt.toLowerCase();
 
   if(
     /remember|my name is|i am|i'm|i like|i prefer/
-      .test(p)
+      .test(lower)
   ){
 
-    const item =
-      prompt.slice(0,220);
-
     if(
-      item &&
-      !state.memories.includes(item)
+      prompt &&
+      !state.memories.includes(
+        prompt
+      )
     ){
 
-      state.memories.push(item);
+      state.memories.push(
+        prompt.slice(
+          0,
+          250
+        )
+      );
 
       state.memories =
-        state.memories.slice(-30);
+        state.memories.slice(
+          -30
+        );
 
       save();
     }
@@ -2339,186 +2755,269 @@ function extractMemory(
 
 function openMemory(){
 
-  const list =
-    $('memoryList');
+  const box =
+    $("memoryList");
 
-  list.innerHTML =
-    state.memories.length
-    ?
+  if(
+    !state.memories.length
+  ){
+
+    box.innerHTML =
+      "<p>No memories yet.</p>";
+
+  }else{
+
+    box.innerHTML =
       state.memories
         .map(
-          (m,i) =>
+          (memory,index) =>
             '<div class="memory-row">' +
-            '<span>' +
-            esc(m) +
-            '</span>' +
-            '<button class="mini" onclick="removeMemory(' +
-            i +
-            ')">Delete</button>' +
-            '</div>'
+            "<span>" +
+            esc(memory) +
+            "</span>" +
+            '<button class="action" data-memory="' +
+            index +
+            '">' +
+            "Delete" +
+            "</button>" +
+            "</div>"
         )
-        .join('')
-    :
-      '<p>No memories yet.</p>';
+        .join("");
 
-  $('memoryModal')
+    box
+      .querySelectorAll(
+        "[data-memory]"
+      )
+      .forEach(
+        button => {
+
+          button.onclick =
+            () => {
+
+              state.memories
+                .splice(
+                  Number(
+                    button.dataset.memory
+                  ),
+                  1
+                );
+
+              save();
+
+              openMemory();
+            };
+        }
+      );
+  }
+
+  $("memoryModal")
     .classList
-    .add('open');
+    .add("open");
 }
 
-window.removeMemory =
-  i => {
+/* =========================================================
+   REGENERATE
+========================================================= */
 
-    state.memories.splice(
-      i,
-      1
-    );
+function regenerate(){
 
-    save();
+  const chat =
+    currentChat();
 
-    openMemory();
-  };
+  if(
+    !chat ||
+    state.busy ||
+    chat.messages.length < 2
+  )
+    return;
 
-function closeDrawer(){
+  const assistant =
+    chat.messages.pop();
 
-  $('sidebar')
-    .classList
-    .remove('open');
+  const user =
+    chat.messages.pop();
 
-  $('backdrop')
-    .classList
-    .remove('open');
+  $("prompt").value =
+    user.content;
+
+  save();
+
+  renderCurrent();
+
+  send();
 }
+
+/* =========================================================
+   UI
+========================================================= */
 
 function autoSize(){
 
-  const x =
-    $('prompt');
+  const textarea =
+    $("prompt");
 
-  x.style.height = 'auto';
+  textarea.style.height =
+    "auto";
 
-  x.style.height =
+  textarea.style.height =
     Math.min(
-      x.scrollHeight,
+      textarea.scrollHeight,
       180
-    ) + 'px';
+    ) +
+    "px";
 }
 
-$('newChat').onclick =
+function closeDrawer(){
+
+  $("sidebar")
+    .classList
+    .remove("open");
+
+  $("backdrop")
+    .classList
+    .remove("open");
+}
+
+/* NEW CHAT */
+
+$("newChat").onclick =
   newChat;
 
-$('newTop').onclick =
+$("newTop").onclick =
   newChat;
 
-$('send').onclick =
+/* SEND */
+
+$("send").onclick =
   send;
 
-$('imageTool').onclick =
-  () => {
+/* ENTER */
 
-    const p =
-      $('prompt')
-        .value
-        .trim();
-
-    if(!p){
-
-      $('prompt').focus();
-
-      $('prompt').placeholder =
-        'Describe the image you want…';
-
-      return;
-    }
-
-    $('prompt').value = '';
-
-    autoSize();
-
-    generateImage(p);
-  };
-
-$('attach').onclick =
-  () =>
-    $('file').click();
-
-$('file').onchange =
-  async e => {
-
-    state.attachments =
-      await Promise.all(
-        [...e.target.files]
-          .map(prepareFile)
-      );
-
-    renderAttachments();
-
-    e.target.value = '';
-  };
-
-$('prompt')
+$("prompt")
   .addEventListener(
-    'input',
-    autoSize
-  );
-
-$('prompt')
-  .addEventListener(
-    'keydown',
-    e => {
+    "keydown",
+    event => {
 
       if(
-        e.key === 'Enter' &&
-        !e.shiftKey
+        event.key ===
+        "Enter" &&
+        !event.shiftKey
       ){
 
-        e.preventDefault();
+        event.preventDefault();
 
         send();
       }
     }
   );
 
-$('search').oninput =
-  e =>
-    renderHistory(
-      e.target.value
-    );
+$("prompt")
+  .addEventListener(
+    "input",
+    autoSize
+  );
 
-$('menu').onclick =
-  () => {
+/* FILE */
 
-    $('sidebar')
-      .classList
-      .add('open');
+$("attach").onclick =
+  () =>
+    $("file").click();
 
-    $('backdrop')
-      .classList
-      .add('open');
+$("file").onchange =
+  async event => {
+
+    state.attachments =
+      await Promise.all(
+        [
+          ...event.target.files
+        ].map(
+          readFile
+        )
+      );
+
+    renderAttachments();
+
+    event.target.value =
+      "";
   };
 
-$('backdrop').onclick =
+/* IMAGE */
+
+$("imageTool").onclick =
+  async () => {
+
+    const prompt =
+      $("prompt")
+        .value
+        .trim();
+
+    if(!prompt){
+
+      $("prompt").placeholder =
+        "Describe the image you want…";
+
+      $("prompt").focus();
+
+      return;
+    }
+
+    $("prompt").value =
+      "";
+
+    autoSize();
+
+    await generateImage(
+      prompt
+    );
+  };
+
+/* SEARCH */
+
+$("search").oninput =
+  event =>
+    renderHistory(
+      event.target.value
+    );
+
+/* MOBILE */
+
+$("menu").onclick =
+  () => {
+
+    $("sidebar")
+      .classList
+      .add("open");
+
+    $("backdrop")
+      .classList
+      .add("open");
+  };
+
+$("backdrop").onclick =
   closeDrawer;
 
-$('memoryBtn').onclick =
+/* MEMORY */
+
+$("memoryBtn").onclick =
   openMemory;
 
-$('closeMemory').onclick =
+$("closeMemory").onclick =
   () =>
-    $('memoryModal')
+    $("memoryModal")
       .classList
-      .remove('open');
+      .remove("open");
 
-$('clearMemory').onclick =
+$("clearMemory").onclick =
   () => {
 
     if(
       confirm(
-        'Clear all memories?'
+        "Clear all memories?"
       )
     ){
 
-      state.memories = [];
+      state.memories =
+        [];
 
       save();
 
@@ -2526,86 +3025,181 @@ $('clearMemory').onclick =
     }
   };
 
-$('clearBtn').onclick =
+/* CLEAR */
+
+$("clearBtn").onclick =
   () => {
 
     if(
       confirm(
-        'Delete all local chats and memories?'
+        "Delete all local chats and memories?"
       )
     ){
 
       localStorage.removeItem(
-        'aether_chats'
+        "aether_chats"
       );
 
       localStorage.removeItem(
-        'aether_memories'
+        "aether_memories"
+      );
+
+      localStorage.removeItem(
+        "aether_models"
       );
 
       location.reload();
     }
   };
 
+/* =========================================================
+   START
+========================================================= */
+
 renderHistory();
+
 renderCurrent();
+
+/*
+  IMPORTANT:
+  Model loading starts immediately,
+  but the UI can never remain
+  permanently in "Loading models…".
+*/
+
 loadModels();
 
 if(
-  'serviceWorker' in navigator
+  "serviceWorker" in navigator
 ){
 
   navigator.serviceWorker
-    .register('/sw.js')
-    .catch(() => {});
+    .register(
+      "/sw.js"
+    )
+    .catch(
+      () => {}
+    );
 }
 
 </script>
 
 </body>
+
 </html>`;
 
-const MANIFEST = JSON.stringify(
-  {
-    name:'AetherAI',
-    short_name:'AetherAI',
-    start_url:'/',
-    display:'standalone',
-    background_color:'#212121',
-    theme_color:'#212121',
-    orientation:'portrait',
-    icons:[
-      {
-        src:'/icon.svg',
-        sizes:'any',
-        type:'image/svg+xml',
-        purpose:'any maskable'
-      }
-    ]
-  },
-  null,
-  2
+/* =========================================================
+   PWA MANIFEST
+========================================================= */
+
+const MANIFEST =
+  JSON.stringify(
+    {
+      name:"AetherAI",
+      short_name:"AetherAI",
+      start_url:"/",
+      display:"standalone",
+      background_color:"#212121",
+      theme_color:"#212121",
+      orientation:"portrait",
+      icons:[
+        {
+          src:"/icon.svg",
+          sizes:"any",
+          type:"image/svg+xml",
+          purpose:"any maskable"
+        }
+      ]
+    },
+    null,
+    2
+  );
+
+/* =========================================================
+   SERVICE WORKER
+========================================================= */
+
+const SW = `
+const CACHE_NAME = "aetherai-v2";
+
+self.addEventListener(
+  "install",
+  event => {
+    self.skipWaiting();
+  }
 );
 
-const SW =
-`const CACHE='aetherai-v1';
-self.addEventListener('install',e=>self.skipWaiting());
-self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
-self.addEventListener('fetch',e=>{
-  if(e.request.method!=='GET')return;
-  e.respondWith(
-    fetch(e.request).catch(
-      ()=>caches.match(e.request)
-    )
-  )
-});`;
+self.addEventListener(
+  "activate",
+  event => {
+    event.waitUntil(
+      self.clients.claim()
+    );
+  }
+);
 
-const ICON =
-`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-<rect width="128" height="128" rx="30" fill="#fff"/>
-<path d="M64 24c-23 0-41 15-41 34 0 11 6 21 16 27l-5 18 18-10c4 1 8 2 12 2 23 0 41-15 41-34S87 24 64 24Z" fill="#111"/>
-<path d="M47 59h34M47 72h22" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
-</svg>`;
+self.addEventListener(
+  "fetch",
+  event => {
+
+    if(
+      event.request.method !==
+      "GET"
+    )
+      return;
+
+    event.respondWith(
+      fetch(
+        event.request
+      ).catch(
+        () =>
+          caches.match(
+            event.request
+          )
+      )
+    );
+  }
+);
+`;
+
+/* =========================================================
+   ICON
+========================================================= */
+
+const ICON = `
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 128 128"
+>
+<rect
+  width="128"
+  height="128"
+  rx="30"
+  fill="#fff"
+/>
+
+<path
+  d="M64 24c-23 0-41 15-41 34
+  0 11 6 21 16 27l-5 18
+  18-10c4 1 8 2 12 2
+  23 0 41-15 41-34
+  S87 24 64 24Z"
+  fill="#111"
+/>
+
+<path
+  d="M47 59h34M47 72h22"
+  stroke="#fff"
+  stroke-width="7"
+  stroke-linecap="round"
+/>
+
+</svg>
+`;
+
+/* =========================================================
+   WORKER
+========================================================= */
 
 export default {
 
@@ -2614,32 +3208,42 @@ export default {
     env
   ){
 
+    /* CORS */
+
     if(
-      request.method === 'OPTIONS'
+      request.method ===
+      "OPTIONS"
     ){
 
       return new Response(
         null,
         {
-          headers:corsHeaders()
+          headers:
+            corsHeaders()
         }
       );
     }
 
     const url =
-      new URL(request.url);
+      new URL(
+        request.url
+      );
+
+    /* =====================================================
+       STATIC FILES
+    ===================================================== */
 
     if(
       url.pathname ===
-      '/manifest.json'
+      "/manifest.json"
     ){
 
       return new Response(
         MANIFEST,
         {
           headers:{
-            'Content-Type':
-              'application/manifest+json',
+            "Content-Type":
+              "application/manifest+json",
             ...corsHeaders()
           }
         }
@@ -2647,15 +3251,16 @@ export default {
     }
 
     if(
-      url.pathname === '/sw.js'
+      url.pathname ===
+      "/sw.js"
     ){
 
       return new Response(
         SW,
         {
           headers:{
-            'Content-Type':
-              'application/javascript; charset=utf-8',
+            "Content-Type":
+              "application/javascript; charset=utf-8",
             ...corsHeaders()
           }
         }
@@ -2663,79 +3268,262 @@ export default {
     }
 
     if(
-      url.pathname === '/icon.svg'
+      url.pathname ===
+      "/icon.svg"
     ){
 
       return new Response(
         ICON,
         {
           headers:{
-            'Content-Type':
-              'image/svg+xml',
+            "Content-Type":
+              "image/svg+xml",
             ...corsHeaders()
           }
         }
       );
     }
 
+    /* =====================================================
+       HEALTH
+    ===================================================== */
+
     if(
-      url.pathname === '/api/health'
+      url.pathname ===
+      "/api/health"
     ){
 
       return json({
         ok:true,
-        provider:'CodeCraft',
-        has_key:!!apiKey(env)
+        provider:"CodeCraft",
+        has_key:
+          Boolean(
+            apiKey(env)
+          )
       });
     }
 
+    /* =====================================================
+       MODELS
+       THIS IS THE IMPORTANT FIX
+    ===================================================== */
+
     if(
-      url.pathname === '/api/models'
+      url.pathname ===
+      "/api/models"
     ){
 
-      if(!apiKey(env)){
+      if(
+        !apiKey(env)
+      ){
 
         return json(
           {
             error:{
               message:
-                'CODECRAFT_API_KEY is not configured'
+                "CODECRAFT_API_KEY is not configured in Cloudflare Secrets.",
+              type:
+                "configuration_error",
+              code:
+                "missing_api_key"
             }
           },
           500
         );
       }
 
-      const r =
-        await ccFetch(
-          env,
-          '/models'
+      const controller =
+        new AbortController();
+
+      const timer =
+        setTimeout(
+          () =>
+            controller.abort(),
+          10000
         );
 
-      const {
-        data
-      } =
-        await bodyJson(r);
+      try{
 
-      return json(
-        data,
-        r.status
-      );
-    }
+        const response =
+          await codecraftFetch(
+            env,
+            "/models",
+            {
+              method:"GET",
+              signal:
+                controller.signal
+            }
+          );
 
-    if(
-      url.pathname ===
-      '/api/generate-image' &&
-      request.method === 'POST'
-    ){
+        const {
+          data,
+          text
+        } =
+          await readJSON(
+            response
+          );
 
-      if(!env.AI){
+        if(
+          !response.ok
+        ){
+
+          const error =
+            data?.error || {};
+
+          return json(
+            {
+              error:{
+                message:
+                  error.message ||
+                  text ||
+                  (
+                    "CodeCraft returned HTTP " +
+                    response.status
+                  ),
+
+                type:
+                  error.type ||
+                  "codecraft_error",
+
+                code:
+                  error.code ||
+                  (
+                    "http_" +
+                    response.status
+                  )
+              },
+
+              status:
+                response.status,
+
+              source:
+                "CodeCraft API"
+            },
+            response.status
+          );
+        }
+
+        if(
+          !Array.isArray(
+            data?.data
+          )
+        ){
+
+          return json(
+            {
+              error:{
+                message:
+                  "CodeCraft returned an invalid /models response. Expected data[].",
+                type:
+                  "invalid_response",
+                code:
+                  "invalid_models_response"
+              }
+            },
+            502
+          );
+        }
+
+        if(
+          data.data.length ===
+          0
+        ){
+
+          return json(
+            {
+              error:{
+                message:
+                  "CodeCraft returned an empty model list. Check that the API key has models:read.",
+                type:
+                  "empty_models",
+                code:
+                  "empty_models"
+              }
+            },
+            502
+          );
+        }
+
+        return json({
+          object:
+            data.object ||
+            "list",
+
+          data:
+            data.data,
+
+          count:
+            data.data.length,
+
+          source:
+            "CodeCraft API"
+        });
+
+      }catch(error){
+
+        if(
+          error?.name ===
+          "AbortError"
+        ){
+
+          return json(
+            {
+              error:{
+                message:
+                  "CodeCraft /v1/models timed out after 10 seconds.",
+                type:
+                  "timeout",
+                code:
+                  "models_timeout"
+              }
+            },
+            504
+          );
+        }
 
         return json(
           {
             error:{
               message:
-                'Workers AI binding AI is not configured. Add the AI binding in wrangler.jsonc.'
+                error?.message ||
+                "Could not reach CodeCraft /v1/models.",
+              type:
+                "upstream_error",
+              code:
+                "models_fetch_failed"
+            }
+          },
+          502
+        );
+
+      }finally{
+
+        clearTimeout(
+          timer
+        );
+      }
+    }
+
+    /* =====================================================
+       IMAGE GENERATION
+    ===================================================== */
+
+    if(
+      url.pathname ===
+      "/api/generate-image" &&
+      request.method ===
+      "POST"
+    ){
+
+      if(
+        !env.AI
+      ){
+
+        return json(
+          {
+            error:{
+              message:
+                "Workers AI binding AI is not configured in wrangler.jsonc."
             }
           },
           500
@@ -2755,7 +3543,7 @@ export default {
           {
             error:{
               message:
-                'Invalid JSON'
+                "Invalid JSON."
             }
           },
           400
@@ -2764,16 +3552,19 @@ export default {
 
       const prompt =
         String(
-          body.prompt || ''
+          body.prompt ||
+          ""
         ).trim();
 
-      if(!prompt){
+      if(
+        !prompt
+      ){
 
         return json(
           {
             error:{
               message:
-                'Image prompt is required'
+                "Image prompt is required."
             }
           },
           400
@@ -2784,10 +3575,12 @@ export default {
 
         const result =
           await env.AI.run(
-            '@cf/black-forest-labs/flux-1-schnell',
+            "@cf/black-forest-labs/flux-1-schnell",
             {
               prompt,
+
               steps:4,
+
               seed:
                 Math.floor(
                   Math.random() *
@@ -2798,17 +3591,18 @@ export default {
 
         return json({
           dataURI:
-            `data:image/jpeg;base64,${result.image}`
+            "data:image/jpeg;base64," +
+            result.image
         });
 
-      }catch(e){
+      }catch(error){
 
         return json(
           {
             error:{
               message:
-                e?.message ||
-                'Image generation failed'
+                error?.message ||
+                "Image generation failed."
             }
           },
           500
@@ -2816,18 +3610,26 @@ export default {
       }
     }
 
+    /* =====================================================
+       CHAT
+    ===================================================== */
+
     if(
-      url.pathname === '/api/chat' &&
-      request.method === 'POST'
+      url.pathname ===
+      "/api/chat" &&
+      request.method ===
+      "POST"
     ){
 
-      if(!apiKey(env)){
+      if(
+        !apiKey(env)
+      ){
 
         return json(
           {
             error:{
               message:
-                'CODECRAFT_API_KEY is not configured'
+                "CODECRAFT_API_KEY is not configured."
             }
           },
           500
@@ -2847,46 +3649,61 @@ export default {
           {
             error:{
               message:
-                'Invalid JSON'
+                "Invalid JSON."
             }
           },
           400
         );
       }
 
-      const r =
-        await ccFetch(
+      const response =
+        await codecraftFetch(
           env,
-          '/chat/completions',
+          "/chat/completions",
           {
-            method:'POST',
+            method:"POST",
             body:
-              JSON.stringify(body)
+              JSON.stringify(
+                body
+              )
           }
         );
 
+      /*
+        Pass CodeCraft's actual response
+        back to the frontend.
+      */
+
       return new Response(
-        r.body,
+        response.body,
         {
-          status:r.status,
+          status:
+            response.status,
+
           headers:{
-            'Content-Type':
-              r.headers.get(
-                'Content-Type'
+            "Content-Type":
+              response.headers.get(
+                "Content-Type"
               ) ||
-              'application/json',
+              "application/json",
+
             ...corsHeaders()
           }
         }
       );
     }
 
+    /* =====================================================
+       APP
+    ===================================================== */
+
     return new Response(
       HTML,
       {
         headers:{
-          'Content-Type':
-            'text/html; charset=utf-8',
+          "Content-Type":
+            "text/html; charset=utf-8",
+
           ...corsHeaders()
         }
       }
