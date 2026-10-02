@@ -1,6 +1,10 @@
 const CODECRAFT_BASE = "https://www.codecraftapi.com/v1";
 const IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
 
+/* ============================================================
+   BASIC HELPERS
+   ============================================================ */
+
 function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
@@ -33,7 +37,14 @@ function getApiKey(env) {
   return env.CODECRAFT_API_KEY || env.XKIRO_API_KEY || "";
 }
 
-async function codecraftFetch(env, path, options = {}) {
+/* ============================================================
+   CODECRAFT FETCH
+   Important:
+   - Timeout applies to connection/headers.
+   - Once fetch resolves, stream is NOT aborted.
+   ============================================================ */
+
+async function codecraftFetch(env, path, options = {}, timeoutMs = 12000) {
   const key = getApiKey(env);
 
   if (!key) {
@@ -41,15 +52,48 @@ async function codecraftFetch(env, path, options = {}) {
   }
 
   const headers = new Headers(options.headers || {});
+
   headers.set("Authorization", "Bearer " + key);
-  headers.set("Content-Type", "application/json");
+
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
   headers.set("Accept", "application/json");
 
-  return fetch(CODECRAFT_BASE + path, {
-    ...options,
-    headers
-  });
+  const controller = new AbortController();
+
+  let timedOut = false;
+
+  const timer = setTimeout(function () {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+
+  try {
+    return await fetch(CODECRAFT_BASE + path, {
+      ...options,
+      headers,
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (timedOut || error.name === "AbortError") {
+      throw new Error(
+        "CodeCraft request timed out after " +
+          Math.round(timeoutMs / 1000) +
+          " seconds."
+      );
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 }
+
+/* ============================================================
+   MODEL HELPERS
+   ============================================================ */
 
 function modelType(model) {
   return String((model && model.type) || "chat").toLowerCase();
@@ -57,7 +101,9 @@ function modelType(model) {
 
 function isChatModel(model) {
   if (!model || !model.id) return false;
+
   const type = modelType(model);
+
   return type !== "image" && type !== "embedding";
 }
 
@@ -69,6 +115,7 @@ function hasWebSearch(model) {
   if (Array.isArray(caps)) {
     if (caps.indexOf("web_search") !== -1) return true;
     if (caps.indexOf("web") !== -1) return true;
+    if (caps.indexOf("search") !== -1) return true;
   }
 
   if (caps && typeof caps === "object" && !Array.isArray(caps)) {
@@ -78,11 +125,18 @@ function hasWebSearch(model) {
     if (caps.search) return true;
   }
 
-  var features = Array.isArray(model.features) ? model.features : [];
+  var features = Array.isArray(model.features)
+    ? model.features
+    : [];
+
   if (features.indexOf("web_search") !== -1) return true;
   if (features.indexOf("web") !== -1) return true;
+  if (features.indexOf("search") !== -1) return true;
 
-  var tags = Array.isArray(model.tags) ? model.tags : [];
+  var tags = Array.isArray(model.tags)
+    ? model.tags
+    : [];
+
   if (tags.indexOf("web_search") !== -1) return true;
   if (tags.indexOf("web") !== -1) return true;
   if (tags.indexOf("search") !== -1) return true;
@@ -93,6 +147,7 @@ function hasWebSearch(model) {
 
   var id = String(model.id || "").toLowerCase();
   var name = String(model.name || "").toLowerCase();
+
   var both = id + " " + name;
 
   if (both.indexOf("web") !== -1) return true;
@@ -104,7 +159,8 @@ function hasWebSearch(model) {
 }
 
 function chooseBestModel(models) {
-  const usable = (Array.isArray(models) ? models : []).filter(isChatModel);
+  const usable = (Array.isArray(models) ? models : [])
+    .filter(isChatModel);
 
   if (!usable.length) return null;
 
@@ -122,12 +178,18 @@ function chooseBestModel(models) {
     if (hasWebSearch(model)) s += 15;
 
     const context = Number(model.context_window || 0);
+
     if (context > 100000) s += 15;
     else if (context > 32000) s += 10;
     else if (context > 16000) s += 5;
 
-    if (id.includes("free") || name.includes("free")) s += 20;
-    if (id.includes("flash") || id.includes("mini")) s += 3;
+    if (id.includes("free") || name.includes("free")) {
+      s += 20;
+    }
+
+    if (id.includes("flash") || id.includes("mini")) {
+      s += 3;
+    }
 
     return s;
   }
@@ -140,14 +202,21 @@ function chooseBestModel(models) {
 }
 
 function chooseResearchModel(models) {
-  var chatModels = (Array.isArray(models) ? models : []).filter(isChatModel);
+  var chatModels = (Array.isArray(models) ? models : [])
+    .filter(isChatModel);
 
-  if (!chatModels.length) return { model: null, fallback: false };
+  if (!chatModels.length) {
+    return {
+      model: null,
+      fallback: false
+    };
+  }
 
   var withSearch = chatModels.filter(hasWebSearch);
 
   function score(model) {
     var s = 0;
+
     var caps = model.capabilities || {};
     var id = String(model.id || "").toLowerCase();
     var name = String(model.name || "").toLowerCase();
@@ -157,52 +226,100 @@ function chooseResearchModel(models) {
     if (caps.tools) s += 10;
 
     var ctx = Number(model.context_window || 0);
+
     if (ctx > 100000) s += 15;
     else if (ctx > 32000) s += 10;
     else if (ctx > 16000) s += 5;
 
-    if (id.indexOf("free") !== -1 || name.indexOf("free") !== -1) s += 10;
+    if (
+      id.indexOf("free") !== -1 ||
+      name.indexOf("free") !== -1
+    ) {
+      s += 10;
+    }
 
     return s;
   }
 
   if (withSearch.length) {
-    withSearch.sort(function (a, b) { return score(b) - score(a); });
-    return { model: withSearch[0], fallback: false };
+    withSearch.sort(function (a, b) {
+      return score(b) - score(a);
+    });
+
+    return {
+      model: withSearch[0],
+      fallback: false
+    };
   }
 
   var fallbackList = chatModels.slice().sort(function (a, b) {
     return score(b) - score(a);
   });
 
-  return { model: fallbackList[0], fallback: true };
+  return {
+    model: fallbackList[0],
+    fallback: true
+  };
 }
 
+/* ============================================================
+   RESEARCH DETECTION
+   ============================================================ */
+
 const RESEARCH_PATTERNS = [
-  /\blatest\b/, /\bcurrent\b/, /\bnews\b/, /\btoday\b/, /\btonight\b/,
-  /\byesterday\b/, /\brecent\b/, /\brecently\b/, /\bupdate\b/, /\bupdates\b/,
-  /\bbreaking\b/, /\bprices?\b/, /\bstock\b/, /\bweather\b/, /\bscores?\b/,
-  /\bwho won\b/, /\bwho is\b/, /\bwhat is happening\b/, /\bwhat happened\b/,
-  /\bresearch\b/, /\blook up\b/, /\bsearch the web\b/, /\bsearch online\b/,
-  /\bthis (week|month|year)\b/, /\bas of\b/, /\bright now\b/,
-  /\b20(2[4-9]|3[0-9])\b/, /\blive\b/
+  /\blatest\b/,
+  /\bcurrent\b/,
+  /\bnews\b/,
+  /\btoday\b/,
+  /\btonight\b/,
+  /\byesterday\b/,
+  /\brecent\b/,
+  /\brecently\b/,
+  /\bupdate\b/,
+  /\bupdates\b/,
+  /\bbreaking\b/,
+  /\bprices?\b/,
+  /\bstock\b/,
+  /\bweather\b/,
+  /\bscores?\b/,
+  /\bwho won\b/,
+  /\bwho is\b/,
+  /\bwhat is happening\b/,
+  /\bwhat happened\b/,
+  /\bresearch\b/,
+  /\blook up\b/,
+  /\bsearch the web\b/,
+  /\bsearch online\b/,
+  /\bthis (week|month|year)\b/,
+  /\bas of\b/,
+  /\bright now\b/,
+  /\b20(2[4-9]|3[0-9])\b/,
+  /\blive\b/
 ];
 
 function isResearchQuery(text) {
   if (!text) return false;
+
   const t = String(text).toLowerCase();
+
   for (let i = 0; i < RESEARCH_PATTERNS.length; i++) {
-    if (RESEARCH_PATTERNS[i].test(t)) return true;
+    if (RESEARCH_PATTERNS[i].test(t)) {
+      return true;
+    }
   }
+
   return false;
 }
 
 function lastUserText(messages) {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
+
     if (!m || m.role !== "user") continue;
 
-    if (typeof m.content === "string") return m.content;
+    if (typeof m.content === "string") {
+      return m.content;
+    }
 
     if (Array.isArray(m.content)) {
       return m.content
@@ -215,6 +332,7 @@ function lastUserText(messages) {
         .join(" ");
     }
   }
+
   return "";
 }
 
@@ -224,7 +342,10 @@ function normalizeMessages(messages) {
   return messages.slice(-40).map(function (message) {
     const role =
       message &&
-      (message.role === "assistant" || message.role === "system")
+      (
+        message.role === "assistant" ||
+        message.role === "system"
+      )
         ? message.role
         : "user";
 
@@ -240,13 +361,18 @@ function normalizeMessages(messages) {
           ) {
             return {
               type: "image_url",
-              image_url: { url: part.image_url.url }
+              image_url: {
+                url: part.image_url.url
+              }
             };
           }
 
           return {
             type: "text",
-            text: String(part && (part.text || part.content || ""))
+            text: String(
+              part &&
+              (part.text || part.content || "")
+            )
           };
         })
       };
@@ -254,13 +380,17 @@ function normalizeMessages(messages) {
 
     return {
       role,
-      content: String(message && message.content ? message.content : "")
+      content: String(
+        message && message.content
+          ? message.content
+          : ""
+      )
     };
   });
 }
 
 /* ============================================================
-   MODEL FAMILY DETECTION + PER-FAMILY PROMPTS
+   MODEL FAMILY
    ============================================================ */
 
 function detectFamily(modelId) {
@@ -274,7 +404,10 @@ function detectFamily(modelId) {
     return "openai";
   }
 
-  if (id.indexOf("claude") !== -1 || id.indexOf("anthropic") !== -1) {
+  if (
+    id.indexOf("claude") !== -1 ||
+    id.indexOf("anthropic") !== -1
+  ) {
     return "anthropic";
   }
 
@@ -290,14 +423,20 @@ function detectFamily(modelId) {
 
   if (id.indexOf("llama") !== -1) return "meta";
 
-  if (id.indexOf("mistral") !== -1 || id.indexOf("mixtral") !== -1) {
+  if (
+    id.indexOf("mistral") !== -1 ||
+    id.indexOf("mixtral") !== -1
+  ) {
     return "mistral";
   }
 
   if (id.indexOf("deepseek") !== -1) return "deepseek";
   if (id.indexOf("qwen") !== -1) return "qwen";
 
-  if (id.indexOf("command") !== -1 || id.indexOf("cohere") !== -1) {
+  if (
+    id.indexOf("command") !== -1 ||
+    id.indexOf("cohere") !== -1
+  ) {
     return "cohere";
   }
 
@@ -388,7 +527,7 @@ var RESEARCH_PROMPTS = {
     "Prioritize current, factual, verifiable information.",
     "Search, cross-check across multiple independent sources, and cite them inline as Markdown links.",
     "Distinguish confirmed facts from claims and speculation.",
-    "End with a 'Sources' section listing every URL you used as a bullet list.",
+    "End with a Sources section listing every URL you used as a bullet list.",
     "Never fabricate URLs, dates, numbers, or quotes.",
     "Use Markdown; put code in fenced code blocks."
   ].join(" "),
@@ -397,7 +536,7 @@ var RESEARCH_PROMPTS = {
     "You are Claude with web search enabled.",
     "Be careful and honest about uncertainty. Cross-check facts and note disagreements between sources.",
     "Cite sources inline as Markdown links where the claim appears.",
-    "End with a 'Sources' section listing the URLs you used.",
+    "End with a Sources section listing the URLs you used.",
     "Never fabricate URLs, dates, numbers, or quotes.",
     "Use Markdown; put code in fenced code blocks."
   ].join(" "),
@@ -406,7 +545,7 @@ var RESEARCH_PROMPTS = {
     "You are Gemini with web search enabled.",
     "Lead with a short factual summary, then details.",
     "Cross-check across sources and cite inline as Markdown links.",
-    "End with a 'Sources' section listing the URLs you used.",
+    "End with a Sources section listing the URLs you used.",
     "Never fabricate URLs, dates, numbers, or quotes.",
     "Use Markdown; put code in fenced code blocks."
   ].join(" "),
@@ -414,7 +553,7 @@ var RESEARCH_PROMPTS = {
   xai: [
     "You are Grok with live web search.",
     "Be direct, current, and a bit blunt. Cite sources inline as Markdown links.",
-    "End with a 'Sources' section listing the URLs you used.",
+    "End with a Sources section listing the URLs you used.",
     "Never fabricate URLs, dates, numbers, or quotes.",
     "Use Markdown; put code in fenced code blocks."
   ].join(" "),
@@ -422,7 +561,7 @@ var RESEARCH_PROMPTS = {
   meta: [
     "You are Llama with web search enabled.",
     "Give clear, factual answers and cite sources inline as Markdown links.",
-    "End with a 'Sources' section listing the URLs you used.",
+    "End with a Sources section listing the URLs you used.",
     "Never fabricate URLs, dates, numbers, or quotes.",
     "Use Markdown; put code in fenced code blocks."
   ].join(" "),
@@ -430,7 +569,7 @@ var RESEARCH_PROMPTS = {
   mistral: [
     "You are Mistral with web search enabled.",
     "Be concise and factual. Cite sources inline as Markdown links.",
-    "End with a 'Sources' section listing the URLs you used.",
+    "End with a Sources section listing the URLs you used.",
     "Never fabricate URLs, dates, numbers, or quotes.",
     "Use Markdown; put code in fenced code blocks."
   ].join(" "),
@@ -438,7 +577,7 @@ var RESEARCH_PROMPTS = {
   deepseek: [
     "You are DeepSeek with web search enabled.",
     "Be analytical and factual. Cite sources inline as Markdown links.",
-    "End with a 'Sources' section listing the URLs you used.",
+    "End with a Sources section listing the URLs you used.",
     "Never fabricate URLs, dates, numbers, or quotes.",
     "Use Markdown; put code in fenced code blocks."
   ].join(" "),
@@ -446,7 +585,7 @@ var RESEARCH_PROMPTS = {
   qwen: [
     "You are Qwen with web search enabled.",
     "Be factual and structured. Cite sources inline as Markdown links.",
-    "End with a 'Sources' section listing the URLs you used.",
+    "End with a Sources section listing the URLs you used.",
     "Never fabricate URLs, dates, numbers, or quotes.",
     "Use Markdown; put code in fenced code blocks."
   ].join(" "),
@@ -454,7 +593,7 @@ var RESEARCH_PROMPTS = {
   cohere: [
     "You are Command with web search enabled.",
     "Be practical and factual. Cite sources inline as Markdown links.",
-    "End with a 'Sources' section listing the URLs you used.",
+    "End with a Sources section listing the URLs you used.",
     "Never fabricate URLs, dates, numbers, or quotes.",
     "Use Markdown; put code in fenced code blocks."
   ].join(" "),
@@ -463,7 +602,7 @@ var RESEARCH_PROMPTS = {
     "You are an AI research assistant with web search.",
     "Cross-check facts across multiple independent sources.",
     "Cite sources inline as Markdown links.",
-    "End with a 'Sources' section listing the URLs you used.",
+    "End with a Sources section listing the URLs you used.",
     "Never fabricate URLs, dates, numbers, or quotes.",
     "Use Markdown; put code in fenced code blocks."
   ].join(" ")
@@ -471,27 +610,36 @@ var RESEARCH_PROMPTS = {
 
 function getSystemPrompt(modelId, research) {
   var family = detectFamily(modelId);
-  var table = research ? RESEARCH_PROMPTS : CHAT_PROMPTS;
+  var table = research
+    ? RESEARCH_PROMPTS
+    : CHAT_PROMPTS;
+
   return table[family] || table.generic;
 }
 
 /* ============================================================
-   MODELS + CHAT HANDLERS
+   MODELS
    ============================================================ */
 
 async function getModels(env) {
-  const response = await codecraftFetch(env, "/models", {
-    method: "GET"
-  });
+  const response = await codecraftFetch(
+    env,
+    "/models",
+    {
+      method: "GET"
+    },
+    12000
+  );
 
   const text = await response.text();
 
   if (!response.ok) {
+    var clean = text.slice(0, 1000);
+
     throw new Error(
-      "CodeCraft models request failed (HTTP " +
+      "CodeCraft /models failed — HTTP " +
         response.status +
-        "): " +
-        text.slice(0, 500)
+        (clean ? ": " + clean : "")
     );
   }
 
@@ -499,42 +647,118 @@ async function getModels(env) {
 
   try {
     data = JSON.parse(text);
-  } catch {
-    throw new Error("Invalid models response from CodeCraft.");
+  } catch (error) {
+    throw new Error(
+      "CodeCraft /models returned invalid JSON."
+    );
   }
 
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data.data)) return data.data;
-  if (Array.isArray(data.models)) return data.models;
+  var result = [];
 
-  return [];
+  if (Array.isArray(data)) {
+    result = data;
+  } else if (Array.isArray(data.data)) {
+    result = data.data;
+  } else if (Array.isArray(data.models)) {
+    result = data.models;
+  }
+
+  if (!result.length) {
+    throw new Error(
+      "CodeCraft /models returned an empty model list."
+    );
+  }
+
+  return result;
 }
 
 async function handleModels(env) {
-  const allModels = await getModels(env);
+  try {
+    const allModels = await getModels(env);
 
-  const models = allModels.filter(isChatModel);
-  const best = chooseBestModel(models);
-  const pick = chooseResearchModel(models);
+    const models = allModels.filter(isChatModel);
 
-  return json({
-    models,
-    best,
-    researchBest: pick.model ? pick.model.id : null,
-    hasWebSearch: Boolean(pick.model && !pick.fallback)
-  });
+    if (!models.length) {
+      return json({
+        ok: false,
+        models: [],
+        best: null,
+        researchBest: null,
+        hasWebSearch: false,
+        error:
+          "CodeCraft returned models, but none are usable chat models."
+      });
+    }
+
+    const best = chooseBestModel(models);
+    const pick = chooseResearchModel(models);
+
+    return json({
+      ok: true,
+      models,
+      best: best
+        ? {
+            id: best.id,
+            name: best.name || best.id,
+            description: best.description || "",
+            type: best.type || "chat"
+          }
+        : null,
+      researchBest: pick.model
+        ? pick.model.id
+        : null,
+      hasWebSearch: Boolean(
+        pick.model && !pick.fallback
+      )
+    });
+  } catch (error) {
+    return json(
+      {
+        ok: false,
+        models: [],
+        best: null,
+        researchBest: null,
+        hasWebSearch: false,
+        error: String(
+          error && error.message
+            ? error.message
+            : error
+        )
+      },
+      200
+    );
+  }
 }
+
+/* ============================================================
+   CHAT
+   ============================================================ */
 
 async function handleChat(request, env) {
   const body = await request.json();
+
   const messages = normalizeMessages(body.messages);
 
+  if (!messages.length) {
+    return json(
+      {
+        error: "At least one message is required."
+      },
+      400
+    );
+  }
+
   const allModels = await getModels(env);
+
   const chatModels = allModels.filter(isChatModel);
 
   let model = String(body.model || "").trim();
+
   const userText = lastUserText(messages);
-  const wantsResearch = Boolean(body.research) || isResearchQuery(userText);
+
+  const wantsResearch =
+    Boolean(body.research) ||
+    isResearchQuery(userText);
 
   let researchMode = false;
   let researchFallback = false;
@@ -544,16 +768,24 @@ async function handleChat(request, env) {
     let fallback = false;
 
     if (model) {
-      const selected = chatModels.find(function (m) {
-        return m.id === model;
-      });
-      if (selected && hasWebSearch(selected)) {
+      const selected = chatModels.find(
+        function (m) {
+          return m.id === model;
+        }
+      );
+
+      if (
+        selected &&
+        hasWebSearch(selected)
+      ) {
         chosen = selected;
       }
     }
 
     if (!chosen) {
-      const pick = chooseResearchModel(chatModels);
+      const pick =
+        chooseResearchModel(chatModels);
+
       chosen = pick.model;
       fallback = pick.fallback;
     }
@@ -562,7 +794,7 @@ async function handleChat(request, env) {
       return json(
         {
           error:
-            "Web research is unavailable: no chat models were returned by CodeCraft."
+            "Web research is unavailable because CodeCraft returned no usable chat models."
         },
         503
       );
@@ -572,10 +804,13 @@ async function handleChat(request, env) {
     researchMode = true;
     researchFallback = fallback;
   } else if (!model) {
-    const best = chooseBestModel(chatModels);
+    const best =
+      chooseBestModel(chatModels);
 
     if (!best) {
-      throw new Error("No usable chat model was returned by CodeCraft.");
+      throw new Error(
+        "No usable chat model was returned by CodeCraft."
+      );
     }
 
     model = best.id;
@@ -583,18 +818,34 @@ async function handleChat(request, env) {
 
   const family = detectFamily(model);
 
-  const systemPrompt = getSystemPrompt(model, researchMode);
+  const systemPrompt =
+    getSystemPrompt(
+      model,
+      researchMode
+    );
 
   const temperature = researchMode
-    ? (family === "anthropic" ? 0.3 : 0.2)
-    : (family === "anthropic" ? 0.8 : family === "google" ? 0.6 : 0.7);
+    ? family === "anthropic"
+      ? 0.3
+      : 0.2
+    : family === "anthropic"
+      ? 0.8
+      : family === "google"
+        ? 0.6
+        : 0.7;
 
-  const maxTokens = researchMode ? 8192 : 4096;
+  const maxTokens =
+    researchMode
+      ? 8192
+      : 4096;
 
   const payload = {
     model,
     messages: [
-      { role: "system", content: systemPrompt },
+      {
+        role: "system",
+        content: systemPrompt
+      },
       ...messages
     ],
     stream: true,
@@ -605,6 +856,7 @@ async function handleChat(request, env) {
   if (researchMode) {
     payload.web_search = true;
     payload.enable_web_search = true;
+
     payload.metadata = {
       research: true,
       web_search: true,
@@ -613,62 +865,140 @@ async function handleChat(request, env) {
     };
   }
 
-  const response = await codecraftFetch(env, "/chat/completions", {
-    method: "POST",
-    body: JSON.stringify(payload)
-  });
+  const response =
+    await codecraftFetch(
+      env,
+      "/chat/completions",
+      {
+        method: "POST",
+        body: JSON.stringify(payload)
+      },
+      12000
+    );
 
   if (!response.ok) {
-    const errorText = await response.text();
+    const errorText =
+      await response.text();
 
-    return new Response(errorText, {
-      status: response.status,
-      headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        ...corsHeaders()
+    return new Response(
+      errorText,
+      {
+        status: response.status,
+        headers: {
+          "Content-Type":
+            "application/json; charset=utf-8",
+          ...corsHeaders()
+        }
       }
-    });
+    );
   }
 
-  const headers = new Headers(corsHeaders());
+  const headers =
+    new Headers(corsHeaders());
 
-  headers.set("Content-Type", "text/event-stream; charset=utf-8");
-  headers.set("X-Accel-Buffering", "no");
-  headers.set("X-Research-Mode", researchMode ? "1" : "0");
-  headers.set("X-Research-Fallback", researchFallback ? "1" : "0");
-  headers.set("X-Model-Used", model);
-  headers.set("X-Model-Family", family);
+  headers.set(
+    "Content-Type",
+    "text/event-stream; charset=utf-8"
+  );
 
-  return new Response(response.body, {
-    status: 200,
-    headers
-  });
+  headers.set(
+    "X-Accel-Buffering",
+    "no"
+  );
+
+  headers.set(
+    "X-Research-Mode",
+    researchMode ? "1" : "0"
+  );
+
+  headers.set(
+    "X-Research-Fallback",
+    researchFallback
+      ? "1"
+      : "0"
+  );
+
+  headers.set(
+    "X-Model-Used",
+    model
+  );
+
+  headers.set(
+    "X-Model-Family",
+    family
+  );
+
+  return new Response(
+    response.body,
+    {
+      status: 200,
+      headers
+    }
+  );
 }
+
+/* ============================================================
+   IMAGE
+   ============================================================ */
 
 async function handleImage(request, env) {
   if (!env.AI) {
-    return json({ error: "Cloudflare AI binding is missing." }, 500);
+    return json(
+      {
+        error:
+          "Cloudflare AI binding is missing."
+      },
+      500
+    );
   }
 
-  const body = await request.json();
-  const prompt = String(body.prompt || "").trim();
+  const body =
+    await request.json();
+
+  const prompt =
+    String(
+      body.prompt || ""
+    ).trim();
 
   if (!prompt) {
-    return json({ error: "Image prompt is required." }, 400);
+    return json(
+      {
+        error:
+          "Image prompt is required."
+      },
+      400
+    );
   }
 
-  const result = await env.AI.run(IMAGE_MODEL, { prompt });
+  const result =
+    await env.AI.run(
+      IMAGE_MODEL,
+      {
+        prompt
+      }
+    );
 
-  if (!result || !result.image) {
-    throw new Error("Cloudflare image model returned no image.");
+  if (
+    !result ||
+    !result.image
+  ) {
+    throw new Error(
+      "Cloudflare image model returned no image."
+    );
   }
 
   return json({
     ok: true,
     model: IMAGE_MODEL,
-    image: "data:image/png;base64," + result.image
+    image:
+      "data:image/png;base64," +
+      result.image
   });
 }
+
+/* ============================================================
+   APP UI
+   ============================================================ */
 
 function appHTML() {
   return String.raw`<!DOCTYPE html>
@@ -692,23 +1022,47 @@ function appHTML() {
 
 <style>
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
-html, body {
+html,
+body {
   margin: 0;
   width: 100%;
   height: 100%;
   background: #212121;
   color: #ececec;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Arial,
+    sans-serif;
 }
 
-body { overflow: hidden; }
+body {
+  overflow: hidden;
+}
 
-button, input, textarea, select { font: inherit; }
-button { border: 0; }
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
 
-.app { width: 100%; height: 100%; display: flex; background: #212121; }
+button {
+  border: 0;
+}
+
+.app {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  background: #212121;
+}
 
 .sidebar {
   width: 280px;
@@ -721,7 +1075,9 @@ button { border: 0; }
   z-index: 20;
 }
 
-.side-top { padding: 12px; }
+.side-top {
+  padding: 12px;
+}
 
 .new-chat {
   width: 100%;
@@ -735,7 +1091,9 @@ button { border: 0; }
   cursor: pointer;
 }
 
-.new-chat:hover { background: #2c2c2c; }
+.new-chat:hover {
+  background: #2c2c2c;
+}
 
 .side-search {
   width: 100%;
@@ -749,9 +1107,17 @@ button { border: 0; }
   color: white;
 }
 
-.history { flex: 1; overflow-y: auto; padding: 8px; }
+.history {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
 
-.history-title { padding: 8px 10px; color: #858585; font-size: 12px; }
+.history-title {
+  padding: 8px 10px;
+  color: #858585;
+  font-size: 12px;
+}
 
 .chat-item {
   display: flex;
@@ -764,8 +1130,13 @@ button { border: 0; }
   font-size: 14px;
 }
 
-.chat-item:hover { background: #292929; }
-.chat-item.active { background: #303030; }
+.chat-item:hover {
+  background: #292929;
+}
+
+.chat-item.active {
+  background: #303030;
+}
 
 .chat-title {
   min-width: 0;
@@ -775,7 +1146,10 @@ button { border: 0; }
   text-overflow: ellipsis;
 }
 
-.side-bottom { padding: 10px; border-top: 1px solid #303030; }
+.side-bottom {
+  padding: 10px;
+  border-top: 1px solid #303030;
+}
 
 .side-btn {
   width: 100%;
@@ -787,7 +1161,9 @@ button { border: 0; }
   cursor: pointer;
 }
 
-.side-btn:hover { background: #292929; }
+.side-btn:hover {
+  background: #292929;
+}
 
 .main {
   min-width: 0;
@@ -810,7 +1186,10 @@ button { border: 0; }
   z-index: 5;
 }
 
-.brand { font-size: 16px; font-weight: 650; }
+.brand {
+  font-size: 16px;
+  font-weight: 650;
+}
 
 .menu {
   display: none;
@@ -823,9 +1202,14 @@ button { border: 0; }
   font-size: 21px;
 }
 
-.menu:hover { background: #303030; }
+.menu:hover {
+  background: #303030;
+}
 
-.model-wrap { position: relative; margin-left: auto; }
+.model-wrap {
+  position: relative;
+  margin-left: auto;
+}
 
 .model-select {
   max-width: 260px;
@@ -868,17 +1252,36 @@ button { border: 0; }
   white-space: nowrap;
 }
 
-.retry-btn:hover { background: #4a2f1d; }
+.retry-btn:hover {
+  background: #4a2f1d;
+}
 
-.messages { flex: 1; overflow-y: auto; scroll-behavior: smooth; }
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
 
-.welcome { max-width: 850px; margin: 0 auto; padding: 11vh 22px 60px; }
-.welcome h1 { margin: 0 0 10px; font-size: 30px; }
-.welcome p { margin: 0 0 24px; color: #aaa; }
+.welcome {
+  max-width: 850px;
+  margin: 0 auto;
+  padding: 11vh 22px 60px;
+}
+
+.welcome h1 {
+  margin: 0 0 10px;
+  font-size: 30px;
+}
+
+.welcome p {
+  margin: 0 0 24px;
+  color: #aaa;
+}
 
 .suggestions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -892,9 +1295,15 @@ button { border: 0; }
   cursor: pointer;
 }
 
-.suggestion:hover { background: #333; }
+.suggestion:hover {
+  background: #333;
+}
 
-.msg { width: 100%; border-bottom: 1px solid rgba(255,255,255,.035); }
+.msg {
+  width: 100%;
+  border-bottom:
+    1px solid rgba(255,255,255,.035);
+}
 
 .msg-inner {
   max-width: 900px;
@@ -916,7 +1325,9 @@ button { border: 0; }
   font-size: 12px;
 }
 
-.user .avatar { background: #4b4b4b; }
+.user .avatar {
+  background: #4b4b4b;
+}
 
 .content {
   min-width: 0;
@@ -926,18 +1337,37 @@ button { border: 0; }
   overflow-wrap: anywhere;
 }
 
-.content p { margin: 0 0 13px; }
-.content p:last-child { margin-bottom: 0; }
+.content p {
+  margin: 0 0 13px;
+}
 
-.content h1, .content h2, .content h3 {
+.content p:last-child {
+  margin-bottom: 0;
+}
+
+.content h1,
+.content h2,
+.content h3 {
   line-height: 1.3;
   margin: 18px 0 10px;
 }
 
-.content h1 { font-size: 24px; }
-.content h2 { font-size: 20px; }
-.content h3 { font-size: 17px; }
-.content ul, .content ol { padding-left: 25px; }
+.content h1 {
+  font-size: 24px;
+}
+
+.content h2 {
+  font-size: 20px;
+}
+
+.content h3 {
+  font-size: 17px;
+}
+
+.content ul,
+.content ol {
+  padding-left: 25px;
+}
 
 .content blockquote {
   margin: 12px 0;
@@ -946,14 +1376,20 @@ button { border: 0; }
   color: #bbb;
 }
 
-.content a { color: #8ab4ff; }
+.content a {
+  color: #8ab4ff;
+}
 
 .inline-code {
   padding: 2px 5px;
   border-radius: 5px;
   border: 1px solid #3c3c3c;
   background: #292929;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
 }
 
 .code-wrap {
@@ -975,7 +1411,8 @@ button { border: 0; }
   font-size: 12px;
 }
 
-.code-copy, .msg-action {
+.code-copy,
+.msg-action {
   padding: 4px 8px;
   border: 1px solid #444;
   border-radius: 6px;
@@ -984,7 +1421,8 @@ button { border: 0; }
   cursor: pointer;
 }
 
-.code-copy:hover, .msg-action:hover {
+.code-copy:hover,
+.msg-action:hover {
   background: #303030;
   color: white;
 }
@@ -997,9 +1435,19 @@ pre {
   line-height: 1.55;
 }
 
-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+code {
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
 
-.actions { display: flex; gap: 6px; margin-top: 10px; }
+.actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
 
 .image-result {
   display: block;
@@ -1021,7 +1469,11 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   font-size: 11px;
 }
 
-.typing { display: inline-flex; align-items: center; gap: 4px; }
+.typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 
 .dot {
   width: 6px;
@@ -1031,16 +1483,33 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   animation: typing 1s infinite;
 }
 
-.dot:nth-child(2) { animation-delay: .15s; }
-.dot:nth-child(3) { animation-delay: .3s; }
+.dot:nth-child(2) {
+  animation-delay: .15s;
+}
+
+.dot:nth-child(3) {
+  animation-delay: .3s;
+}
 
 @keyframes typing {
-  0%, 70%, 100% { opacity: .3; transform: translateY(0); }
-  35% { opacity: 1; transform: translateY(-3px); }
+  0%,
+  70%,
+  100% {
+    opacity: .3;
+    transform: translateY(0);
+  }
+
+  35% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
 }
 
 .composer-area {
-  padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+  padding:
+    10px
+    14px
+    calc(10px + env(safe-area-inset-bottom));
   background: #212121;
 }
 
@@ -1050,7 +1519,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   border: 1px solid #454545;
   border-radius: 15px;
   background: #2f2f2f;
-  box-shadow: 0 2px 14px rgba(0,0,0,.2);
+  box-shadow:
+    0 2px 14px rgba(0,0,0,.2);
 }
 
 .preview {
@@ -1061,7 +1531,9 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   border-bottom: 1px solid #454545;
 }
 
-.preview.show { display: flex; }
+.preview.show {
+  display: flex;
+}
 
 .preview img {
   width: 48px;
@@ -1107,7 +1579,10 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   font-size: 19px;
 }
 
-.tool:hover { background: #3b3b3b; color: white; }
+.tool:hover {
+  background: #3b3b3b;
+  color: white;
+}
 
 textarea {
   min-height: 38px;
@@ -1133,7 +1608,10 @@ textarea {
   font-size: 17px;
 }
 
-.send.stop { background: #777; color: white; }
+.send.stop {
+  background: #777;
+  color: white;
+}
 
 .hint {
   max-width: 900px;
@@ -1159,7 +1637,9 @@ textarea {
   font-size: 11px;
 }
 
-.research-badge.show { display: inline-flex; }
+.research-badge.show {
+  display: inline-flex;
+}
 
 .overlay {
   display: none;
@@ -1181,10 +1661,13 @@ textarea {
   border: 1px solid #444;
   border-radius: 14px;
   background: #242424;
-  box-shadow: 0 15px 50px rgba(0,0,0,.6);
+  box-shadow:
+    0 15px 50px rgba(0,0,0,.6);
 }
 
-.modal h3 { margin: 0 0 12px; }
+.modal h3 {
+  margin: 0 0 12px;
+}
 
 .modal textarea {
   width: 100%;
@@ -1211,7 +1694,10 @@ textarea {
   cursor: pointer;
 }
 
-.modal-actions .primary { background: white; color: #111; }
+.modal-actions .primary {
+  background: white;
+  color: #111;
+}
 
 .toast {
   position: fixed;
@@ -1229,9 +1715,12 @@ textarea {
   font-size: 13px;
 }
 
-.toast.show { opacity: 1; }
+.toast.show {
+  opacity: 1;
+}
 
 @media (max-width: 800px) {
+
   .sidebar {
     position: fixed;
     left: 0;
@@ -1240,19 +1729,50 @@ textarea {
     transform: translateX(-100%);
     transition: transform .2s;
     width: 285px;
-    box-shadow: 12px 0 40px rgba(0,0,0,.5);
+    box-shadow:
+      12px 0 40px rgba(0,0,0,.5);
   }
 
-  .sidebar.open { transform: translateX(0); }
-  .overlay.show { display: block; }
-  .menu { display: block; }
-  .model-info { display: none; }
-  .model-select { max-width: 155px; }
-  .retry-btn { font-size: 11px; padding: 6px 8px; }
-  .suggestions { grid-template-columns: 1fr; }
-  .msg-inner { padding: 16px 14px; }
-  .welcome { padding: 9vh 16px 40px; }
-  .welcome h1 { font-size: 25px; }
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .overlay.show {
+    display: block;
+  }
+
+  .menu {
+    display: block;
+  }
+
+  .model-info {
+    display: none;
+  }
+
+  .model-select {
+    max-width: 155px;
+  }
+
+  .retry-btn {
+    font-size: 11px;
+    padding: 6px 8px;
+  }
+
+  .suggestions {
+    grid-template-columns: 1fr;
+  }
+
+  .msg-inner {
+    padding: 16px 14px;
+  }
+
+  .welcome {
+    padding: 9vh 16px 40px;
+  }
+
+  .welcome h1 {
+    font-size: 25px;
+  }
 }
 
 </style>
@@ -1263,67 +1783,197 @@ textarea {
 <div class="app">
 
 <aside class="sidebar" id="sidebar">
+
   <div class="side-top">
-    <button class="new-chat" id="newChat">＋ New chat</button>
-    <input class="side-search" id="search" placeholder="Search chats">
+
+    <button
+      class="new-chat"
+      id="newChat"
+    >
+      ＋ New chat
+    </button>
+
+    <input
+      class="side-search"
+      id="search"
+      placeholder="Search chats"
+    >
+
   </div>
 
-  <div class="history" id="history"></div>
+  <div
+    class="history"
+    id="history"
+  ></div>
 
   <div class="side-bottom">
-    <button class="side-btn" id="memoryBtn">🧠 Memory</button>
-    <button class="side-btn" id="installBtn">⌂ Add to Home Screen</button>
-    <button class="side-btn" id="clearBtn">Clear all chats</button>
+
+    <button
+      class="side-btn"
+      id="memoryBtn"
+    >
+      🧠 Memory
+    </button>
+
+    <button
+      class="side-btn"
+      id="installBtn"
+    >
+      ⌂ Add to Home Screen
+    </button>
+
+    <button
+      class="side-btn"
+      id="clearBtn"
+    >
+      Clear all chats
+    </button>
+
   </div>
+
 </aside>
 
-<div class="overlay" id="overlay"></div>
+<div
+  class="overlay"
+  id="overlay"
+></div>
 
 <main class="main">
 
 <header class="topbar">
-  <button class="menu" id="menu">☰</button>
-  <div class="brand">my-ai</div>
+
+  <button
+    class="menu"
+    id="menu"
+  >
+    ☰
+  </button>
+
+  <div class="brand">
+    my-ai
+  </div>
 
   <div class="model-wrap">
-    <select class="model-select" id="modelSelect">
-      <option>Loading models…</option>
+
+    <select
+      class="model-select"
+      id="modelSelect"
+    >
+      <option>
+        Loading models…
+      </option>
     </select>
-    <span class="model-arrow">⌄</span>
+
+    <span class="model-arrow">
+      ⌄
+    </span>
+
   </div>
 
-  <button class="retry-btn" id="modelsRetry" type="button">⚠ Retry</button>
+  <button
+    class="retry-btn"
+    id="modelsRetry"
+    type="button"
+  >
+    ⚠ Retry
+  </button>
 
-  <div class="model-info" id="modelInfo"></div>
+  <div
+    class="model-info"
+    id="modelInfo"
+  ></div>
+
 </header>
 
-<section class="messages" id="messages">
-  <div class="welcome" id="welcome">
-    <h1>How can I help?</h1>
-    <p>Chat, analyze images, write code, generate images, do web research, and keep your conversations on this device.</p>
+<section
+  class="messages"
+  id="messages"
+>
+
+  <div
+    class="welcome"
+    id="welcome"
+  >
+
+    <h1>
+      How can I help?
+    </h1>
+
+    <p>
+      Chat, analyze images, write code,
+      generate images, do web research,
+      and keep your conversations on this device.
+    </p>
 
     <div class="suggestions">
-      <button class="suggestion">Explain a difficult topic simply</button>
-      <button class="suggestion">What is the latest news today?</button>
-      <button class="suggestion">Analyze an image I upload</button>
-      <button class="suggestion">Create an image from my idea</button>
+
+      <button class="suggestion">
+        Explain a difficult topic simply
+      </button>
+
+      <button class="suggestion">
+        What is the latest news today?
+      </button>
+
+      <button class="suggestion">
+        Analyze an image I upload
+      </button>
+
+      <button class="suggestion">
+        Create an image from my idea
+      </button>
+
     </div>
+
   </div>
+
 </section>
 
 <div class="composer-area">
 
   <div class="composer">
 
-    <div class="preview" id="preview">
-      <img id="previewImg" alt="">
-      <div class="preview-name" id="previewName"></div>
-      <button class="remove-file" id="removeFile">×</button>
+    <div
+      class="preview"
+      id="preview"
+    >
+
+      <img
+        id="previewImg"
+        alt=""
+      >
+
+      <div
+        class="preview-name"
+        id="previewName"
+      ></div>
+
+      <button
+        class="remove-file"
+        id="removeFile"
+      >
+        ×
+      </button>
+
     </div>
 
     <div class="composer-row">
-      <button class="tool" id="attach" title="Attach file">＋</button>
-      <button class="tool" id="imageMode" title="Generate image">◉</button>
+
+      <button
+        class="tool"
+        id="attach"
+        title="Attach file"
+      >
+        ＋
+      </button>
+
+      <button
+        class="tool"
+        id="imageMode"
+        title="Generate image"
+      >
+        ◉
+      </button>
 
       <textarea
         id="input"
@@ -1331,14 +1981,32 @@ textarea {
         placeholder="Message my-ai..."
       ></textarea>
 
-      <button class="send" id="send" title="Send">↑</button>
+      <button
+        class="send"
+        id="send"
+        title="Send"
+      >
+        ↑
+      </button>
+
     </div>
 
   </div>
 
   <div class="hint">
-    <span class="research-badge" id="researchBadge">🌐 Research mode</span>
-    <span>my-ai can make mistakes. Check important information.</span>
+
+    <span
+      class="research-badge"
+      id="researchBadge"
+    >
+      🌐 Research mode
+    </span>
+
+    <span>
+      my-ai can make mistakes.
+      Check important information.
+    </span>
+
   </div>
 
 </div>
@@ -1354,17 +2022,41 @@ textarea {
   hidden
 >
 
-<div class="modal" id="memoryModal">
-  <h3>Memory</h3>
-  <textarea id="memoryText" placeholder="Things you want my-ai to remember on this device..."></textarea>
+<div
+  class="modal"
+  id="memoryModal"
+>
+
+  <h3>
+    Memory
+  </h3>
+
+  <textarea
+    id="memoryText"
+    placeholder="Things you want my-ai to remember on this device..."
+  ></textarea>
 
   <div class="modal-actions">
-    <button id="memoryCancel">Cancel</button>
-    <button class="primary" id="memorySave">Save</button>
+
+    <button id="memoryCancel">
+      Cancel
+    </button>
+
+    <button
+      class="primary"
+      id="memorySave"
+    >
+      Save
+    </button>
+
   </div>
+
 </div>
 
-<div class="toast" id="toast"></div>
+<div
+  class="toast"
+  id="toast"
+></div>
 
 <script>
 
@@ -1398,11 +2090,19 @@ var sidebar = $("sidebar");
 var overlay = $("overlay");
 
 function uid() {
-  return Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 9);
+  return (
+    Date.now().toString(36) +
+    "_" +
+    Math.random()
+      .toString(36)
+      .slice(2, 9)
+  );
 }
 
 function escapeHTML(value) {
-  return String(value == null ? "" : value)
+  return String(
+    value == null ? "" : value
+  )
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -1411,50 +2111,101 @@ function escapeHTML(value) {
 }
 
 function safeURL(value) {
+
   try {
-    var url = new URL(value, location.href);
-    if (url.protocol === "http:" || url.protocol === "https:") {
+
+    var url =
+      new URL(
+        value,
+        location.href
+      );
+
+    if (
+      url.protocol === "http:" ||
+      url.protocol === "https:"
+    ) {
       return url.href;
     }
+
   } catch (error) {}
+
   return "#";
 }
 
 function showToast(message) {
+
   var toast = $("toast");
+
   toast.textContent = message;
+
   toast.classList.add("show");
 
-  clearTimeout(showToast.timer);
-  showToast.timer = setTimeout(function () {
-    toast.classList.remove("show");
-  }, 2400);
+  clearTimeout(
+    showToast.timer
+  );
+
+  showToast.timer =
+    setTimeout(
+      function () {
+        toast.classList.remove(
+          "show"
+        );
+      },
+      2400
+    );
 }
 
 function saveState() {
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(chats));
-  localStorage.setItem(CURRENT_KEY, currentId || "");
+
+  localStorage.setItem(
+    HISTORY_KEY,
+    JSON.stringify(chats)
+  );
+
+  localStorage.setItem(
+    CURRENT_KEY,
+    currentId || ""
+  );
 }
 
 function loadState() {
+
   try {
-    chats = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+
+    chats =
+      JSON.parse(
+        localStorage.getItem(
+          HISTORY_KEY
+        ) || "[]"
+      );
+
   } catch (error) {
+
+    chats = [];
+
+  }
+
+  if (!Array.isArray(chats)) {
     chats = [];
   }
 
-  if (!Array.isArray(chats)) chats = [];
-
-  currentId = localStorage.getItem(CURRENT_KEY) || "";
+  currentId =
+    localStorage.getItem(
+      CURRENT_KEY
+    ) || "";
 }
 
 function getCurrentChat() {
-  return chats.find(function (chat) {
-    return chat.id === currentId;
-  }) || null;
+
+  return chats.find(
+    function (chat) {
+      return chat.id === currentId;
+    }
+  ) || null;
 }
 
 function createChat() {
+
   var chat = {
     id: uid(),
     title: "New chat",
@@ -1464,6 +2215,7 @@ function createChat() {
   };
 
   chats.unshift(chat);
+
   currentId = chat.id;
 
   saveState();
@@ -1473,58 +2225,127 @@ function createChat() {
 }
 
 function ensureChat() {
-  var chat = getCurrentChat();
+
+  var chat =
+    getCurrentChat();
+
   if (chat) return chat;
+
   createChat();
+
   return getCurrentChat();
 }
 
 function renderHistory() {
-  var container = $("history");
 
-  var query = String($("search").value || "").toLowerCase().trim();
+  var container =
+    $("history");
+
+  var query =
+    String(
+      $("search").value || ""
+    )
+      .toLowerCase()
+      .trim();
+
   container.innerHTML = "";
 
-  var visible = chats.filter(function (chat) {
-    return !query || String(chat.title || "").toLowerCase().includes(query);
-  });
+  var visible =
+    chats.filter(
+      function (chat) {
+
+        return (
+          !query ||
+          String(
+            chat.title || ""
+          )
+            .toLowerCase()
+            .includes(query)
+        );
+
+      }
+    );
 
   if (!visible.length) {
-    container.innerHTML = '<div class="history-title">No chats yet</div>';
+
+    container.innerHTML =
+      '<div class="history-title">No chats yet</div>';
+
     return;
   }
 
-  visible.forEach(function (chat) {
-    var item = document.createElement("div");
-    item.className = "chat-item" + (chat.id === currentId ? " active" : "");
+  visible.forEach(
+    function (chat) {
 
-    var icon = document.createElement("span");
-    icon.textContent = "💬";
+      var item =
+        document.createElement(
+          "div"
+        );
 
-    var title = document.createElement("span");
-    title.className = "chat-title";
-    title.textContent = chat.title || "New chat";
+      item.className =
+        "chat-item" +
+        (
+          chat.id === currentId
+            ? " active"
+            : ""
+        );
 
-    item.appendChild(icon);
-    item.appendChild(title);
+      var icon =
+        document.createElement(
+          "span"
+        );
 
-    item.onclick = function () {
-      currentId = chat.id;
-      saveState();
-      renderHistory();
-      renderChat();
-      closeDrawer();
-    };
+      icon.textContent = "💬";
 
-    container.appendChild(item);
-  });
+      var title =
+        document.createElement(
+          "span"
+        );
+
+      title.className =
+        "chat-title";
+
+      title.textContent =
+        chat.title ||
+        "New chat";
+
+      item.appendChild(icon);
+      item.appendChild(title);
+
+      item.onclick =
+        function () {
+
+          currentId =
+            chat.id;
+
+          saveState();
+          renderHistory();
+          renderChat();
+          closeDrawer();
+
+        };
+
+      container.appendChild(
+        item
+      );
+
+    }
+  );
 }
 
 function renderChat() {
-  var chat = getCurrentChat();
+
+  var chat =
+    getCurrentChat();
+
   messagesEl.innerHTML = "";
 
-  if (!chat || !chat.messages || !chat.messages.length) {
+  if (
+    !chat ||
+    !chat.messages ||
+    !chat.messages.length
+  ) {
+
     messagesEl.innerHTML =
       '<div class="welcome">' +
       "<h1>How can I help?</h1>" +
@@ -1538,106 +2359,278 @@ function renderChat() {
       "</div>";
 
     bindSuggestions();
+
     return;
   }
 
-  chat.messages.forEach(function (message, index) {
-    renderMessage(message, index);
-  });
+  chat.messages.forEach(
+    function (message, index) {
+      renderMessage(
+        message,
+        index
+      );
+    }
+  );
 
   scrollBottom(false);
 }
 
-function renderMessage(message, index) {
-  var row = document.createElement("div");
-  row.className = "msg " + (message.role === "user" ? "user" : "assistant");
+function renderMessage(
+  message,
+  index
+) {
 
-  var inner = document.createElement("div");
-  inner.className = "msg-inner";
+  var row =
+    document.createElement(
+      "div"
+    );
 
-  var avatar = document.createElement("div");
-  avatar.className = "avatar";
-  avatar.textContent = message.role === "user" ? "U" : "AI";
+  row.className =
+    "msg " +
+    (
+      message.role === "user"
+        ? "user"
+        : "assistant"
+    );
 
-  var content = document.createElement("div");
-  content.className = "content";
+  var inner =
+    document.createElement(
+      "div"
+    );
+
+  inner.className =
+    "msg-inner";
+
+  var avatar =
+    document.createElement(
+      "div"
+    );
+
+  avatar.className =
+    "avatar";
+
+  avatar.textContent =
+    message.role === "user"
+      ? "U"
+      : "AI";
+
+  var content =
+    document.createElement(
+      "div"
+    );
+
+  content.className =
+    "content";
 
   if (message.image) {
-    var image = document.createElement("img");
-    image.className = "image-result";
-    image.src = message.image;
-    image.alt = "Generated image";
-    content.appendChild(image);
+
+    var image =
+      document.createElement(
+        "img"
+      );
+
+    image.className =
+      "image-result";
+
+    image.src =
+      message.image;
+
+    image.alt =
+      "Generated image";
+
+    content.appendChild(
+      image
+    );
+
   } else {
-    if (message.role === "assistant" && message.research) {
-      var badge = document.createElement("div");
-      badge.className = "msg-research-badge";
-      badge.textContent = "🌐 Web research";
-      content.appendChild(badge);
+
+    if (
+      message.role === "assistant" &&
+      message.research
+    ) {
+
+      var badge =
+        document.createElement(
+          "div"
+        );
+
+      badge.className =
+        "msg-research-badge";
+
+      badge.textContent =
+        "🌐 Web research";
+
+      content.appendChild(
+        badge
+      );
     }
 
-    var bodyHTML = renderMarkdown(message.content || "");
-    var holder = document.createElement("div");
-    holder.innerHTML = bodyHTML;
+    var bodyHTML =
+      renderMarkdown(
+        message.content || ""
+      );
 
-    while (holder.firstChild) {
-      content.appendChild(holder.firstChild);
+    var holder =
+      document.createElement(
+        "div"
+      );
+
+    holder.innerHTML =
+      bodyHTML;
+
+    while (
+      holder.firstChild
+    ) {
+
+      content.appendChild(
+        holder.firstChild
+      );
+
     }
   }
 
-  if (message.role === "assistant") {
-    var actions = document.createElement("div");
-    actions.className = "actions";
+  if (
+    message.role === "assistant"
+  ) {
 
-    var copy = document.createElement("button");
-    copy.className = "msg-action";
-    copy.textContent = "Copy";
-    copy.onclick = function () {
-      copyText(message.content || "");
-    };
-    actions.appendChild(copy);
+    var actions =
+      document.createElement(
+        "div"
+      );
 
-    var regenerate = document.createElement("button");
-    regenerate.className = "msg-action";
-    regenerate.textContent = "Regenerate";
-    regenerate.onclick = function () {
-      regenerateMessage(index);
-    };
-    actions.appendChild(regenerate);
+    actions.className =
+      "actions";
 
-    content.appendChild(actions);
+    var copy =
+      document.createElement(
+        "button"
+      );
+
+    copy.className =
+      "msg-action";
+
+    copy.textContent =
+      "Copy";
+
+    copy.onclick =
+      function () {
+        copyText(
+          message.content || ""
+        );
+      };
+
+    actions.appendChild(
+      copy
+    );
+
+    var regenerate =
+      document.createElement(
+        "button"
+      );
+
+    regenerate.className =
+      "msg-action";
+
+    regenerate.textContent =
+      "Regenerate";
+
+    regenerate.onclick =
+      function () {
+        regenerateMessage(
+          index
+        );
+      };
+
+    actions.appendChild(
+      regenerate
+    );
+
+    content.appendChild(
+      actions
+    );
   }
 
-  inner.appendChild(avatar);
-  inner.appendChild(content);
-  row.appendChild(inner);
-  messagesEl.appendChild(row);
+  inner.appendChild(
+    avatar
+  );
+
+  inner.appendChild(
+    content
+  );
+
+  row.appendChild(
+    inner
+  );
+
+  messagesEl.appendChild(
+    row
+  );
 
   return content;
 }
 
-function appendLiveAssistant(research) {
-  var row = document.createElement("div");
-  row.className = "msg assistant";
+function appendLiveAssistant(
+  research
+) {
 
-  var inner = document.createElement("div");
-  inner.className = "msg-inner";
+  var row =
+    document.createElement(
+      "div"
+    );
 
-  var avatar = document.createElement("div");
-  avatar.className = "avatar";
-  avatar.textContent = "AI";
+  row.className =
+    "msg assistant";
 
-  var content = document.createElement("div");
-  content.className = "content";
+  var inner =
+    document.createElement(
+      "div"
+    );
+
+  inner.className =
+    "msg-inner";
+
+  var avatar =
+    document.createElement(
+      "div"
+    );
+
+  avatar.className =
+    "avatar";
+
+  avatar.textContent =
+    "AI";
+
+  var content =
+    document.createElement(
+      "div"
+    );
+
+  content.className =
+    "content";
 
   if (research) {
-    var badge = document.createElement("div");
-    badge.className = "msg-research-badge";
-    badge.textContent = "🌐 Web research";
-    content.appendChild(badge);
+
+    var badge =
+      document.createElement(
+        "div"
+      );
+
+    badge.className =
+      "msg-research-badge";
+
+    badge.textContent =
+      "🌐 Web research";
+
+    content.appendChild(
+      badge
+    );
   }
 
-  var live = document.createElement("div");
+  var live =
+    document.createElement(
+      "div"
+    );
+
   live.innerHTML =
     '<div class="typing">' +
     '<span class="dot"></span>' +
@@ -1645,12 +2638,25 @@ function appendLiveAssistant(research) {
     '<span class="dot"></span>' +
     "</div>";
 
-  content.appendChild(live);
+  content.appendChild(
+    live
+  );
 
-  inner.appendChild(avatar);
-  inner.appendChild(content);
-  row.appendChild(inner);
-  messagesEl.appendChild(row);
+  inner.appendChild(
+    avatar
+  );
+
+  inner.appendChild(
+    content
+  );
+
+  row.appendChild(
+    inner
+  );
+
+  messagesEl.appendChild(
+    row
+  );
 
   scrollBottom(true);
 
@@ -1658,254 +2664,665 @@ function appendLiveAssistant(research) {
 }
 
 function renderMarkdown(text) {
-  var source = String(text || "");
+
+  var source =
+    String(text || "");
 
   var codeBlocks = [];
   var inlineCodes = [];
 
-  var tick = String.fromCharCode(96);
+  var tick =
+    String.fromCharCode(96);
 
-  var fencePattern = new RegExp(
-    tick + tick + tick + "([a-zA-Z0-9_+-]*)" + "\\n?([\\s\\S]*?)" + tick + tick + tick,
-    "g"
-  );
+  var fencePattern =
+    new RegExp(
+      tick +
+      tick +
+      tick +
+      "([a-zA-Z0-9_+-]*)" +
+      "\\n?" +
+      "([\\s\\S]*?)" +
+      tick +
+      tick +
+      tick,
+      "g"
+    );
 
-  source = source.replace(fencePattern, function (match, language, code) {
-    var id = codeBlocks.length;
-    codeBlocks.push({ language: language || "code", code: code });
-    return "%%CODEBLOCK" + id + "%%";
-  });
+  source =
+    source.replace(
+      fencePattern,
+      function (
+        match,
+        language,
+        code
+      ) {
 
-  var inlinePattern = new RegExp(tick + "([^" + tick + "]+)" + tick, "g");
+        var id =
+          codeBlocks.length;
 
-  source = source.replace(inlinePattern, function (match, code) {
-    var id = inlineCodes.length;
-    inlineCodes.push('<span class="inline-code">' + escapeHTML(code) + "</span>");
-    return "%%INLINECODE" + id + "%%";
-  });
+        codeBlocks.push({
+          language:
+            language || "code",
+          code: code
+        });
 
-  source = escapeHTML(source);
+        return (
+          "%%CODEBLOCK" +
+          id +
+          "%%"
+        );
 
-  source = source.replace(/^### (.+)$/gm, "<h3>$1</h3>");
-  source = source.replace(/^## (.+)$/gm, "<h2>$1</h2>");
-  source = source.replace(/^# (.+)$/gm, "<h1>$1</h1>");
-  source = source.replace(/^> (.+)$/gm, "<blockquote>$1</blockquote>");
+      }
+    );
 
-  source = source.replace(new RegExp("\\*\\*([^*]+)\\*\\*", "g"), "<strong>$1</strong>");
-  source = source.replace(new RegExp("__([^_]+)__", "g"), "<strong>$1</strong>");
-  source = source.replace(new RegExp("\\*([^*\\n]+)\\*", "g"), "<em>$1</em>");
-  source = source.replace(new RegExp("_([^_\\n]+)_", "g"), "<em>$1</em>");
+  var inlinePattern =
+    new RegExp(
+      tick +
+      "([^" +
+      tick +
+      "]+)" +
+      tick,
+      "g"
+    );
 
-  source = source.replace(
-    new RegExp("\\[([^\\]]+)\\]\\(([^)]+)\\)", "g"),
-    function (match, label, url) {
-      var safe = safeURL(url);
-      if (safe === "#") return label;
-      return '<a href="' + escapeHTML(safe) + '" target="_blank" rel="noopener noreferrer">' + label + "</a>";
-    }
-  );
+  source =
+    source.replace(
+      inlinePattern,
+      function (
+        match,
+        code
+      ) {
 
-  var lines = source.split("\n");
+        var id =
+          inlineCodes.length;
+
+        inlineCodes.push(
+          '<span class="inline-code">' +
+          escapeHTML(code) +
+          "</span>"
+        );
+
+        return (
+          "%%INLINECODE" +
+          id +
+          "%%"
+        );
+
+      }
+    );
+
+  source =
+    escapeHTML(source);
+
+  source =
+    source.replace(
+      /^### (.+)$/gm,
+      "<h3>$1</h3>"
+    );
+
+  source =
+    source.replace(
+      /^## (.+)$/gm,
+      "<h2>$1</h2>"
+    );
+
+  source =
+    source.replace(
+      /^# (.+)$/gm,
+      "<h1>$1</h1>"
+    );
+
+  source =
+    source.replace(
+      /^> (.+)$/gm,
+      "<blockquote>$1</blockquote>"
+    );
+
+  source =
+    source.replace(
+      new RegExp(
+        "\\*\\*([^*]+)\\*\\*",
+        "g"
+      ),
+      "<strong>$1</strong>"
+    );
+
+  source =
+    source.replace(
+      new RegExp(
+        "__([^_]+)__",
+        "g"
+      ),
+      "<strong>$1</strong>"
+    );
+
+  source =
+    source.replace(
+      new RegExp(
+        "\\*([^*\\n]+)\\*",
+        "g"
+      ),
+      "<em>$1</em>"
+    );
+
+  source =
+    source.replace(
+      new RegExp(
+        "_([^_\\n]+)_",
+        "g"
+      ),
+      "<em>$1</em>"
+    );
+
+  source =
+    source.replace(
+      new RegExp(
+        "\$begin:math:display$\(\[\^\\$end:math:display$]+)\\]\$begin:math:text$\(\[\^\)\]\+\)\\$end:math:text$",
+        "g"
+      ),
+      function (
+        match,
+        label,
+        url
+      ) {
+
+        var safe =
+          safeURL(url);
+
+        if (safe === "#") {
+          return label;
+        }
+
+        return (
+          '<a href="' +
+          escapeHTML(safe) +
+          '" target="_blank" rel="noopener noreferrer">' +
+          label +
+          "</a>"
+        );
+
+      }
+    );
+
+  var lines =
+    source.split("\n");
 
   var output = "";
-  var unorderedOpen = false;
-  var orderedOpen = false;
 
-  lines.forEach(function (line) {
-    var unordered = /^\s*[-*] (.+)$/.exec(line);
-    var ordered = /^\s*\d+\. (.+)$/.exec(line);
+  var unorderedOpen =
+    false;
 
-    if (unordered) {
-      if (orderedOpen) { output += "</ol>"; orderedOpen = false; }
-      if (!unorderedOpen) { output += "<ul>"; unorderedOpen = true; }
-      output += "<li>" + unordered[1] + "</li>";
-      return;
+  var orderedOpen =
+    false;
+
+  lines.forEach(
+    function (line) {
+
+      var unordered =
+        /^\s*[-*] (.+)$/
+          .exec(line);
+
+      var ordered =
+        /^\s*\d+\. (.+)$/
+          .exec(line);
+
+      if (unordered) {
+
+        if (orderedOpen) {
+          output += "</ol>";
+          orderedOpen = false;
+        }
+
+        if (!unorderedOpen) {
+          output += "<ul>";
+          unorderedOpen = true;
+        }
+
+        output +=
+          "<li>" +
+          unordered[1] +
+          "</li>";
+
+        return;
+      }
+
+      if (ordered) {
+
+        if (unorderedOpen) {
+          output += "</ul>";
+          unorderedOpen = false;
+        }
+
+        if (!orderedOpen) {
+          output += "<ol>";
+          orderedOpen = true;
+        }
+
+        output +=
+          "<li>" +
+          ordered[1] +
+          "</li>";
+
+        return;
+      }
+
+      if (unorderedOpen) {
+        output += "</ul>";
+        unorderedOpen = false;
+      }
+
+      if (orderedOpen) {
+        output += "</ol>";
+        orderedOpen = false;
+      }
+
+      if (!line.trim()) {
+        return;
+      }
+
+      if (
+        line.indexOf("<h1>") === 0 ||
+        line.indexOf("<h2>") === 0 ||
+        line.indexOf("<h3>") === 0 ||
+        line.indexOf("<blockquote>") === 0
+      ) {
+
+        output += line;
+
+      } else {
+
+        output +=
+          "<p>" +
+          line +
+          "</p>";
+
+      }
+
     }
+  );
 
-    if (ordered) {
-      if (unorderedOpen) { output += "</ul>"; unorderedOpen = false; }
-      if (!orderedOpen) { output += "<ol>"; orderedOpen = true; }
-      output += "<li>" + ordered[1] + "</li>";
-      return;
-    }
+  if (unorderedOpen) {
+    output += "</ul>";
+  }
 
-    if (unorderedOpen) { output += "</ul>"; unorderedOpen = false; }
-    if (orderedOpen) { output += "</ol>"; orderedOpen = false; }
+  if (orderedOpen) {
+    output += "</ol>";
+  }
 
-    if (!line.trim()) return;
+  output =
+    output.replace(
+      /%%INLINECODE(\d+)%%/g,
+      function (
+        match,
+        id
+      ) {
+        return (
+          inlineCodes[
+            Number(id)
+          ] || ""
+        );
+      }
+    );
 
-    if (
-      line.indexOf("<h1>") === 0 ||
-      line.indexOf("<h2>") === 0 ||
-      line.indexOf("<h3>") === 0 ||
-      line.indexOf("<blockquote>") === 0
-    ) {
-      output += line;
-    } else {
-      output += "<p>" + line + "</p>";
-    }
-  });
+  output =
+    output.replace(
+      /%%CODEBLOCK(\d+)%%/g,
+      function (
+        match,
+        id
+      ) {
 
-  if (unorderedOpen) output += "</ul>";
-  if (orderedOpen) output += "</ol>";
+        var block =
+          codeBlocks[
+            Number(id)
+          ];
 
-  output = output.replace(/%%INLINECODE(\d+)%%/g, function (match, id) {
-    return inlineCodes[Number(id)] || "";
-  });
+        if (!block) {
+          return "";
+        }
 
-  output = output.replace(/%%CODEBLOCK(\d+)%%/g, function (match, id) {
-    var block = codeBlocks[Number(id)];
-    if (!block) return "";
+        var holder =
+          document.createElement(
+            "div"
+          );
 
-    var holder = document.createElement("div");
-    holder.innerHTML =
-      '<div class="code-wrap">' +
-      '<div class="code-head">' +
-      "<span></span>" +
-      '<button class="code-copy">Copy</button>' +
-      "</div>" +
-      "<pre><code></code></pre>" +
-      "</div>";
+        holder.innerHTML =
+          '<div class="code-wrap">' +
+          '<div class="code-head">' +
+          "<span></span>" +
+          '<button class="code-copy">Copy</button>' +
+          "</div>" +
+          "<pre><code></code></pre>" +
+          "</div>";
 
-    holder.querySelector(".code-head span").textContent = block.language;
-    holder.querySelector("code").textContent = block.code;
-    holder.querySelector(".code-copy").setAttribute("data-copy-code", block.code);
+        holder.querySelector(
+          ".code-head span"
+        ).textContent =
+          block.language;
 
-    return holder.innerHTML;
-  });
+        holder.querySelector(
+          "code"
+        ).textContent =
+          block.code;
+
+        holder.querySelector(
+          ".code-copy"
+        ).setAttribute(
+          "data-copy-code",
+          block.code
+        );
+
+        return holder.innerHTML;
+      }
+    );
 
   return output;
 }
 
 function bindSuggestions() {
-  document.querySelectorAll(".suggestion").forEach(function (button) {
-    button.onclick = function () {
-      input.value = button.textContent;
-      resizeInput();
-      updateResearchBadge();
-      input.focus();
-    };
-  });
+
+  document
+    .querySelectorAll(
+      ".suggestion"
+    )
+    .forEach(
+      function (button) {
+
+        button.onclick =
+          function () {
+
+            input.value =
+              button.textContent;
+
+            resizeInput();
+            updateResearchBadge();
+
+            input.focus();
+          };
+
+      }
+    );
 }
 
 function scrollBottom(force) {
+
   if (force) {
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    messagesEl.scrollTop =
+      messagesEl.scrollHeight;
+
     return;
   }
 
   var distance =
-    messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+    messagesEl.scrollHeight -
+    messagesEl.scrollTop -
+    messagesEl.clientHeight;
 
   if (distance < 180) {
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    messagesEl.scrollTop =
+      messagesEl.scrollHeight;
   }
 }
 
 function resizeInput() {
-  input.style.height = "auto";
-  input.style.height = Math.min(input.scrollHeight, 170) + "px";
+
+  input.style.height =
+    "auto";
+
+  input.style.height =
+    Math.min(
+      input.scrollHeight,
+      170
+    ) + "px";
 }
 
 function openDrawer() {
-  sidebar.classList.add("open");
-  overlay.classList.add("show");
+
+  sidebar.classList.add(
+    "open"
+  );
+
+  overlay.classList.add(
+    "show"
+  );
 }
 
 function closeDrawer() {
-  sidebar.classList.remove("open");
-  overlay.classList.remove("show");
+
+  sidebar.classList.remove(
+    "open"
+  );
+
+  overlay.classList.remove(
+    "show"
+  );
 }
 
 function getMemory() {
-  return localStorage.getItem(MEMORY_KEY) || "";
+
+  return (
+    localStorage.getItem(
+      MEMORY_KEY
+    ) || ""
+  );
 }
 
 function buildApiMessages(chat) {
+
   var result = [];
-  var memory = getMemory();
+
+  var memory =
+    getMemory();
 
   if (memory.trim()) {
+
     result.push({
       role: "system",
-      content: "Saved user memory:\n" + memory
+      content:
+        "Saved user memory:\n" +
+        memory
     });
   }
 
-  chat.messages.forEach(function (message) {
-    if (message.role !== "user" && message.role !== "assistant") return;
-    if (message.image) return;
+  chat.messages.forEach(
+    function (message) {
 
-    result.push({
-      role: message.role,
-      content: message.apiContent || message.content || ""
-    });
-  });
+      if (
+        message.role !== "user" &&
+        message.role !== "assistant"
+      ) {
+        return;
+      }
+
+      if (message.image) {
+        return;
+      }
+
+      result.push({
+        role: message.role,
+        content:
+          message.apiContent ||
+          message.content ||
+          ""
+      });
+
+    }
+  );
 
   return result;
 }
 
 function makeTitle(text) {
-  var title = String(text || "").replace(/\s+/g, " ").trim();
-  if (title.length > 48) return title.slice(0, 48) + "…";
-  return title || "New chat";
+
+  var title =
+    String(text || "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  if (title.length > 48) {
+    return (
+      title.slice(0, 48) +
+      "…"
+    );
+  }
+
+  return (
+    title ||
+    "New chat"
+  );
 }
 
 var RESEARCH_PATTERNS = [
-  /\blatest\b/, /\bcurrent\b/, /\bnews\b/, /\btoday\b/, /\btonight\b/,
-  /\byesterday\b/, /\brecent\b/, /\brecently\b/, /\bupdate\b/, /\bupdates\b/,
-  /\bbreaking\b/, /\bprices?\b/, /\bstock\b/, /\bweather\b/, /\bscores?\b/,
-  /\bwho won\b/, /\bwho is\b/, /\bwhat is happening\b/, /\bwhat happened\b/,
-  /\bresearch\b/, /\blook up\b/, /\bsearch the web\b/, /\bsearch online\b/,
-  /\bthis (week|month|year)\b/, /\bas of\b/, /\bright now\b/,
-  /\b20(2[4-9]|3[0-9])\b/, /\blive\b/
+  /\blatest\b/,
+  /\bcurrent\b/,
+  /\bnews\b/,
+  /\btoday\b/,
+  /\btonight\b/,
+  /\byesterday\b/,
+  /\brecent\b/,
+  /\brecently\b/,
+  /\bupdate\b/,
+  /\bupdates\b/,
+  /\bbreaking\b/,
+  /\bprices?\b/,
+  /\bstock\b/,
+  /\bweather\b/,
+  /\bscores?\b/,
+  /\bwho won\b/,
+  /\bwho is\b/,
+  /\bwhat is happening\b/,
+  /\bwhat happened\b/,
+  /\bresearch\b/,
+  /\blook up\b/,
+  /\bsearch the web\b/,
+  /\bsearch online\b/,
+  /\bthis (week|month|year)\b/,
+  /\bas of\b/,
+  /\bright now\b/,
+  /\b20(2[4-9]|3[0-9])\b/,
+  /\blive\b/
 ];
 
 function isResearchQuery(text) {
+
   if (!text) return false;
-  var t = String(text).toLowerCase();
-  for (var i = 0; i < RESEARCH_PATTERNS.length; i++) {
-    if (RESEARCH_PATTERNS[i].test(t)) return true;
+
+  var t =
+    String(text)
+      .toLowerCase();
+
+  for (
+    var i = 0;
+    i < RESEARCH_PATTERNS.length;
+    i++
+  ) {
+
+    if (
+      RESEARCH_PATTERNS[i].test(t)
+    ) {
+      return true;
+    }
   }
+
   return false;
 }
 
 function updateResearchBadge() {
-  var badge = $("researchBadge");
+
+  var badge =
+    $("researchBadge");
+
   if (!badge) return;
 
-  var text = input.value || "";
-  if (isResearchQuery(text)) {
-    badge.classList.add("show");
+  var text =
+    input.value || "";
+
+  if (
+    isResearchQuery(text)
+  ) {
+
+    badge.classList.add(
+      "show"
+    );
+
   } else {
-    badge.classList.remove("show");
+
+    badge.classList.remove(
+      "show"
+    );
+
   }
 }
 
 async function sendMessage() {
+
   if (generating) {
+
     stopGeneration();
+
     return;
   }
 
-  var text = input.value.trim();
+  var text =
+    input.value.trim();
 
-  if (!text && !selectedFile) return;
-
-  var chat = ensureChat();
-
-  var apiContent = text;
-
-  if (selectedFile && selectedFile.kind === "image") {
-    apiContent = [
-      { type: "text", text: text || "Analyze this image." },
-      { type: "image_url", image_url: { url: selectedFile.data } }
-    ];
-  } else if (selectedFile && selectedFile.kind === "text") {
-    apiContent = (text ? text + "\n\n" : "") + selectedFile.data;
+  if (
+    !text &&
+    !selectedFile
+  ) {
+    return;
   }
 
-  var displayText = text || (selectedFile ? selectedFile.name : "");
+  var chat =
+    ensureChat();
+
+  var apiContent =
+    text;
+
+  if (
+    selectedFile &&
+    selectedFile.kind === "image"
+  ) {
+
+    apiContent = [
+      {
+        type: "text",
+        text:
+          text ||
+          "Analyze this image."
+      },
+      {
+        type: "image_url",
+        image_url: {
+          url:
+            selectedFile.data
+        }
+      }
+    ];
+
+  } else if (
+    selectedFile &&
+    selectedFile.kind === "text"
+  ) {
+
+    apiContent =
+      (
+        text
+          ? text + "\n\n"
+          : ""
+      ) +
+      selectedFile.data;
+  }
+
+  var displayText =
+    text ||
+    (
+      selectedFile
+        ? selectedFile.name
+        : ""
+    );
 
   chat.messages.push({
     role: "user",
@@ -1913,118 +3330,268 @@ async function sendMessage() {
     apiContent
   });
 
-  if (chat.messages.length === 1) {
-    chat.title = makeTitle(displayText);
+  if (
+    chat.messages.length === 1
+  ) {
+    chat.title =
+      makeTitle(
+        displayText
+      );
   }
 
-  chat.updated = Date.now();
+  chat.updated =
+    Date.now();
 
   saveState();
   renderHistory();
   renderChat();
 
   input.value = "";
+
   resizeInput();
   updateResearchBadge();
   clearFile();
 
   if (imageMode) {
+
     imageMode = false;
-    $("imageMode").style.background = "transparent";
-    await generateImage(displayText);
+
+    $("imageMode").style.background =
+      "transparent";
+
+    await generateImage(
+      displayText
+    );
+
     return;
   }
 
-  var research = isResearchQuery(displayText);
-  await streamChat(chat, { research: research });
+  var research =
+    isResearchQuery(
+      displayText
+    );
+
+  await streamChat(
+    chat,
+    {
+      research
+    }
+  );
 }
 
-async function streamChat(chat, options) {
-  options = options || {};
+async function streamChat(
+  chat,
+  options
+) {
+
+  options =
+    options || {};
 
   generating = true;
+
   setSendState(true);
 
-  var live = appendLiveAssistant(Boolean(options.research));
+  var live =
+    appendLiveAssistant(
+      Boolean(
+        options.research
+      )
+    );
 
   var full = "";
-  var researchUsed = Boolean(options.research);
 
-  controller = new AbortController();
+  var researchUsed =
+    Boolean(
+      options.research
+    );
+
+  controller =
+    new AbortController();
 
   try {
-    var response = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: $("modelSelect").value,
-        messages: buildApiMessages(chat),
-        research: Boolean(options.research)
-      }),
-      signal: controller.signal
-    });
+
+    var response =
+      await fetch(
+        "/api/chat",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+          body:
+            JSON.stringify({
+              model:
+                $("modelSelect").value,
+              messages:
+                buildApiMessages(
+                  chat
+                ),
+              research:
+                Boolean(
+                  options.research
+                )
+            }),
+          signal:
+            controller.signal
+        }
+      );
 
     if (!response.ok) {
-      var errorText = await response.text();
+
+      var errorText =
+        await response.text();
+
       var parsed = null;
 
-      try { parsed = JSON.parse(errorText); } catch (e) {}
+      try {
+        parsed =
+          JSON.parse(
+            errorText
+          );
+      } catch (e) {}
 
-      var msg = (parsed && parsed.error) || errorText.slice(0, 900) || "Chat request failed (HTTP " + response.status + ")";
+      var msg =
+        (
+          parsed &&
+          parsed.error
+        ) ||
+        errorText.slice(
+          0,
+          900
+        ) ||
+        (
+          "Chat request failed (HTTP " +
+          response.status +
+          ")"
+        );
 
       throw new Error(msg);
     }
 
-    var headerResearch = response.headers.get("X-Research-Mode");
-    if (headerResearch === "1") researchUsed = true;
+    var headerResearch =
+      response.headers.get(
+        "X-Research-Mode"
+      );
 
-    if (!response.body) {
-      throw new Error("Streaming is unavailable.");
+    if (
+      headerResearch === "1"
+    ) {
+      researchUsed = true;
     }
 
-    var reader = response.body.getReader();
-    var decoder = new TextDecoder();
+    if (!response.body) {
+      throw new Error(
+        "Streaming is unavailable."
+      );
+    }
+
+    var reader =
+      response.body.getReader();
+
+    var decoder =
+      new TextDecoder();
+
     var buffer = "";
 
     while (true) {
-      var result = await reader.read();
-      if (result.done) break;
 
-      buffer += decoder.decode(result.value, { stream: true });
+      var result =
+        await reader.read();
 
-      var lines = buffer.split("\n");
-      buffer = lines.pop() || "";
+      if (result.done) {
+        break;
+      }
 
-      for (var i = 0; i < lines.length; i++) {
-        var line = lines[i].trim();
+      buffer +=
+        decoder.decode(
+          result.value,
+          {
+            stream: true
+          }
+        );
 
-        if (!line || line.indexOf("data:") !== 0) continue;
+      var lines =
+        buffer.split("\n");
 
-        var data = line.slice(5).trim();
-        if (data === "[DONE]") continue;
+      buffer =
+        lines.pop() || "";
+
+      for (
+        var i = 0;
+        i < lines.length;
+        i++
+      ) {
+
+        var line =
+          lines[i].trim();
+
+        if (
+          !line ||
+          line.indexOf(
+            "data:"
+          ) !== 0
+        ) {
+          continue;
+        }
+
+        var data =
+          line.slice(5).trim();
+
+        if (
+          data === "[DONE]"
+        ) {
+          continue;
+        }
 
         try {
-          var object = JSON.parse(data);
-          var choice = object.choices && object.choices[0];
+
+          var object =
+            JSON.parse(
+              data
+            );
+
+          var choice =
+            object.choices &&
+            object.choices[0];
 
           if (
             choice &&
             choice.delta &&
-            typeof choice.delta.content === "string"
+            typeof
+              choice.delta.content ===
+              "string"
           ) {
-            full += choice.delta.content;
-          } else if (choice && typeof choice.text === "string") {
-            full += choice.text;
+
+            full +=
+              choice.delta.content;
+
+          } else if (
+            choice &&
+            typeof choice.text ===
+              "string"
+          ) {
+
+            full +=
+              choice.text;
           }
 
-          live.innerHTML = renderMarkdown(full);
+          live.innerHTML =
+            renderMarkdown(
+              full
+            );
+
           scrollBottom(false);
+
         } catch (error) {}
+
       }
     }
 
     if (!full) {
-      full = "The model returned an empty response.";
+
+      full =
+        "The model returned an empty response.";
     }
 
     chat.messages.push({
@@ -2033,60 +3600,107 @@ async function streamChat(chat, options) {
       research: researchUsed
     });
 
-    chat.updated = Date.now();
+    chat.updated =
+      Date.now();
 
     saveState();
     renderChat();
+
   } catch (error) {
-    if (error.name === "AbortError") {
+
+    if (
+      error.name ===
+      "AbortError"
+    ) {
+
       if (full) {
+
         chat.messages.push({
           role: "assistant",
           content: full,
-          research: researchUsed
+          research:
+            researchUsed
         });
+
       } else {
+
         chat.messages.push({
           role: "assistant",
-          content: "Generation stopped."
+          content:
+            "Generation stopped."
         });
       }
 
-      chat.updated = Date.now();
+      chat.updated =
+        Date.now();
+
       saveState();
       renderChat();
+
     } else {
+
       live.innerHTML =
         "<p><strong>Error:</strong> " +
-        escapeHTML(error.message) +
+        escapeHTML(
+          error.message
+        ) +
         "</p>";
     }
+
   } finally {
+
     generating = false;
+
     controller = null;
+
     setSendState(false);
   }
 }
 
-function setSendState(active) {
-  sendButton.classList.toggle("stop", active);
-  sendButton.textContent = active ? "■" : "↑";
+function setSendState(
+  active
+) {
+
+  sendButton.classList.toggle(
+    "stop",
+    active
+  );
+
+  sendButton.textContent =
+    active
+      ? "■"
+      : "↑";
 }
 
 function stopGeneration() {
-  if (controller) controller.abort();
+
+  if (controller) {
+    controller.abort();
+  }
 }
 
-async function generateImage(prompt) {
+async function generateImage(
+  prompt
+) {
+
   if (!prompt.trim()) {
-    showToast("Write an image prompt first.");
+
+    showToast(
+      "Write an image prompt first."
+    );
+
     return;
   }
 
   generating = true;
+
   setSendState(true);
 
-  var live = appendLiveAssistant(false);
+  var live =
+    appendLiveAssistant(
+      false
+    );
+
   live.innerHTML =
     '<div class="typing">' +
     '<span class="dot"></span>' +
@@ -2096,19 +3710,36 @@ async function generateImage(prompt) {
     "<p>Generating image…</p>";
 
   try {
-    var response = await fetch("/api/generate-image", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: prompt })
-    });
 
-    var data = await response.json();
+    var response =
+      await fetch(
+        "/api/generate-image",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+          body:
+            JSON.stringify({
+              prompt
+            })
+        }
+      );
+
+    var data =
+      await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || "Image generation failed.");
+
+      throw new Error(
+        data.error ||
+        "Image generation failed."
+      );
     }
 
-    var chat = ensureChat();
+    var chat =
+      ensureChat();
 
     chat.messages.push({
       role: "assistant",
@@ -2116,376 +3747,899 @@ async function generateImage(prompt) {
       image: data.image
     });
 
-    chat.updated = Date.now();
+    chat.updated =
+      Date.now();
 
     saveState();
+
     renderChat();
+
   } catch (error) {
+
     live.innerHTML =
       "<p><strong>Error:</strong> " +
-      escapeHTML(error.message) +
+      escapeHTML(
+        error.message
+      ) +
       "</p>";
+
   } finally {
+
     generating = false;
+
     setSendState(false);
   }
 }
 
-async function regenerateMessage(index) {
+async function regenerateMessage(
+  index
+) {
+
   if (generating) return;
 
-  var chat = getCurrentChat();
+  var chat =
+    getCurrentChat();
+
   if (!chat) return;
 
-  if (index < 0 || index >= chat.messages.length) return;
+  if (
+    index < 0 ||
+    index >= chat.messages.length
+  ) {
+    return;
+  }
 
-  chat.messages = chat.messages.slice(0, index);
+  chat.messages =
+    chat.messages.slice(
+      0,
+      index
+    );
 
   saveState();
+
   renderChat();
 
   var lastUser = null;
-  for (var i = chat.messages.length - 1; i >= 0; i--) {
-    if (chat.messages[i].role === "user") {
-      lastUser = chat.messages[i];
+
+  for (
+    var i =
+      chat.messages.length - 1;
+    i >= 0;
+    i--
+  ) {
+
+    if (
+      chat.messages[i].role ===
+      "user"
+    ) {
+
+      lastUser =
+        chat.messages[i];
+
       break;
     }
   }
 
-  var research = lastUser ? isResearchQuery(lastUser.content || "") : false;
+  var research =
+    lastUser
+      ? isResearchQuery(
+          lastUser.content || ""
+        )
+      : false;
 
-  await streamChat(chat, { research: research });
+  await streamChat(
+    chat,
+    {
+      research
+    }
+  );
 }
 
 function copyText(text) {
-  if (navigator.clipboard && navigator.clipboard.writeText) {
+
+  if (
+    navigator.clipboard &&
+    navigator.clipboard.writeText
+  ) {
+
     navigator.clipboard
-      .writeText(String(text || ""))
-      .then(function () { showToast("Copied"); })
-      .catch(function () { fallbackCopy(text); });
+      .writeText(
+        String(text || "")
+      )
+      .then(
+        function () {
+          showToast("Copied");
+        }
+      )
+      .catch(
+        function () {
+          fallbackCopy(text);
+        }
+      );
+
     return;
   }
+
   fallbackCopy(text);
 }
 
-function fallbackCopy(text) {
-  var textarea = document.createElement("textarea");
-  textarea.value = String(text || "");
-  document.body.appendChild(textarea);
+function fallbackCopy(
+  text
+) {
+
+  var textarea =
+    document.createElement(
+      "textarea"
+    );
+
+  textarea.value =
+    String(text || "");
+
+  document.body.appendChild(
+    textarea
+  );
+
   textarea.select();
 
-  try { document.execCommand("copy"); } catch (error) {}
+  try {
+    document.execCommand(
+      "copy"
+    );
+  } catch (error) {}
 
   textarea.remove();
+
   showToast("Copied");
 }
 
 function clearFile() {
+
   selectedFile = null;
+
   $("fileInput").value = "";
-  $("preview").classList.remove("show");
+
+  $("preview").classList.remove(
+    "show"
+  );
+
   $("previewImg").src = "";
-  $("previewName").textContent = "";
+
+  $("previewName").textContent =
+    "";
 }
 
-function fileToDataURL(file) {
-  return new Promise(function (resolve, reject) {
-    var reader = new FileReader();
-    reader.onload = function () { resolve(reader.result); };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+function fileToDataURL(
+  file
+) {
+
+  return new Promise(
+    function (
+      resolve,
+      reject
+    ) {
+
+      var reader =
+        new FileReader();
+
+      reader.onload =
+        function () {
+          resolve(
+            reader.result
+          );
+        };
+
+      reader.onerror =
+        reject;
+
+      reader.readAsDataURL(
+        file
+      );
+
+    }
+  );
 }
 
-async function readSelectedFile(file) {
-  if (file.size > 8 * 1024 * 1024) {
-    throw new Error("File is too large. Maximum 8 MB.");
+async function readSelectedFile(
+  file
+) {
+
+  if (
+    file.size >
+    8 * 1024 * 1024
+  ) {
+
+    throw new Error(
+      "File is too large. Maximum 8 MB."
+    );
   }
 
-  if (file.type.indexOf("image/") === 0) {
+  if (
+    file.type.indexOf(
+      "image/"
+    ) === 0
+  ) {
+
     return {
       kind: "image",
-      data: await fileToDataURL(file),
-      name: file.name
+      data:
+        await fileToDataURL(
+          file
+        ),
+      name:
+        file.name
     };
   }
 
-  var text = await file.text();
+  var text =
+    await file.text();
 
-  if (text.length > 120000) {
-    text = text.slice(0, 120000) + "\n[File truncated]";
+  if (
+    text.length > 120000
+  ) {
+
+    text =
+      text.slice(
+        0,
+        120000
+      ) +
+      "\n[File truncated]";
   }
 
   return {
     kind: "text",
-    data: "Attached file " + file.name + ":\n" + text,
-    name: file.name
+    data:
+      "Attached file " +
+      file.name +
+      ":\n" +
+      text,
+    name:
+      file.name
   };
 }
 
 function openMemory() {
-  $("memoryText").value = getMemory();
-  $("memoryModal").style.display = "block";
+
+  $("memoryText").value =
+    getMemory();
+
+  $("memoryModal").style.display =
+    "block";
 }
 
 function closeMemory() {
-  $("memoryModal").style.display = "none";
+
+  $("memoryModal").style.display =
+    "none";
 }
 
+/* ============================================================
+   MODEL LOADING
+   Main fix:
+   - 15 sec frontend timeout
+   - 3 attempts
+   - cache busting
+   - JSON validation
+   - backend error shown
+   ============================================================ */
+
 var MODELS_MAX_ATTEMPTS = 3;
+
 var MODELS_TIMEOUT_MS = 15000;
 
-function setRetryButton(show) {
-  var btn = $("modelsRetry");
+function setRetryButton(
+  show
+) {
+
+  var btn =
+    $("modelsRetry");
+
   if (!btn) return;
-  btn.style.display = show ? "inline-block" : "none";
+
+  btn.style.display =
+    show
+      ? "inline-block"
+      : "none";
 }
 
 function sleep(ms) {
-  return new Promise(function (resolve) {
-    setTimeout(resolve, ms);
-  });
+
+  return new Promise(
+    function (resolve) {
+      setTimeout(
+        resolve,
+        ms
+      );
+    }
+  );
 }
 
 async function fetchModelsOnce() {
-  var attemptController = new AbortController();
-  var timer = setTimeout(function () {
-    attemptController.abort();
-  }, MODELS_TIMEOUT_MS);
+
+  var attemptController =
+    new AbortController();
+
+  var timer =
+    setTimeout(
+      function () {
+        attemptController.abort();
+      },
+      MODELS_TIMEOUT_MS
+    );
 
   try {
-    var response = await fetch("/api/models", {
-      signal: attemptController.signal,
-      cache: "no-store"
-    });
 
-    clearTimeout(timer);
+    var response =
+      await fetch(
+        "/api/models?t=" +
+          Date.now(),
+        {
+          method: "GET",
+          signal:
+            attemptController.signal,
+          cache: "no-store",
+          headers: {
+            "Accept":
+              "application/json"
+          }
+        }
+      );
 
     if (!response.ok) {
+
       var text = "";
-      try { text = await response.text(); } catch (e) {}
+
+      try {
+        text =
+          await response.text();
+      } catch (e) {}
 
       var parsed = null;
-      try { parsed = JSON.parse(text); } catch (e) {}
 
-      var detail = (parsed && parsed.error) || text.slice(0, 240);
+      try {
+        parsed =
+          JSON.parse(text);
+      } catch (e) {}
+
+      var detail =
+        (
+          parsed &&
+          parsed.error
+        ) ||
+        text.slice(
+          0,
+          500
+        );
 
       throw new Error(
-        "HTTP " + response.status + " " + (response.statusText || "") +
-        (detail ? " — " + detail : "")
+        "HTTP " +
+        response.status +
+        (
+          response.statusText
+            ? " " +
+              response.statusText
+            : ""
+        ) +
+        (
+          detail
+            ? " — " +
+              detail
+            : ""
+        )
       );
     }
 
-    return await response.json();
-  } catch (error) {
-    clearTimeout(timer);
+    var data =
+      await response.json();
 
-    if (error.name === "AbortError") {
-      throw new Error("Request timed out after " + (MODELS_TIMEOUT_MS / 1000) + "s");
+    if (
+      !data ||
+      typeof data !== "object"
+    ) {
+
+      throw new Error(
+        "Invalid /api/models response."
+      );
+    }
+
+    if (
+      data.ok === false
+    ) {
+
+      throw new Error(
+        data.error ||
+        "Models endpoint returned an error."
+      );
+    }
+
+    return data;
+
+  } catch (error) {
+
+    if (
+      error.name ===
+      "AbortError"
+    ) {
+
+      throw new Error(
+        "Request timed out after " +
+        (
+          MODELS_TIMEOUT_MS /
+          1000
+        ) +
+        " seconds."
+      );
     }
 
     throw error;
+
+  } finally {
+
+    clearTimeout(timer);
   }
 }
 
 async function loadModels() {
-  var select = $("modelSelect");
+
+  var select =
+    $("modelSelect");
 
   setRetryButton(false);
-  select.innerHTML = "<option>Loading models…</option>";
+
+  select.innerHTML =
+    "<option>Loading models…</option>";
+
   select.disabled = true;
-  $("modelInfo").textContent = "";
+
+  $("modelInfo").textContent =
+    "Connecting to CodeCraft…";
 
   var lastError = null;
 
-  for (var attempt = 1; attempt <= MODELS_MAX_ATTEMPTS; attempt++) {
+  for (
+    var attempt = 1;
+    attempt <= MODELS_MAX_ATTEMPTS;
+    attempt++
+  ) {
+
     try {
+
       select.innerHTML =
-        "<option>Loading models… (attempt " + attempt + "/" + MODELS_MAX_ATTEMPTS + ")</option>";
+        "<option>" +
+        "Loading models… (attempt " +
+        attempt +
+        "/" +
+        MODELS_MAX_ATTEMPTS +
+        ")" +
+        "</option>";
 
-      var data = await fetchModelsOnce();
+      $("modelInfo").textContent =
+        "Connecting to CodeCraft…";
 
-      models = Array.isArray(data.models) ? data.models : [];
+      var data =
+        await fetchModelsOnce();
+
+      models =
+        Array.isArray(
+          data.models
+        )
+          ? data.models
+          : [];
 
       if (!models.length) {
-        throw new Error("CodeCraft returned an empty models list.");
+
+        throw new Error(
+          "CodeCraft returned an empty models list."
+        );
       }
 
-      select.innerHTML = "";
-      select.disabled = false;
+      select.innerHTML =
+        "";
 
-      var saved = localStorage.getItem(MODEL_KEY);
-      var best = data.best || models[0];
+      select.disabled =
+        false;
 
-      models.forEach(function (model) {
-        var option = document.createElement("option");
-        option.value = model.id;
-        option.textContent = model.name || model.id;
-        select.appendChild(option);
-      });
+      var saved =
+        localStorage.getItem(
+          MODEL_KEY
+        );
+
+      var best =
+        data.best ||
+        models[0];
+
+      models.forEach(
+        function (model) {
+
+          var option =
+            document.createElement(
+              "option"
+            );
+
+          option.value =
+            model.id;
+
+          option.textContent =
+            model.name ||
+            model.id;
+
+          select.appendChild(
+            option
+          );
+
+        }
+      );
 
       if (
         saved &&
-        models.some(function (model) {
-          return model.id === saved;
-        })
+        models.some(
+          function (model) {
+            return (
+              model.id ===
+              saved
+            );
+          }
+        )
       ) {
-        select.value = saved;
-      } else if (best && best.id) {
-        select.value = best.id;
+
+        select.value =
+          saved;
+
+      } else if (
+        best &&
+        best.id
+      ) {
+
+        select.value =
+          best.id;
       }
 
       updateModelInfo();
-      setRetryButton(false);
 
-      if (data.hasWebSearch === false) {
+      setRetryButton(
+        false
+      );
+
+      if (
+        data.hasWebSearch ===
+        false
+      ) {
+
         $("modelInfo").textContent =
-          "⚠ No dedicated web-search model — using best chat model.";
+          "Ready • Web research unavailable";
+
+      } else {
+
+        $("modelInfo").textContent =
+          "Ready • Web research available";
       }
 
       return;
-    } catch (error) {
-      lastError = error;
 
-      if (attempt < MODELS_MAX_ATTEMPTS) {
-        await sleep(700 * attempt);
+    } catch (error) {
+
+      lastError =
+        error;
+
+      if (
+        attempt <
+        MODELS_MAX_ATTEMPTS
+      ) {
+
+        $("modelInfo").textContent =
+          "Retrying… " +
+          (
+            error.message ||
+            "Models request failed."
+          );
+
+        await sleep(
+          700 * attempt
+        );
       }
     }
   }
 
-  select.disabled = false;
-  select.innerHTML = '<option value="">⚠ Models unavailable</option>';
-  $("modelInfo").textContent = lastError ? lastError.message : "Unknown models error.";
+  select.disabled =
+    false;
+
+  select.innerHTML =
+    '<option value="">⚠ Models unavailable</option>';
+
+  $("modelInfo").textContent =
+    lastError
+      ? lastError.message
+      : "Unknown models error.";
+
   setRetryButton(true);
 }
 
 function updateModelInfo() {
-  var model = models.find(function (item) {
-    return item.id === $("modelSelect").value;
-  });
 
-  $("modelInfo").textContent = model
-    ? (model.description || "")
-    : "";
+  var model =
+    models.find(
+      function (item) {
+        return (
+          item.id ===
+          $("modelSelect").value
+        );
+      }
+    );
+
+  if (!model) {
+
+    $("modelInfo").textContent =
+      "";
+
+    return;
+  }
+
+  $("modelInfo").textContent =
+    model.description ||
+    "Ready";
 }
 
-$("newChat").onclick = function () { createChat(); };
-$("menu").onclick = function () { openDrawer(); };
-overlay.onclick = function () { closeDrawer(); };
+/* ============================================================
+   EVENTS
+   ============================================================ */
 
-$("search").oninput = function () { renderHistory(); };
-
-$("modelSelect").onchange = function () {
-  localStorage.setItem(MODEL_KEY, this.value);
-  updateModelInfo();
-};
-
-$("modelsRetry").onclick = function () {
-  loadModels();
-};
-
-sendButton.onclick = function () { sendMessage(); };
-
-input.oninput = function () {
-  resizeInput();
-  updateResearchBadge();
-};
-
-input.onkeydown = function (event) {
-  if (event.key === "Enter" && !event.shiftKey) {
-    event.preventDefault();
-    sendMessage();
-  }
-};
-
-$("attach").onclick = function () { $("fileInput").click(); };
-
-$("fileInput").onchange = async function () {
-  var file = this.files && this.files[0];
-  if (!file) return;
-
-  try {
-    selectedFile = await readSelectedFile(file);
-
-    $("preview").classList.add("show");
-    $("previewName").textContent = selectedFile.name;
-
-    if (selectedFile.kind === "image") {
-      $("previewImg").src = selectedFile.data;
-    } else {
-      $("previewImg").src =
-        "data:image/svg+xml;charset=utf-8," +
-        encodeURIComponent(
-          '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48">' +
-          '<rect width="48" height="48" rx="7" fill="#444"/>' +
-          '<text x="24" y="29" text-anchor="middle" fill="white" font-size="11">FILE</text>' +
-          "</svg>"
-        );
-    }
-  } catch (error) {
-    showToast(error.message);
-    clearFile();
-  }
-};
-
-$("removeFile").onclick = function () { clearFile(); };
-
-$("imageMode").onclick = function () {
-  imageMode = !imageMode;
-  this.style.background = imageMode ? "#555" : "transparent";
-  showToast(imageMode ? "Image generation enabled" : "Image generation disabled");
-};
-
-$("memoryBtn").onclick = function () { openMemory(); };
-$("memoryCancel").onclick = function () { closeMemory(); };
-
-$("memorySave").onclick = function () {
-  localStorage.setItem(MEMORY_KEY, $("memoryText").value);
-  closeMemory();
-  showToast("Memory saved");
-};
-
-$("installBtn").onclick = function () {
-  if (installPrompt) {
-    installPrompt.prompt();
-    installPrompt = null;
-  } else {
-    showToast("On iPhone: Share → Add to Home Screen");
-  }
-};
-
-$("clearBtn").onclick = function () {
-  if (confirm("Delete all chats on this device?")) {
-    chats = [];
-    currentId = "";
-    saveState();
+$("newChat").onclick =
+  function () {
     createChat();
+  };
+
+$("menu").onclick =
+  function () {
+    openDrawer();
+  };
+
+overlay.onclick =
+  function () {
+    closeDrawer();
+  };
+
+$("search").oninput =
+  function () {
+    renderHistory();
+  };
+
+$("modelSelect").onchange =
+  function () {
+
+    localStorage.setItem(
+      MODEL_KEY,
+      this.value
+    );
+
+    updateModelInfo();
+  };
+
+$("modelsRetry").onclick =
+  function () {
+    loadModels();
+  };
+
+sendButton.onclick =
+  function () {
+    sendMessage();
+  };
+
+input.oninput =
+  function () {
+    resizeInput();
+    updateResearchBadge();
+  };
+
+input.onkeydown =
+  function (event) {
+
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey
+    ) {
+
+      event.preventDefault();
+
+      sendMessage();
+    }
+  };
+
+$("attach").onclick =
+  function () {
+    $("fileInput").click();
+  };
+
+$("fileInput").onchange =
+  async function () {
+
+    var file =
+      this.files &&
+      this.files[0];
+
+    if (!file) return;
+
+    try {
+
+      selectedFile =
+        await readSelectedFile(
+          file
+        );
+
+      $("preview")
+        .classList.add(
+          "show"
+        );
+
+      $("previewName")
+        .textContent =
+        selectedFile.name;
+
+      if (
+        selectedFile.kind ===
+        "image"
+      ) {
+
+        $("previewImg").src =
+          selectedFile.data;
+
+      } else {
+
+        $("previewImg").src =
+          "data:image/svg+xml;charset=utf-8," +
+          encodeURIComponent(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48">' +
+            '<rect width="48" height="48" rx="7" fill="#444"/>' +
+            '<text x="24" y="29" text-anchor="middle" fill="white" font-size="11">FILE</text>' +
+            "</svg>"
+          );
+      }
+
+    } catch (error) {
+
+      showToast(
+        error.message
+      );
+
+      clearFile();
+    }
+  };
+
+$("removeFile").onclick =
+  function () {
+    clearFile();
+  };
+
+$("imageMode").onclick =
+  function () {
+
+    imageMode =
+      !imageMode;
+
+    this.style.background =
+      imageMode
+        ? "#555"
+        : "transparent";
+
+    showToast(
+      imageMode
+        ? "Image generation enabled"
+        : "Image generation disabled"
+    );
+  };
+
+$("memoryBtn").onclick =
+  function () {
+    openMemory();
+  };
+
+$("memoryCancel").onclick =
+  function () {
+    closeMemory();
+  };
+
+$("memorySave").onclick =
+  function () {
+
+    localStorage.setItem(
+      MEMORY_KEY,
+      $("memoryText").value
+    );
+
+    closeMemory();
+
+    showToast(
+      "Memory saved"
+    );
+  };
+
+$("installBtn").onclick =
+  function () {
+
+    if (installPrompt) {
+
+      installPrompt.prompt();
+
+      installPrompt =
+        null;
+
+    } else {
+
+      showToast(
+        "On iPhone: Share → Add to Home Screen"
+      );
+    }
+  };
+
+$("clearBtn").onclick =
+  function () {
+
+    if (
+      confirm(
+        "Delete all chats on this device?"
+      )
+    ) {
+
+      chats = [];
+      currentId = "";
+
+      saveState();
+
+      createChat();
+    }
+  };
+
+document.addEventListener(
+  "click",
+  function (event) {
+
+    var button =
+      event.target.closest &&
+      event.target.closest(
+        ".code-copy"
+      );
+
+    if (button) {
+
+      copyText(
+        button.getAttribute(
+          "data-copy-code"
+        ) || ""
+      );
+    }
   }
-};
+);
 
-document.addEventListener("click", function (event) {
-  var button =
-    event.target.closest && event.target.closest(".code-copy");
+window.addEventListener(
+  "beforeinstallprompt",
+  function (event) {
 
-  if (button) {
-    copyText(button.getAttribute("data-copy-code") || "");
+    event.preventDefault();
+
+    installPrompt =
+      event;
   }
-});
+);
 
-window.addEventListener("beforeinstallprompt", function (event) {
-  event.preventDefault();
-  installPrompt = event;
-});
+/* ============================================================
+   START
+   ============================================================ */
 
 loadState();
 
-if (!currentId && chats.length) {
-  currentId = chats[0].id;
+if (
+  !currentId &&
+  chats.length
+) {
+
+  currentId =
+    chats[0].id;
 }
 
 if (!currentId) {
+
   createChat();
+
 } else {
+
   renderHistory();
   renderChat();
 }
@@ -2503,6 +4657,10 @@ updateResearchBadge();
 </html>`;
 }
 
+/* ============================================================
+   PWA MANIFEST
+   ============================================================ */
+
 function getManifest() {
   return {
     name: "my-ai",
@@ -2511,21 +4669,28 @@ function getManifest() {
     display: "standalone",
     background_color: "#212121",
     theme_color: "#212121",
-    description: "Private ChatGPT-style AI app",
+    description:
+      "Private ChatGPT-style AI app",
     icons: [
       {
         src: "/icon.svg",
         sizes: "any",
         type: "image/svg+xml",
-        purpose: "any maskable"
+        purpose:
+          "any maskable"
       }
     ]
   };
 }
 
+/* ============================================================
+   SERVICE WORKER
+   ============================================================ */
+
 function getServiceWorker() {
+
   return [
-    "const CACHE = 'my-ai-v6';",
+    "const CACHE = 'my-ai-v7';",
     "",
     "self.addEventListener('install', function(event) {",
     "  self.skipWaiting();",
@@ -2547,7 +4712,12 @@ function getServiceWorker() {
   ].join("\n");
 }
 
+/* ============================================================
+   ICON
+   ============================================================ */
+
 function getIcon() {
+
   return [
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">',
     '<rect width="512" height="512" rx="112" fill="#212121"/>',
@@ -2559,80 +4729,212 @@ function getIcon() {
   ].join("");
 }
 
-export default {
-  async fetch(request, env) {
+/* ============================================================
+   WORKER
+   ============================================================ */
 
-    if (request.method === "OPTIONS") {
-      return new Response(null, {
-        status: 204,
-        headers: corsHeaders()
-      });
+export default {
+
+  async fetch(
+    request,
+    env
+  ) {
+
+    if (
+      request.method ===
+      "OPTIONS"
+    ) {
+
+      return new Response(
+        null,
+        {
+          status: 204,
+          headers:
+            corsHeaders()
+        }
+      );
     }
 
-    const url = new URL(request.url);
+    const url =
+      new URL(
+        request.url
+      );
 
     try {
-      if (url.pathname === "/" || url.pathname === "/index.html") {
-        return html(appHTML());
+
+      if (
+        url.pathname === "/" ||
+        url.pathname ===
+          "/index.html"
+      ) {
+
+        return html(
+          appHTML()
+        );
       }
 
-      if (url.pathname === "/api/health") {
+      /* --------------------------------------------------------
+         HEALTH
+         -------------------------------------------------------- */
+
+      if (
+        url.pathname ===
+        "/api/health"
+      ) {
+
         return json({
           ok: true,
-          codecraft_key: Boolean(getApiKey(env)),
-          cloudflare_ai: Boolean(env.AI)
+
+          codecraft_key:
+            Boolean(
+              getApiKey(env)
+            ),
+
+          cloudflare_ai:
+            Boolean(
+              env.AI
+            ),
+
+          timestamp:
+            new Date().toISOString()
         });
       }
 
-      if (url.pathname === "/api/models" && request.method === "GET") {
-        return await handleModels(env);
+      /* --------------------------------------------------------
+         MODELS
+         -------------------------------------------------------- */
+
+      if (
+        url.pathname ===
+          "/api/models" &&
+        request.method ===
+          "GET"
+      ) {
+
+        return await handleModels(
+          env
+        );
       }
 
-      if (url.pathname === "/api/chat" && request.method === "POST") {
-        return await handleChat(request, env);
+      /* --------------------------------------------------------
+         CHAT
+         -------------------------------------------------------- */
+
+      if (
+        url.pathname ===
+          "/api/chat" &&
+        request.method ===
+          "POST"
+      ) {
+
+        return await handleChat(
+          request,
+          env
+        );
       }
 
-      if (url.pathname === "/api/generate-image" && request.method === "POST") {
-        return await handleImage(request, env);
+      /* --------------------------------------------------------
+         IMAGE
+         -------------------------------------------------------- */
+
+      if (
+        url.pathname ===
+          "/api/generate-image" &&
+        request.method ===
+          "POST"
+      ) {
+
+        return await handleImage(
+          request,
+          env
+        );
       }
 
-      if (url.pathname === "/manifest.json") {
-        return new Response(JSON.stringify(getManifest()), {
-          headers: {
-            "Content-Type": "application/manifest+json",
-            ...corsHeaders()
+      /* --------------------------------------------------------
+         MANIFEST
+         -------------------------------------------------------- */
+
+      if (
+        url.pathname ===
+        "/manifest.json"
+      ) {
+
+        return new Response(
+          JSON.stringify(
+            getManifest()
+          ),
+          {
+            headers: {
+              "Content-Type":
+                "application/manifest+json",
+              ...corsHeaders()
+            }
           }
-        });
+        );
       }
 
-      if (url.pathname === "/sw.js") {
-        return new Response(getServiceWorker(), {
-          headers: {
-            "Content-Type": "application/javascript; charset=utf-8",
-            ...corsHeaders()
+      /* --------------------------------------------------------
+         SERVICE WORKER
+         -------------------------------------------------------- */
+
+      if (
+        url.pathname ===
+        "/sw.js"
+      ) {
+
+        return new Response(
+          getServiceWorker(),
+          {
+            headers: {
+              "Content-Type":
+                "application/javascript; charset=utf-8",
+              ...corsHeaders()
+            }
           }
-        });
+        );
       }
 
-      if (url.pathname === "/icon.svg") {
-        return new Response(getIcon(), {
-          headers: {
-            "Content-Type": "image/svg+xml",
-            ...corsHeaders()
+      /* --------------------------------------------------------
+         ICON
+         -------------------------------------------------------- */
+
+      if (
+        url.pathname ===
+        "/icon.svg"
+      ) {
+
+        return new Response(
+          getIcon(),
+          {
+            headers: {
+              "Content-Type":
+                "image/svg+xml",
+              ...corsHeaders()
+            }
           }
-        });
+        );
       }
 
-      return new Response("Not Found", {
-        status: 404,
-        headers: corsHeaders()
-      });
+      return new Response(
+        "Not Found",
+        {
+          status: 404,
+          headers:
+            corsHeaders()
+        }
+      );
+
     } catch (error) {
+
       return json(
         {
-          error: String(
-            error && error.message ? error.message : error
-          )
+          error:
+            String(
+              error &&
+              error.message
+                ? error.message
+                : error
+            )
         },
         500
       );
