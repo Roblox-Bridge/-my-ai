@@ -3132,7 +3132,7 @@ function renderMarkdown(
 
   source =
     source.replace(
-      /```([a-zA-Z0-9_+#.-]*)\n?([\s\S]*?)```/g,
+      /```([A-Za-z0-9_+#.-]*)\n?([\s\S]*?)```/g
       function (
         match,
         language,
