@@ -2254,10 +2254,6 @@ textarea::placeholder {
 
 <div class="app">
 
-<!-- =======================================================
-     SIDEBAR
-     ======================================================== -->
-
 <aside
   class="sidebar"
   id="sidebar"
@@ -2328,15 +2324,10 @@ textarea::placeholder {
   id="overlay"
 ></div>
 
-<!-- =======================================================
-     MAIN
-     ======================================================== -->
-
 <main class="main">
 
   <header class="topbar">
 
-    <!-- 3 LINE MENU -->
     <button
       class="hamburger"
       id="menu"
@@ -2386,10 +2377,6 @@ textarea::placeholder {
 
   </header>
 
-  <!-- =====================================================
-       MESSAGES
-       ====================================================== -->
-
   <section
     class="messages"
     id="messages"
@@ -2433,10 +2420,6 @@ textarea::placeholder {
     </div>
 
   </section>
-
-  <!-- =====================================================
-       COMPOSER
-       ====================================================== -->
 
   <div class="composer-area">
 
@@ -2530,10 +2513,6 @@ textarea::placeholder {
   accept="image/png,image/jpeg,image/webp,image/gif,.txt,.md,.json,.js,.html,.css,.py,.csv"
   hidden
 >
-
-<!-- =========================================================
-     MEMORY MODAL
-     ========================================================== -->
 
 <div
   class="modal"
@@ -2637,6 +2616,67 @@ var sidebar =
 
 var overlay =
   $("overlay");
+
+/* ==========================================================
+   RESEARCH DETECTION (browser-side)
+   ========================================================== */
+
+var RESEARCH_PATTERNS = [
+  /\blatest\b/i,
+  /\bcurrent\b/i,
+  /\bnews\b/i,
+  /\btoday\b/i,
+  /\btonight\b/i,
+  /\byesterday\b/i,
+  /\brecent\b/i,
+  /\brecently\b/i,
+  /\bupdate\b/i,
+  /\bupdates\b/i,
+  /\bbreaking\b/i,
+  /\bprices?\b/i,
+  /\bstock\b/i,
+  /\bweather\b/i,
+  /\bscores?\b/i,
+  /\bwho won\b/i,
+  /\bwhat is happening\b/i,
+  /\bwhat happened\b/i,
+  /\bresearch\b/i,
+  /\blook up\b/i,
+  /\bsearch the web\b/i,
+  /\bsearch online\b/i,
+  /\bthis (week|month|year)\b/i,
+  /\bas of\b/i,
+  /\bright now\b/i,
+  /\b20(2[4-9]|3[0-9])\b/i,
+  /\blive\b/i
+];
+
+function isResearchQuery(text) {
+
+  if (!text) {
+    return false;
+  }
+
+  var t =
+    String(text).toLowerCase();
+
+  for (
+    var i = 0;
+    i < RESEARCH_PATTERNS.length;
+    i++
+  ) {
+
+    if (
+      RESEARCH_PATTERNS[i].test(t)
+    ) {
+      return true;
+    }
+
+  }
+
+  return false;
+
+}
 
 /* ==========================================================
    UTILITIES
@@ -3132,7 +3172,7 @@ function renderMarkdown(
 
   source =
     source.replace(
-      /```([A-Za-z0-9_+#.-]*)\n?([\s\S]*?)```/g
+      /```([A-Za-z0-9_+#.-]*)\n?([\s\S]*?)```/g,
       function (
         match,
         language,
@@ -3216,23 +3256,24 @@ function renderMarkdown(
     source.replace(
       /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
       function (
-        match,
+        match +=,
         label,
         url
-      ) {
+      )
+ {
 
         var safe =
           safeURL(
-            url
+                     url
           );
 
-        if (!safe) {
+        if (!safe) "< {
           return label;
         }
 
         return (
-          '<a href="' +
-          escapeHTML(
+li          '<a href="' +
+          escapeHTML>"(
             safe
           ) +
           '" target="_blank" rel="noopener noreferrer">' +
@@ -3332,10 +3373,6 @@ function renderMarkdown(
         return;
 
       }
-
-      /*
-       * Tokens are kept safe.
-       */
 
       var h3 =
         /^### (.+)$/.exec(
@@ -3472,8 +3509,7 @@ function renderMarkdown(
 
         }
 
-        output +=
-          "<li>" +
+        output +
           ordered[1] +
           "</li>";
 
@@ -3486,10 +3522,6 @@ function renderMarkdown(
       ) {
         closeList();
       }
-
-      /*
-       * Horizontal rule.
-       */
 
       if (
         /^(-{3,}|\*{3,}|_{3,})$/.test(
@@ -4210,6 +4242,18 @@ function updateResearchBadge() {
   }
 
   if (
+    imageMode
+  ) {
+
+    badge.classList.remove(
+      "show"
+    );
+
+    return;
+
+  }
+
+  if (
     isResearchQuery(
       input.value
     )
@@ -4628,24 +4672,11 @@ async function streamChat(
                   '<span class="dot"></span>' +
                 "</div>";
 
-          /*
-           * IMPORTANT:
-           * Only follow stream when the user
-           * is already near the bottom.
-           */
-
           scrollBottom(
             false
           );
 
-        } catch (error) {
-
-          /*
-           * Some providers may send
-           * non-JSON SSE comments.
-           */
-
-        }
+        } catch (error) {}
 
       }
 
@@ -5720,6 +5751,8 @@ $("imageMode").onclick =
       imageMode
     );
 
+    updateResearchBadge();
+
     showToast(
       imageMode
         ? "Image generation enabled"
@@ -6016,10 +6049,6 @@ export default {
 
     try {
 
-      /* ------------------------------------------------------
-         APP
-         ------------------------------------------------------ */
-
       if (
         url.pathname === "/" ||
         url.pathname ===
@@ -6031,10 +6060,6 @@ export default {
         );
 
       }
-
-      /* ------------------------------------------------------
-         HEALTH
-         ------------------------------------------------------ */
 
       if (
         url.pathname ===
@@ -6060,10 +6085,6 @@ export default {
 
       }
 
-      /* ------------------------------------------------------
-         MODELS
-         ------------------------------------------------------ */
-
       if (
         url.pathname ===
           "/api/models" &&
@@ -6076,10 +6097,6 @@ export default {
         );
 
       }
-
-      /* ------------------------------------------------------
-         CHAT
-         ------------------------------------------------------ */
 
       if (
         url.pathname ===
@@ -6095,10 +6112,6 @@ export default {
 
       }
 
-      /* ------------------------------------------------------
-         IMAGE
-         ------------------------------------------------------ */
-
       if (
         url.pathname ===
           "/api/generate-image" &&
@@ -6112,10 +6125,6 @@ export default {
         );
 
       }
-
-      /* ------------------------------------------------------
-         MANIFEST
-         ------------------------------------------------------ */
 
       if (
         url.pathname ===
@@ -6137,10 +6146,6 @@ export default {
 
       }
 
-      /* ------------------------------------------------------
-         SERVICE WORKER
-         ------------------------------------------------------ */
-
       if (
         url.pathname ===
         "/sw.js"
@@ -6158,10 +6163,6 @@ export default {
         );
 
       }
-
-      /* ------------------------------------------------------
-         ICON
-         ------------------------------------------------------ */
 
       if (
         url.pathname ===
