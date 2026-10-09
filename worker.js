@@ -1,830 +1,1150 @@
 
-const PROVIDERS = {
-  codecraft: {
-    name: "CodeCraft",
-    base: "https://www.codecraftapi.com/v1",
-    keyEnv: "CODECRAFT_API_KEY"
-  },
-  cometapi: {
-    name: "CometAPI",
-    base: "https://api.cometapi.com/v1",
-    keyEnv: "COMETAPI_API_KEY"
-  }
+const COMET_BASE = "https://api.cometapi.com/v1";
+const IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
+const DEFAULT_MODEL = "gpt-6-astra";
+
+const MODEL_ALLOWLIST = [
+  "gpt-6-astra",
+  "gpt-6-sol",
+  "gpt-6.1-sol",
+  "claude-opus-5-5",
+  "claude-sonnet-5-5",
+  "grok-4.20-0309-reasoning",
+  "grok-4.7",
+  "mimo-v2.6-pro"
+];
+
+const HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Cache-Control": "no-store"
 };
 
-const DEFAULT_PROVIDER = "codecraft";
-const DEFAULT_MODEL = "";
-const IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
-const MAX_BODY_SIZE = 10 * 1024 * 1024;
-
-const APP_HTML = `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#101010">
-<meta name="description" content="Your personal AI chat workspace">
-<link rel="manifest" href="/manifest.json">
-<title>My AI</title>
-<style>
-:root{color-scheme:dark;--bg:#101010;--panel:#171717;--panel2:#202020;--line:#303030;--text:#f5f5f5;--muted:#a0a0a0;--accent:#d8d8d8}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-button,input,textarea,select{font:inherit}
-button{cursor:pointer}
-button:disabled{opacity:.45;cursor:not-allowed}
-.app{display:flex;height:100dvh;overflow:hidden}
-.sidebar{width:270px;flex-shrink:0;background:#151515;border-right:1px solid var(--line);display:flex;flex-direction:column;padding:14px;gap:12px;z-index:5}
-.brand{display:flex;align-items:center;gap:10px;font-size:19px;font-weight:700;padding:8px 4px}
-.logo{width:32px;height:32px;border-radius:11px;background:#f2f2f2;color:#111;display:grid;place-items:center;font-weight:900}
-.btn{border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:11px;padding:10px 12px}
-.btn:hover{background:#2b2b2b}
-.btn.primary{background:#f0f0f0;color:#111;border-color:#f0f0f0;font-weight:650}
-.btn.full{width:100%;text-align:left}
-.sidebar-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:8px 4px 0}
-.history{flex:1;overflow:auto;display:flex;flex-direction:column;gap:4px}
-.history-item{display:flex;gap:6px;align-items:center;border-radius:9px;padding:8px 9px;color:#ddd}
-.history-item.active,.history-item:hover{background:#252525}
-.history-title{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer}
-.icon-btn{border:0;background:transparent;color:#aaa;border-radius:8px;padding:6px}
-.icon-btn:hover{background:#333;color:white}
-.side-bottom{display:grid;gap:7px}
-.main{flex:1;min-width:0;display:flex;flex-direction:column;position:relative}
-.topbar{height:60px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:0 18px}
-.topbar-title{font-weight:650;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.select{background:#1c1c1c;color:#eee;border:1px solid var(--line);border-radius:9px;padding:8px;max-width:190px;min-width:0}
-.content{flex:1;overflow:auto;scroll-behavior:smooth}
-.welcome{max-width:760px;margin:12vh auto 30px;padding:20px}
-.welcome h1{font-size:clamp(28px,5vw,42px);letter-spacing:-1.5px;line-height:1.15;margin:0 0 12px}
-.sub{color:var(--muted)}
-.suggestions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:28px}
-.suggestion{background:#181818;border:1px solid var(--line);color:#ddd;border-radius:14px;padding:14px;text-align:left}
-.suggestion:hover{background:#222}
-.messages{max-width:850px;margin:0 auto;padding:25px 22px 36px}
-.message{display:flex;gap:12px;margin:0 0 26px;min-width:0}
-.avatar{width:30px;height:30px;border:1px solid var(--line);border-radius:10px;display:grid;place-items:center;flex-shrink:0;font-size:12px;background:#1c1c1c}
-.message-body{flex:1;min-width:0;overflow-wrap:anywhere}
-.message-head{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:650;margin-bottom:5px}
-.message-text{line-height:1.75}
-.message-text p{margin:0 0 12px}
-.message-text h1,.message-text h2,.message-text h3{line-height:1.3;margin:22px 0 10px}
-.message-text h1{font-size:1.5em}.message-text h2{font-size:1.3em}.message-text h3{font-size:1.12em}
-.message-text ul,.message-text ol{padding-left:24px}
-.message-text blockquote{margin:12px 0;border-left:3px solid #666;padding:4px 14px;color:#bbb}
-.message-text a{color:#c5dfff}
-.message-text pre{position:relative;overflow:auto;background:#090909;border:1px solid #303030;border-radius:12px;padding:42px 14px 14px;margin:12px 0;white-space:pre}
-.message-text code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em}
-.message-text p code,.message-text li code{background:#292929;border-radius:5px;padding:2px 5px}
-.message-text pre code{background:none;padding:0}
-.code-copy{position:absolute;right:8px;top:7px}
-.msg-tools{display:flex;gap:4px;margin-top:7px;opacity:.85}
-.msg-tools button{font-size:12px}
-.message-image{display:block;max-width:min(100%,600px);max-height:520px;object-fit:contain;border-radius:12px;border:1px solid var(--line);margin:10px 0}
-.file-chip{font-size:12px;border:1px solid var(--line);background:#202020;border-radius:8px;padding:5px 8px;display:inline-block;margin:0 0 8px;color:#ccc}
-.composer-area{padding:10px 18px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--bg) 20%)}
-.composer{max-width:850px;margin:auto;border:1px solid #3a3a3a;border-radius:19px;background:#1b1b1b;padding:10px 12px;box-shadow:0 8px 32px #0003}
-.composer textarea{width:100%;resize:none;max-height:190px;min-height:42px;border:0;outline:0;background:transparent;color:#fff;padding:8px;font-size:15px;line-height:1.55}
-.composer-bottom{display:flex;align-items:center;gap:7px}
-.composer-bottom .spacer{flex:1}
-.round{width:39px;height:39px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);background:#2b2b2b;color:white;font-size:17px}
-.round.send{background:#f5f5f5;color:#111;border-color:#f5f5f5}
-.round.selected{background:#424242;border-color:#777}
-.hint{text-align:center;color:#777;font-size:11px;margin-top:8px}
-.status{font-size:12px;color:#aaa;padding:0 4px;min-height:18px}
-.attachments{display:flex;gap:6px;flex-wrap:wrap}
-.attachment{font-size:12px;background:#303030;border-radius:8px;padding:4px 8px;display:flex;align-items:center;gap:6px}
-.overlay{display:none;position:fixed;inset:0;background:#0009;z-index:10}
-.overlay.show{display:block}
-.drawer{position:absolute;left:0;top:0;bottom:0;width:min(300px,85vw);background:#151515;padding:14px;display:flex;flex-direction:column;gap:12px}
-.modal-backdrop{position:fixed;inset:0;background:#000a;display:none;place-items:center;z-index:20;padding:18px}
-.modal-backdrop.show{display:grid}
-.modal{width:min(500px,100%);max-height:85dvh;overflow:auto;background:#191919;border:1px solid var(--line);border-radius:16px;padding:20px}
-.modal h2{margin-top:0}
-.modal textarea,.modal input{width:100%;background:#101010;color:white;border:1px solid var(--line);border-radius:9px;padding:10px;margin:6px 0 12px}
-.modal textarea{min-height:130px}
-.hidden{display:none!important}
-.toast{position:fixed;bottom:105px;left:50%;transform:translateX(-50%);background:#ededed;color:#111;padding:9px 15px;border-radius:10px;font-size:13px;z-index:40;box-shadow:0 4px 20px #0006}
-@media(max-width:700px){.sidebar{display:none}.topbar{padding:0 10px;height:56px}.topbar .select{max-width:125px;font-size:12px;padding:7px}.welcome{margin:8vh auto 20px;padding:18px}.suggestions{grid-template-columns:1fr}.messages{padding:20px 13px 25px}.composer-area{padding:8px 10px calc(10px + env(safe-area-inset-bottom))}.message{gap:9px}.avatar{width:27px;height:27px}.hint{font-size:10px}}
-</style>
-</head>
-<body>
-<div class="app">
-<aside class="sidebar">
-<div class="brand"><div class="logo">M</div><span>My AI</span></div>
-<button class="btn full primary" id="newChat">＋ New chat</button>
-<button class="btn full" id="searchChats">⌕ Search chats</button>
-<div class="sidebar-label">Recent chats</div>
-<div class="history" id="history"></div>
-<div class="side-bottom">
-<button class="btn full" id="memoryBtn">▤ Local memory</button>
-<button class="btn full" id="installBtn">⇩ Install app</button>
-<button class="btn full" id="clearBtn">Clear chat history</button>
-<div class="status" id="modelStatus">Connecting…</div>
-</div>
-</aside>
-<main class="main">
-<header class="topbar">
-<button class="icon-btn" id="menuBtn" aria-label="Open menu">☰</button>
-<div class="topbar-title" id="topTitle">New chat</div>
-<select class="select" id="providerSelect" aria-label="API provider">
-<option value="codecraft">CodeCraft</option>
-<option value="cometapi">CometAPI</option>
-</select>
-<select class="select" id="modelSelect" aria-label="AI model">
-<option value="">Loading models…</option>
-</select>
-</header>
-<section class="content" id="content">
-<div class="welcome" id="welcome">
-<h1>What can I help with?</h1>
-<div class="sub">Your personal AI workspace. Ask, create, explore and learn.</div>
-<div class="suggestions">
-<button class="suggestion" data-prompt="Explain a difficult topic in simple English, step by step.">✦ Learn something new<br><span class="sub">Clear, simple explanations</span></button>
-<button class="suggestion" data-prompt="Help me write clean, reliable code. Explain the solution and common mistakes.">⌘ Write or debug code<br><span class="sub">Understand the solution</span></button>
-<button class="suggestion" data-prompt="Research this topic. If live web search is available, use recent sources and clearly cite them.">⌕ Research a topic<br><span class="sub">Sources when actually available</span></button>
-<button class="suggestion" data-prompt="Give me three creative ideas for a useful personal project, with a practical first step for each.">✧ Brainstorm ideas<br><span class="sub">Turn ideas into a plan</span></button>
-</div>
-</div>
-<div class="messages hidden" id="messages"></div>
-</section>
-<div class="composer-area">
-<div class="composer">
-<div class="attachments" id="attachments"></div>
-<textarea id="prompt" rows="1" placeholder="Message My AI…" aria-label="Message"></textarea>
-<div class="composer-bottom">
-<button class="round" id="attachBtn" title="Attach a file">＋</button>
-<button class="round" id="imageModeBtn" title="Generate an image">▧</button>
-<div class="spacer"></div>
-<button class="round" id="stopBtn" title="Stop generating" disabled>■</button>
-<button class="round send" id="sendBtn" title="Send message">↑</button>
-</div>
-</div>
-<div class="hint">AI can make mistakes. Check important information.</div>
-<input id="fileInput" class="hidden" type="file" multiple accept="image/*,.txt,.md,.json,.csv,.js,.ts,.py,.html,.css,.xml,.yaml,.yml,.log">
-</div>
-</main>
-</div>
-<div class="overlay" id="overlay"><div class="drawer">
-<div class="brand"><div class="logo">M</div><span>My AI</span><button class="icon-btn" id="closeMenu" style="margin-left:auto">✕</button></div>
-<button class="btn full primary" id="drawerNew">＋ New chat</button>
-<div class="sidebar-label">Recent chats</div><div class="history" id="drawerHistory"></div>
-<button class="btn full" id="drawerMemory">▤ Local memory</button>
-<button class="btn full" id="drawerClear">Clear chat history</button>
-</div></div>
-<div class="modal-backdrop" id="memoryModal">
-<div class="modal"><h2>Local memory</h2><p class="sub">Saved only in this browser on this device. Add preferences or context you want the AI to use.</p>
-<textarea id="memoryText" placeholder="Example: Explain things in simple English."></textarea>
-<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" id="memoryCancel">Cancel</button><button class="btn primary" id="memorySave">Save memory</button></div></div>
-</div>
-<div class="modal-backdrop" id="searchModal">
-<div class="modal"><h2>Search chats</h2><input id="searchInput" placeholder="Search chat titles and messages">
-<div id="searchResults"></div><div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn" id="searchClose">Close</button></div></div>
-</div>
-<div id="toast" class="toast hidden"></div>
-<script>
-(function(){
-"use strict";
-var $=function(id){return document.getElementById(id)};
-var KEYS={history:"my_ai_history_v10",current:"my_ai_current_v10",memory:"my_ai_memory_v10",model:"my_ai_model_v10",provider:"my_ai_provider_v10"};
-var chats=[],currentId="",memory="",busy=false,controller=null,attachments=[],imageMode=false,toastTimer=null;
-var deferredInstall=null;
-var tick=String.fromCharCode(96);
-function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
-function safeParse(value,fallback){try{return JSON.parse(value)}catch(e){return fallback}}
-function save(){try{localStorage.setItem(KEYS.history,JSON.stringify(chats));localStorage.setItem(KEYS.current,currentId)}catch(e){notify("Browser storage is full. Try clearing older chats.")}}
-function notify(message){var t=$("toast");t.textContent=message;t.classList.remove("hidden");clearTimeout(toastTimer);toastTimer=setTimeout(function(){t.classList.add("hidden")},2600)}
-function escapeHTML(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}
-function currentChat(){return chats.find(function(c){return c.id===currentId})}
-function createChat(){var c={id:uid(),title:"New chat",messages:[],updated:Date.now()};chats.unshift(c);currentId=c.id;save();renderAll();closeDrawer();$("prompt").focus()}
-function chooseChat(id){if(!chats.some(function(c){return c.id===id}))return;currentId=id;save();renderAll();closeDrawer()}
-function closeDrawer(){$("overlay").classList.remove("show")}
-function renderHistory(targetId){
-var root=$(targetId);root.innerHTML="";
-chats.slice().sort(function(a,b){return b.updated-a.updated}).forEach(function(c){
-var row=document.createElement("div");row.className="history-item"+(c.id===currentId?" active":"");
-var title=document.createElement("div");title.className="history-title";title.textContent=c.title||"New chat";title.onclick=function(){chooseChat(c.id)};
-var del=document.createElement("button");del.className="icon-btn";del.textContent="×";del.title="Delete chat";del.onclick=function(e){e.stopPropagation();if(!confirm("Delete this chat?"))return;chats=chats.filter(function(x){return x.id!==c.id});if(currentId===c.id)currentId=chats.length?chats[0].id:"";if(!currentId){createChat();return}save();renderAll()};
-row.appendChild(title);row.appendChild(del);root.appendChild(row)
-})
-}
-function renderAll(){renderHistory("history");renderHistory("drawerHistory");renderMessages();var c=currentChat();$("topTitle").textContent=c?(c.title||"New chat"):"New chat"}
-function scrollBottom(force){if(force)$("content").scrollTop=$("content").scrollHeight}
-function formatInline(text){
-var parts=text.split(tick),out="";
-for(var i=0;i<parts.length;i++){
-if(i%2===1){out+="<code>"+escapeHTML(parts[i])+"</code>";continue}
-var s=escapeHTML(parts[i]);
-s=s.replace(/\\*\\*(.+?)\\*\\*/g,"<strong>$1</strong>").replace(/~~(.+?)~~/g,"<del>$1</del>").replace(/\\*(?!\\s)(.+?)(?<!\\s)\\*/g,"<em>$1</em>");
-s=s.replace(/\\[([^\\]]+)\\]\\((https?:\\/\\/[^\\s)]+)\\)/g,'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
-out+=s
-}
-return out
-}
-function markdown(src){
-var lines=String(src||"").replace(/\\r/g,"").split("\\n"),out=[],para=[],inCode=false,code=[],codeLang="";
-function flush(){if(para.length){out.push("<p>"+para.map(formatInline).join("<br>")+"</p>");para=[]}}
-function flushCode(){out.push('<pre><button class="btn code-copy" data-copy-code="1">Copy code</button><code>'+escapeHTML(code.join("\\n"))+"</code></pre>");code=[]}
-for(var i=0;i<lines.length;i++){
-var line=lines[i],trim=line.trim();
-if(trim.startsWith(tick.repeat(3))){
-if(!inCode){flush();inCode=true;codeLang=trim.slice(3).trim();code=[]}else{flushCode();inCode=false}
-continue
-}
-if(inCode){code.push(line);continue}
-if(!trim){flush();continue}
-var hm=trim.match(/^(#{1,3})\\s+(.+)$/);
-if(hm){flush();var level=hm[1].length;out.push("<h"+level+">"+formatInline(hm[2])+"</h"+level+">");continue}
-if(/^[-*_]{3,}$/.test(trim)){flush();out.push("<hr>");continue}
-if(trim.startsWith(">")){flush();out.push("<blockquote>"+formatInline(trim.replace(/^>\\s?/,""))+"</blockquote>");continue}
-var ul=trim.match(/^[-*+]\\s+(.+)$/),ol=trim.match(/^\\d+[.)]\\s+(.+)$/);
-if(ul||ol){
-flush();var tag=ul?"ul":"ol",items=[];
-while(i<lines.length){var m=lines[i].trim().match(ul?/^[-*+]\\s+(.+)$/:/^\\d+[.)]\\s+(.+)$/);if(!m){i--;break}items.push("<li>"+formatInline(m[1])+"</li>");i++}
-out.push("<"+tag+">"+items.join("")+"</"+tag+">");continue
-}
-para.push(line)
-}
-if(inCode)flushCode();flush();return out.join("\\n")
-}
-function renderMessages(){
-var c=currentChat(),root=$("messages"),welcome=$("welcome");
-if(!c||!c.messages.length){welcome.classList.remove("hidden");root.classList.add("hidden");root.innerHTML="";return}
-welcome.classList.add("hidden");root.classList.remove("hidden");root.innerHTML="";
-c.messages.forEach(function(m,index){
-var row=document.createElement("article");row.className="message";
-var avatar=document.createElement("div");avatar.className="avatar";avatar.textContent=m.role==="user"?"Y":"M";
-var body=document.createElement("div");body.className="message-body";
-var head=document.createElement("div");head.className="message-head";head.textContent=m.role==="user"?"You":"My AI";
-body.appendChild(head);
-if(m.fileNames&&m.fileNames.length){m.fileNames.forEach(function(n){var chip=document.createElement("div");chip.className="file-chip";chip.textContent="📎 "+n;body.appendChild(chip)})}
-var text=document.createElement("div");text.className="message-text";
-if(m.content)text.innerHTML=markdown(m.content);
-if(m.imageUrl){var img=document.createElement("img");img.className="message-image";img.alt="Generated image";img.src=m.imageUrl;text.appendChild(img)}
-if(!m.content&&!m.imageUrl&&m.role==="assistant")text.innerHTML='<span class="sub">No response content was returned.</span>';
-body.appendChild(text);
-var tools=document.createElement("div");tools.className="msg-tools";
-if(m.content){var cp=document.createElement("button");cp.className="icon-btn";cp.textContent="Copy";cp.onclick=function(){copyText(m.content)};tools.appendChild(cp)}
-if(m.role==="assistant"&&m.content){var regen=document.createElement("button");regen.className="icon-btn";regen.textContent="Regenerate";regen.onclick=function(){regenerate(index)};tools.appendChild(regen)}
-if(tools.childNodes.length)body.appendChild(tools);
-row.appendChild(avatar);row.appendChild(body);root.appendChild(row)
-});
-root.querySelectorAll("[data-copy-code]").forEach(function(btn){btn.onclick=function(){var code=btn.parentElement.querySelector("code");copyText(code?code.textContent:"")}});
-if(!busy)scrollBottom(false)
-}
-function copyText(text){if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(String(text)).then(function(){notify("Copied")}).catch(function(){fallbackCopy(text)})}else fallbackCopy(text)}
-function fallbackCopy(text){var ta=document.createElement("textarea");ta.value=String(text);ta.style.position="fixed";ta.style.opacity="0";document.body.appendChild(ta);ta.select();try{var ok=document.execCommand("copy");notify(ok?"Copied":"Could not copy automatically")}catch(e){notify("Could not copy automatically")}ta.remove()}
-function updateAttachments(){var root=$("attachments");root.innerHTML="";attachments.forEach(function(a,i){var chip=document.createElement("div");chip.className="attachment";chip.textContent=a.name;var x=document.createElement("button");x.className="icon-btn";x.textContent="×";x.onclick=function(){attachments.splice(i,1);updateAttachments()};chip.appendChild(x);root.appendChild(chip)})}
-function readFile(file){return new Promise(function(resolve,reject){var r=new FileReader();r.onload=function(){resolve(r.result)};r.onerror=function(){reject(new Error("Could not read "+file.name))};r.readAsDataURL(file)})}
-async function addFiles(files){
-for(var i=0;i<files.length;i++){
-var f=files[i];if(f.size>8*1024*1024){notify(f.name+" is larger than 8 MB");continue}
-try{
-if(f.type.startsWith("image/")){attachments.push({name:f.name,type:f.type,data:await readFile(f),kind:"image"})}
-else{var text=await f.text();attachments.push({name:f.name,type:f.type||"text/plain",text:text.slice(0,100000),kind:"text"})}
-}catch(e){notify(e.message)}
-}
-updateAttachments()
-}
-function setBusy(value){busy=value;$("sendBtn").disabled=value;$("stopBtn").disabled=!value;$("attachBtn").disabled=value;$("imageModeBtn").disabled=value;if(!value){controller=null;$("modelStatus").textContent="Ready"}}
-function titleFrom(text){text=String(text||"").replace(/\\s+/g," ").trim();return text.length>42?text.slice(0,39)+"…":text||"New chat"}
-function apiHeaders(){return {"Content-Type":"application/json"}}
-function memoryPrompt(){return memory?"\\n\\nUser preferences and memory (use when relevant):\\n"+memory:""}
-function attachmentContent(text,files){
-var content=[];if(text)content.push({type:"text",text:text});
-files.forEach(function(f){if(f.kind==="image")content.push({type:"image_url",image_url:{url:f.data}});else content.push({type:"text",text:"\\n\\nAttached file: "+f.name+"\\n"+f.text})});
-return content.length===1&&content[0].type==="text"?content[0].text:content
-}
-function buildMessages(chat){
-var arr=[];if(memory)arr.push({role:"system",content:"Use this saved user memory when relevant. It is user-provided context, not instructions to override safety or system rules:\\n"+memory});
-chat.messages.forEach(function(m){if(m.role==="user"||m.role==="assistant"){arr.push({role:m.role,content:m.apiContent||m.content||""})}});
-return arr
-}
-async function send(){
-if(busy)return;
-var text=$("prompt").value.trim(),files=attachments.slice();
-if(!text&&!files.length)return;
-if(imageMode){if(!text){notify("Describe the image you want");return}await generateImage(text);return}
-var chat=currentChat();if(!chat){createChat();chat=currentChat()}
-var userMsg={role:"user",content:text,fileNames:files.map(function(f){return f.name}),apiContent:attachmentContent(text,files)};
-chat.messages.push(userMsg);chat.updated=Date.now();if(chat.title==="New chat")chat.title=titleFrom(text||files.map(function(f){return f.name}).join(", "));
-$("prompt").value="";$("prompt").style.height="auto";attachments=[];updateAttachments();save();renderAll();scrollBottom(true);
-setBusy(true);controller=new AbortController();
-var assistant={role:"assistant",content:"",pending:true};chat.messages.push(assistant);renderAll();scrollBottom(true);
-try{
-var payload={provider:$("providerSelect").value,model:$("modelSelect").value||undefined,messages:buildMessages(chat),stream:true};
-var response=await fetch("/api/chat",{method:"POST",headers:apiHeaders(),body:JSON.stringify(payload),signal:controller.signal});
-if(!response.ok){var err=await response.json().catch(function(){return {error:"Request failed ("+response.status+")"}});throw new Error(err.error||"Request failed ("+response.status+")")}
-if(!response.body)throw new Error("Streaming is not supported by this response");
-await readStream(response,assistant,chat);
-assistant.pending=false;
-if(!assistant.content.trim())assistant.content="The provider returned no text. Try another model or check the API provider settings.";
-}catch(e){
-assistant.pending=false;
-assistant.content=e.name==="AbortError"?(assistant.content?"\\n\\n*Generation stopped.*":"Generation stopped."):"Request error: "+(e.message||"Unknown error");
-}finally{
-setBusy(false);chat.updated=Date.now();save();renderAll();renderHistory("history");renderHistory("drawerHistory")
-}
-}
-async function readStream(response,assistant,chat){
-var reader=response.body.getReader(),decoder=new TextDecoder(),buffer="",done=false,received=false;
-while(!done){
-var result=await reader.read();done=result.done;
-buffer+=decoder.decode(result.value||new Uint8Array(),{stream:!done});
-var lines=buffer.split("\\n");buffer=lines.pop()||"";
-for(var i=0;i<lines.length;i++){
-var line=lines[i].replace(/\\r$/,"").trim();
-if(!line||line.startsWith(":")||!line.startsWith("data:"))continue;
-var raw=line.slice(5).trim();if(raw==="[DONE]"){done=true;break}
-var obj;try{obj=JSON.parse(raw)}catch(e){continue}
-if(obj.error)throw new Error(typeof obj.error==="string"?obj.error:(obj.error.message||"Provider error"));
-var delta=obj.choices&&obj.choices[0]&&obj.choices[0].delta;
-var piece=delta&&delta.content;
-if(Array.isArray(piece))piece=piece.map(function(p){return p.text||""}).join("");
-if(typeof piece==="string"&&piece){assistant.content+=piece;received=true;renderMessages();if($("content").scrollTop+ $("content").clientHeight >= $("content").scrollHeight-160)scrollBottom(true)}
-}
-}
-if(buffer.trim().startsWith("data:")){
-var rawEnd=buffer.trim().slice(5).trim();if(rawEnd&&rawEnd!=="[DONE]"){try{var objEnd=JSON.parse(rawEnd);var d=objEnd.choices&&objEnd.choices[0]&&objEnd.choices[0].delta;var p=d&&d.content;if(typeof p==="string")assistant.content+=p}catch(e){}}
-}
-if(!received&&!assistant.content)assistant.content=""
-}
-async function generateImage(prompt){
-var chat=currentChat();if(!chat){createChat();chat=currentChat()}
-chat.messages.push({role:"user",content:"Generate an image: "+prompt});if(chat.title==="New chat")chat.title=titleFrom(prompt);save();renderAll();scrollBottom(true);
-setBusy(true);controller=new AbortController();
-try{
-var response=await fetch("/api/generate-image",{method:"POST",headers:apiHeaders(),body:JSON.stringify({prompt:prompt,provider:$("providerSelect").value}),signal:controller.signal});
-var data=await response.json();if(!response.ok)throw new Error(data.error||"Image generation failed");
-chat.messages.push({role:"assistant",content:"Generated image",imageUrl:data.image});
-}catch(e){chat.messages.push({role:"assistant",content:"Image generation error: "+e.message})}
-finally{setBusy(false);imageMode=false;$("imageModeBtn").classList.remove("selected");$("prompt").placeholder="Message My AI…";chat.updated=Date.now();save();renderAll();scrollBottom(true)}
-}
-function stop(){if(controller)controller.abort();setBusy(false)}
-async function regenerate(index){
-if(busy)return;var chat=currentChat();if(!chat)return;
-if(index<0||index>=chat.messages.length||chat.messages[index].role!=="assistant")return;
-chat.messages=chat.messages.slice(0,index);save();renderAll();
-var lastUser=-1;for(var i=chat.messages.length-1;i>=0;i--){if(chat.messages[i].role==="user"){lastUser=i;break}}
-if(lastUser<0)return;
-var original=chat.messages.slice(lastUser+1);chat.messages=chat.messages.slice(0,lastUser+1);save();renderAll();
-var assistant={role:"assistant",content:"",pending:true};chat.messages.push(assistant);setBusy(true);controller=new AbortController();
-try{
-var response=await fetch("/api/chat",{method:"POST",headers:apiHeaders(),body:JSON.stringify({provider:$("providerSelect").value,model:$("modelSelect").value||undefined,messages:buildMessages(chat),stream:true}),signal:controller.signal});
-if(!response.ok){var err=await response.json().catch(function(){return {error:"Request failed"}});throw new Error(err.error||"Request failed")}
-await readStream(response,assistant,chat);assistant.pending=false;
-}catch(e){assistant.pending=false;assistant.content="Request error: "+e.message}
-finally{setBusy(false);chat.updated=Date.now();save();renderAll();scrollBottom(true)}
-}
-async function loadModels(){
-var provider=$("providerSelect").value,select=$("modelSelect"),status=$("modelStatus");
-select.innerHTML='<option value="">Loading models…</option>';status.textContent="Loading models…";
-var lastError="";
-for(var attempt=0;attempt<3;attempt++){
-var ctrl=new AbortController(),timer=setTimeout(function(){ctrl.abort()},12000);
-try{
-var r=await fetch("/api/models?provider="+encodeURIComponent(provider),{signal:ctrl.signal});var data=await r.json();
-if(!r.ok)throw new Error(data.error||"Could not load models");
-var models=Array.isArray(data.models)?data.models:[];
-select.innerHTML="";
-if(!models.length){select.innerHTML='<option value="">Enter model manually in request</option>';status.textContent="No models listed";return}
-models.forEach(function(m){var opt=document.createElement("option");opt.value=m.id;opt.textContent=m.name||m.id;select.appendChild(opt)});
-var saved=localStorage.getItem(KEYS.model+"_"+provider)||localStorage.getItem(KEYS.model)||"";
-if(models.some(function(m){return m.id===saved}))select.value=saved;
-else if(models.some(function(m){return m.id===DEFAULT_MODEL}))select.value=DEFAULT_MODEL;
-else select.selectedIndex=0;
-status.textContent=models.length+" models available";return
-}catch(e){lastError=e.name==="AbortError"?"Model request timed out":e.message}
-finally{clearTimeout(timer)}
-}
-select.innerHTML='<option value="">Models unavailable</option>';status.textContent="Models unavailable";
-notify(lastError+" — check provider API key");
-}
-function saveSettings(){try{localStorage.setItem(KEYS.provider,$("providerSelect").value);localStorage.setItem(KEYS.model+"_"+$("providerSelect").value,$("modelSelect").value)}catch(e){}}
-function loadState(){
-try{chats=safeParse(localStorage.getItem(KEYS.history)||"[]",[]);if(!Array.isArray(chats))chats=[];chats=chats.filter(function(c){return c&&typeof c.id==="string"&&Array.isArray(c.messages)});memory=localStorage.getItem(KEYS.memory)||"";currentId=localStorage.getItem(KEYS.current)||"";if(!chats.some(function(c){return c.id===currentId}))currentId=chats.length?chats[0].id:"";if(!currentId){var c={id:uid(),title:"New chat",messages:[],updated:Date.now()};chats.unshift(c);currentId=c.id}var provider=localStorage.getItem(KEYS.provider);if(provider&&PROVIDER_VALUES.indexOf(provider)>=0)$("providerSelect").value=provider}catch(e){chats=[];memory="";var c={id:uid(),title:"New chat",messages:[],updated:Date.now()};chats=[c];currentId=c.id}
-}
-var PROVIDER_VALUES=["codecraft","cometapi"];
-function openMemory(){$("memoryText").value=memory;$("memoryModal").classList.add("show")}
-function runSearch(){
-var q=$("searchInput").value.trim().toLowerCase(),root=$("searchResults");root.innerHTML="";
-var matches=chats.filter(function(c){return !q||(c.title+" "+c.messages.map(function(m){return m.content||""}).join(" ")).toLowerCase().includes(q)}).slice(0,30);
-if(!matches.length){root.textContent="No matching chats.";return}
-matches.forEach(function(c){var b=document.createElement("button");b.className="btn full";b.style.margin="4px 0";b.textContent=c.title||"New chat";b.onclick=function(){$("searchModal").classList.remove("show");chooseChat(c.id)};root.appendChild(b)})
-}
-$("newChat").onclick=createChat;$("drawerNew").onclick=createChat;
-$("menuBtn").onclick=function(){$("overlay").classList.add("show")};$("closeMenu").onclick=closeDrawer;$("overlay").onclick=function(e){if(e.target===$("overlay"))closeDrawer()};
-$("memoryBtn").onclick=openMemory;$("drawerMemory").onclick=openMemory;
-$("memoryCancel").onclick=function(){$("memoryModal").classList.remove("show")};
-$("memorySave").onclick=function(){memory=$("memoryText").value.trim();try{localStorage.setItem(KEYS.memory,memory)}catch(e){}$("memoryModal").classList.remove("show");notify("Memory saved on this device")};
-$("clearBtn").onclick=$("drawerClear").onclick=function(){if(!confirm("Delete all chat history on this device?"))return;chats=[];currentId="";save();createChat();notify("Chat history cleared")};
-$("searchChats").onclick=function(){$("searchModal").classList.add("show");$("searchInput").value="";runSearch();$("searchInput").focus()};
-$("searchClose").onclick=function(){$("searchModal").classList.remove("show")};$("searchInput").oninput=runSearch;
-$("sendBtn").onclick=send;$("stopBtn").onclick=stop;
-$("prompt").addEventListener("keydown",function(e){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send()}});
-$("prompt").addEventListener("input",function(){this.style.height="auto";this.style.height=Math.min(this.scrollHeight,190)+"px"});
-$("attachBtn").onclick=function(){$("fileInput").click()};
-$("fileInput").onchange=function(){addFiles(Array.from(this.files||[]));this.value=""};
-$("imageModeBtn").onclick=function(){imageMode=!imageMode;this.classList.toggle("selected",imageMode);$("prompt").placeholder=imageMode?"Describe the image to generate…":"Message My AI…";$("prompt").focus();if(imageMode)notify("Image generation mode enabled")};
-document.querySelectorAll("[data-prompt]").forEach(function(b){b.onclick=function(){$("prompt").value=b.getAttribute("data-prompt");$("prompt").focus();$("prompt").dispatchEvent(new Event("input"))}});
-$("providerSelect").onchange=function(){saveSettings();loadModels()};
-$("modelSelect").onchange=saveSettings;
-$("installBtn").onclick=function(){if(deferredInstall){deferredInstall.prompt();deferredInstall=null}else notify("On iPhone: open Share, then Add to Home Screen")};
-window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();deferredInstall=e});
-window.addEventListener("online",function(){notify("Back online")});
-if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("/sw.js").catch(function(){})})}
-loadState();renderAll();loadModels();
-})();
-</script>
-</body>
-</html>`;
-
-function corsHeaders() {
-  return {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type,Authorization",
-    "X-Content-Type-Options": "nosniff"
-  };
-}
-
-function json(data, status = 200) {
+function json(data, status = 200, extra = {}) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
-      ...corsHeaders(),
+      ...HEADERS,
       "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "no-store"
+      ...extra
     }
   });
 }
 
-function html(source) {
-  return new Response(source, {
-    headers: {
-      ...corsHeaders(),
-      "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "no-cache"
-    }
-  });
+function getKey(env) {
+  return env.COMETAPI_API_KEY || "";
 }
 
-function getProvider(name, env) {
-  const key = name || DEFAULT_PROVIDER;
-  const provider = PROVIDERS[key];
-  if (!provider) throw new Error("Unknown API provider.");
-  if (!env[provider.keyEnv]) {
-    throw new Error(provider.name + " API key is missing. Add " + provider.keyEnv + " in Cloudflare Worker Secrets.");
+function messageOf(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function cometRequest(env, path, options = {}, timeout = 20000) {
+  const key = getKey(env);
+
+  if (!key) {
+    throw new Error("COMETAPI_API_KEY is missing in Cloudflare secrets.");
   }
-  return { ...provider, key: env[provider.keyEnv] };
-}
 
-async function readBody(request) {
-  const length = Number(request.headers.get("content-length") || 0);
-  if (length > MAX_BODY_SIZE) throw new Error("Request is too large. Keep uploads below 10 MB.");
-  const text = await request.text();
-  if (text.length > MAX_BODY_SIZE) throw new Error("Request is too large. Keep uploads below 10 MB.");
-  try {
-    return JSON.parse(text || "{}");
-  } catch {
-    throw new Error("Invalid JSON request.");
-  }
-}
-
-async function providerFetch(url, init, timeoutMs = 30000) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let expired = false;
+
+  const timer = setTimeout(() => {
+    expired = true;
+    controller.abort();
+  }, timeout);
+
   try {
-    return await fetch(url, { ...init, signal: controller.signal });
+    const headers = new Headers(options.headers || {});
+    headers.set("Authorization", `Bearer ${key}`);
+    headers.set("Accept", "application/json");
+
+    if (options.body) {
+      headers.set("Content-Type", "application/json");
+    }
+
+    const response = await fetch(COMET_BASE + path, {
+      ...options,
+      headers,
+      signal: controller.signal
+    });
+
+    const text = await response.text();
+
+    if (expired) {
+      throw new Error("CometAPI request timed out.");
+    }
+
+    return { response, text };
   } catch (error) {
-    if (error.name === "AbortError") throw new Error("The API request timed out. Please retry.");
+    if (expired || error?.name === "AbortError") {
+      throw new Error(
+        `CometAPI timed out after ${timeout / 1000} seconds.`
+      );
+    }
     throw error;
   } finally {
     clearTimeout(timer);
   }
 }
 
-function normalizeMessages(messages) {
-  if (!Array.isArray(messages)) return [];
-  return messages
-    .filter(m => m && ["system", "user", "assistant"].includes(m.role))
-    .slice(-60)
-    .map(m => {
-      let content = m.content;
-      if (typeof content !== "string" && !Array.isArray(content)) content = String(content ?? "");
-      if (Array.isArray(content)) {
-        content = content.map(part => {
-          if (!part || typeof part !== "object") return { type: "text", text: String(part ?? "") };
-          if (part.type === "text") return { type: "text", text: String(part.text ?? "") };
-          if (part.type === "image_url" && part.image_url) {
-            return { type: "image_url", image_url: part.image_url };
-          }
-          return { type: "text", text: "" };
-        });
-      }
-      return { role: m.role, content };
-    });
-}
-
-function lastUserText(messages) {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === "user") {
-      const content = messages[i].content;
-      if (typeof content === "string") return content;
-      if (Array.isArray(content)) {
-        return content.map(p => p && p.type === "text" ? p.text : "").join(" ");
-      }
-    }
-  }
-  return "";
-}
-
-function isResearchQuery(text) {
-  return /\b(latest|current|today|tonight|yesterday|this week|this month|recent|news|price|prices|forecast|weather|research|sources|citations|202[5-9]|compare online|look up|search the web|what happened|new release|release date|updates?)\b/i.test(text || "");
-}
-
-function researchPrompt() {
-  return [
-    "You are an accurate research assistant.",
-    "For factual claims, distinguish known information from uncertain information.",
-    "Use live web search only if the API provider/model actually supplies it.",
-    "Never invent sources, URLs, search results, quotations, or citations.",
-    "If live search is unavailable, clearly say that you could not verify current information.",
-    "When real sources are supplied by the provider, cite them clearly.",
-    "Prefer concise, structured answers and state relevant dates."
-  ].join(" ");
-}
-
-function baseSystemPrompt(model, research) {
-  const family = String(model || "").toLowerCase();
-  let style = "Be helpful, accurate, clear, and direct. Use the user's language. Format answers with readable Markdown.";
-  if (/claude|anthropic/.test(family)) {
-    style = "Use careful reasoning, natural prose, useful headings, and a helpful Claude-like writing style. Do not claim hidden reasoning.";
-  } else if (/gpt|openai|o[134]-|chatgpt/.test(family)) {
-    style = "Use a polished ChatGPT-like style: conversational, structured, practical, and concise unless detail is requested.";
-  } else if (/gemini|google/.test(family)) {
-    style = "Use a clear, organized, exploratory style with practical examples when useful.";
-  } else if (/deepseek/.test(family)) {
-    style = "Be technically precise and organized. Explain code and calculations carefully when relevant.";
-  } else if (/llama|meta/.test(family)) {
-    style = "Be direct, approachable, and well structured. Avoid unnecessary filler.";
-  } else if (/qwen/.test(family)) {
-    style = "Be multilingual, precise, and well organized. Use examples when they clarify the answer.";
-  }
-  return style + (research ? " " + researchPrompt() : "");
-}
-
-async function getModels(provider) {
-  const response = await providerFetch(provider.base + "/models", {
-    headers: { Authorization: "Bearer " + provider.key, Accept: "application/json" }
-  }, 15000);
-
-  const raw = await response.text();
-  let data;
+function parseJSON(text, label) {
   try {
-    data = JSON.parse(raw);
+    return JSON.parse(text);
   } catch {
-    throw new Error("The provider returned an unreadable models response.");
+    throw new Error(`${label} returned invalid JSON.`);
   }
+}
+
+function chatModel(model) {
+  if (!model || typeof model.id !== "string") return false;
+
+  const id = model.id.toLowerCase();
+  const type = String(model.type || "").toLowerCase();
+
+  if (/embedding|moderation|rerank|speech-to-text|text-to-speech/.test(id)) {
+    return false;
+  }
+
+  if (/image|audio|video|embedding|moderation/.test(type)) {
+    return false;
+  }
+
+  return true;
+}
+
+function normalizeModel(item) {
+  if (typeof item === "string") {
+    return { id: item, name: item, type: "chat" };
+  }
+
+  if (!item || typeof item !== "object") return null;
+
+  const id = item.id || item.model;
+  if (typeof id !== "string" || !id) return null;
+
+  return {
+    ...item,
+    id,
+    name: item.name || id
+  };
+}
+
+function modelArray(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.models)) return payload.models;
+  if (Array.isArray(payload?.result)) return payload.result;
+  if (Array.isArray(payload?.items)) return payload.items;
+  return [];
+}
+
+async function getModels(env) {
+  const { response, text } = await cometRequest(
+    env,
+    "/models",
+    { method: "GET" },
+    20000
+  );
 
   if (!response.ok) {
-    throw new Error((data.error && data.error.message) || data.message || ("Models request failed (" + response.status + ")."));
+    const detail = response.status === 401 || response.status === 403
+      ? "API key rejected or account access denied. Check Cloudflare secrets."
+      : response.status === 429
+        ? "CometAPI rate limit reached."
+        : text.slice(0, 400);
+
+    throw new Error(`/models failed (${response.status}): ${detail}`);
   }
 
-  const source = Array.isArray(data.data) ? data.data :
-    Array.isArray(data.models) ? data.models :
-    Array.isArray(data) ? data : [];
+  const payload = parseJSON(text, "CometAPI /models");
 
-  return source
-    .map(item => {
-      if (typeof item === "string") return { id: item, name: item };
-      const id = item && (item.id || item.name || item.model);
-      if (!id || typeof id !== "string") return null;
-      return { id, name: item.name || item.id || item.model || id };
-    })
+  const available = modelArray(payload)
+    .map(normalizeModel)
     .filter(Boolean)
-    .filter((item, index, arr) => arr.findIndex(other => other.id === item.id) === index)
-    .slice(0, 500);
+    .filter(chatModel)
+    .filter(model => MODEL_ALLOWLIST.includes(model.id));
+
+  available.sort(
+    (a, b) =>
+      MODEL_ALLOWLIST.indexOf(a.id) - MODEL_ALLOWLIST.indexOf(b.id)
+  );
+
+  if (!available.length) {
+    throw new Error(
+      "No allowlisted model IDs were returned. Check the actual IDs from your CometAPI /models response before changing the allowlist."
+    );
+  }
+
+  return available;
 }
 
-async function handleModels(url, env) {
+async function handleModels(env) {
   try {
-    const provider = getProvider(url.searchParams.get("provider"), env);
-    const models = await getModels(provider);
-    return json({ provider: provider.name, models });
+    const models = await getModels(env);
+
+    return json({
+      ok: true,
+      provider: "cometapi",
+      models,
+      best: models.find(model => model.id === DEFAULT_MODEL) || models[0],
+      error: null
+    });
   } catch (error) {
-    return json({ error: error.message || "Could not load models." }, 502);
+    return json({
+      ok: false,
+      provider: "cometapi",
+      models: [],
+      best: null,
+      error: messageOf(error)
+    }, 502);
   }
+}
+
+function normalizeMessages(input) {
+  if (!Array.isArray(input)) {
+    throw new Error("messages must be an array.");
+  }
+
+  return input
+    .filter(item => item && typeof item === "object")
+    .map(item => {
+      const role = ["system", "user", "assistant"].includes(item.role)
+        ? item.role
+        : "user";
+
+      if (typeof item.content === "string") {
+        return { role, content: item.content };
+      }
+
+      if (Array.isArray(item.content)) {
+        const content = item.content.map(part => {
+          if (part?.type === "text") {
+            return { type: "text", text: String(part.text || "") };
+          }
+
+          if (part?.type === "image_url" && part.image_url) {
+            return {
+              type: "image_url",
+              image_url: part.image_url
+            };
+          }
+
+          return null;
+        }).filter(Boolean);
+
+        return { role, content };
+      }
+
+      return { role, content: String(item.content ?? "") };
+    })
+    .filter(item =>
+      typeof item.content === "string"
+        ? item.content.trim().length > 0
+        : item.content.length > 0
+    );
 }
 
 async function handleChat(request, env) {
   let body;
+
   try {
-    body = await readBody(request);
+    body = await request.json();
+  } catch {
+    return json({ error: "Invalid JSON request body." }, 400);
+  }
+
+  let messages;
+
+  try {
+    messages = normalizeMessages(body.messages);
   } catch (error) {
-    return json({ error: error.message }, 400);
+    return json({ error: messageOf(error) }, 400);
   }
 
-  let provider;
+  if (!messages.length) {
+    return json({ error: "No messages provided." }, 400);
+  }
+
+  let models;
+
   try {
-    provider = getProvider(body.provider, env);
+    models = await getModels(env);
   } catch (error) {
-    return json({ error: error.message }, 400);
+    return json({ error: messageOf(error) }, 502);
   }
 
-  const messages = normalizeMessages(body.messages);
-  if (!messages.length) return json({ error: "Add a message before sending." }, 400);
+  const requested = typeof body.model === "string"
+    ? body.model
+    : DEFAULT_MODEL;
 
-  const model = typeof body.model === "string" ? body.model.trim() : "";
-  if (!model) {
-    return json({ error: "No model selected. Load models and select one, then retry." }, 400);
+  const selected = models.find(model => model.id === requested);
+
+  if (!selected) {
+    return json({
+      error: "Selected model is not available. Refresh the model list.",
+      availableModels: models.map(model => model.id)
+    }, 400);
   }
 
-  const research = body.research === true || isResearchQuery(lastUserText(messages));
-  const system = { role: "system", content: baseSystemPrompt(model, research) };
-  const finalMessages = messages[0] && messages[0].role === "system"
-    ? [system, ...messages.filter(m => m.role !== "system")]
-    : [system, ...messages];
+  const controller = new AbortController();
+  let timedOut = false;
 
-  const payload = {
-    model,
-    messages: finalMessages,
-    stream: true,
-    temperature: research ? 0.2 : 0.7,
-    max_tokens: research ? 8192 : 4096
-  };
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, 120000);
 
-  if (research) {
-    payload.web_search = true;
-    payload.enable_web_search = true;
-    payload.metadata = { web_search: true, research_mode: true };
-  }
-
-  let upstream;
   try {
-    upstream = await providerFetch(provider.base + "/chat/completions", {
+    const response = await fetch(`${COMET_BASE}/chat/completions`, {
       method: "POST",
       headers: {
-        Authorization: "Bearer " + provider.key,
+        Authorization: `Bearer ${getKey(env)}`,
         "Content-Type": "application/json",
-        Accept: "text/event-stream, application/json"
+        Accept: "text/event-stream"
       },
-      body: JSON.stringify(payload)
-    }, 60000);
-  } catch (error) {
-    return json({ error: error.message || "Could not connect to the provider." }, 502);
-  }
+      body: JSON.stringify({
+        model: selected.id,
+        messages,
+        stream: true
+      }),
+      signal: controller.signal
+    });
 
-  if (!upstream.ok) {
-    const raw = await upstream.text();
-    let message = raw;
-    try {
-      const parsed = JSON.parse(raw);
-      message = (parsed.error && (parsed.error.message || parsed.error)) || parsed.message || raw;
-      if (typeof message !== "string") message = JSON.stringify(message);
-    } catch {}
-    return json({
-      error: "Provider error (" + upstream.status + "): " + String(message).slice(0, 1500)
-    }, upstream.status === 429 ? 429 : 502);
-  }
+    if (!response.ok) {
+      const detail = (await response.text()).slice(0, 1200);
+      clearTimeout(timer);
 
-  if (!upstream.body) return json({ error: "The provider returned an empty response." }, 502);
-
-  return new Response(upstream.body, {
-    status: 200,
-    headers: {
-      ...corsHeaders(),
-      "Content-Type": upstream.headers.get("content-type") || "text/event-stream; charset=utf-8",
-      "Cache-Control": "no-cache, no-transform",
-      "X-Accel-Buffering": "no"
+      return json({
+        error: `CometAPI chat failed (${response.status}).`,
+        details: detail,
+        model: selected.id
+      }, response.status);
     }
-  });
+
+    if (!response.body) {
+      clearTimeout(timer);
+      return json({ error: "The provider returned no response stream." }, 502);
+    }
+
+    const reader = response.body.getReader();
+    const encoder = new TextEncoder();
+
+    const stream = new ReadableStream({
+      async pull(output) {
+        try {
+          const result = await reader.read();
+
+          if (result.done) {
+            clearTimeout(timer);
+            output.close();
+            return;
+          }
+
+          output.enqueue(result.value);
+        } catch (error) {
+          clearTimeout(timer);
+
+          const message = timedOut
+            ? "Model response timed out."
+            : `Stream interrupted: ${messageOf(error)}`;
+
+          output.enqueue(
+            encoder.encode(`data: ${JSON.stringify({
+              error: { message }
+            })}\n\ndata: [DONE]\n\n`)
+          );
+
+          output.close();
+        }
+      },
+
+      async cancel(reason) {
+        clearTimeout(timer);
+        controller.abort();
+
+        try {
+          await reader.cancel(reason);
+        } catch {}
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        ...HEADERS,
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        "X-Selected-Model": selected.id
+      }
+    });
+  } catch (error) {
+    clearTimeout(timer);
+
+    return json({
+      error: timedOut
+        ? "CometAPI request timed out."
+        : messageOf(error)
+    }, 502);
+  }
 }
 
-function toBase64(buffer) {
-  const bytes = new Uint8Array(buffer);
+function toBase64(bytes) {
   let binary = "";
-  const step = 0x8000;
-  for (let i = 0; i < bytes.length; i += step) {
-    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + step));
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   }
   return btoa(binary);
 }
 
 async function handleImage(request, env) {
   if (!env.AI) {
-    return json({ error: "Cloudflare AI binding is missing. Check the AI binding in wrangler.jsonc." }, 503);
+    return json({
+      error: "Cloudflare AI binding is missing from wrangler.jsonc."
+    }, 500);
   }
 
   let body;
+
   try {
-    body = await readBody(request);
-  } catch (error) {
-    return json({ error: error.message }, 400);
+    body = await request.json();
+  } catch {
+    return json({ error: "Invalid JSON request body." }, 400);
   }
 
-  const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
-  if (!prompt) return json({ error: "Describe the image you want to generate." }, 400);
-  if (prompt.length > 3000) return json({ error: "Image prompt is too long. Use 3000 characters or fewer." }, 400);
+  const prompt = typeof body.prompt === "string"
+    ? body.prompt.trim()
+    : "";
+
+  if (!prompt) {
+    return json({ error: "Please enter an image prompt." }, 400);
+  }
+
+  if (prompt.length > 4000) {
+    return json({ error: "Image prompt is too long." }, 400);
+  }
 
   try {
     const result = await env.AI.run(IMAGE_MODEL, { prompt });
-    if (result instanceof Response) {
-      const contentType = result.headers.get("content-type") || "image/png";
-      const buffer = await result.arrayBuffer();
-      return json({ image: "data:" + contentType + ";base64," + toBase64(buffer) });
+
+    let image = result?.image ?? result;
+
+    if (typeof image === "string") {
+      return json({
+        ok: true,
+        image: image.startsWith("data:")
+          ? image
+          : `data:image/png;base64,${image}`
+      });
     }
-    if (result && result.image) {
-      if (typeof result.image === "string") {
-        const value = result.image.startsWith("data:") ? result.image : "data:image/png;base64," + result.image;
-        return json({ image: value });
-      }
-      return json({ image: "data:image/png;base64," + toBase64(result.image) });
+
+    if (image instanceof ReadableStream) {
+      image = new Uint8Array(await new Response(image).arrayBuffer());
+    } else if (!(image instanceof Uint8Array)) {
+      image = new Uint8Array(image);
     }
-    if (result instanceof ArrayBuffer || ArrayBuffer.isView(result)) {
-      const buffer = result instanceof ArrayBuffer ? result : result.buffer.slice(result.byteOffset, result.byteOffset + result.byteLength);
-      return json({ image: "data:image/png;base64," + toBase64(buffer) });
-    }
-    return json({ error: "Cloudflare AI returned an unexpected image format." }, 502);
+
+    return json({
+      ok: true,
+      image: `data:image/png;base64,${toBase64(image)}`
+    });
   } catch (error) {
-    return json({ error: "Image generation failed: " + (error.message || "Unknown error") }, 502);
+    return json({
+      error: `Image generation failed: ${messageOf(error)}`
+    }, 502);
   }
 }
 
-const MANIFEST = {
-  name: "My AI",
-  short_name: "My AI",
-  description: "Your personal AI workspace",
-  start_url: "/",
-  display: "standalone",
-  background_color: "#101010",
-  theme_color: "#101010"
-};
+function appHTML() {
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101010">
+<title>My AI</title>
+<style>
+:root{color-scheme:dark;--bg:#101010;--panel:#191919;--line:#303030;--text:#f5f5f5;--muted:#a0a0a0;--accent:#d6d6d6}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer;color:var(--text);background:#242424;border:1px solid #383838;border-radius:12px;padding:9px 13px}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:hover{background:#303030}
+#layout{display:flex;height:100dvh;overflow:hidden}
+aside{width:260px;flex-shrink:0;background:#151515;border-right:1px solid var(--line);padding:14px;display:flex;flex-direction:column;gap:12px}
+.brand{font-size:20px;font-weight:700;padding:8px 4px}
+#history{overflow:auto;display:flex;flex-direction:column;gap:6px}
+.history-item{text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:transparent;border-color:transparent}
+main{min-width:0;flex:1;display:flex;flex-direction:column}
+header{min-height:62px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line)}
+#top-left{display:flex;align-items:center;gap:10px}
+#model{max-width:min(48vw,360px);background:#202020;color:white;border:1px solid #3b3b3b;padding:9px;border-radius:10px}
+#messages{flex:1;overflow:auto;padding:24px max(18px,calc((100% - 820px)/2));scroll-behavior:auto}
+.message{margin:0 0 28px;overflow-wrap:anywhere}
+.role{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px}
+.content{white-space:pre-wrap}
+.content img{max-width:100%;height:auto;border-radius:14px}
+.content pre{overflow:auto;background:#090909;border:1px solid var(--line);border-radius:12px;padding:14px}
+.content code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.content p{margin:.4em 0 1em}
+.content blockquote{border-left:3px solid #666;margin:12px 0;padding-left:14px;color:#ccc}
+.actions{display:flex;gap:7px;margin-top:10px}
+.actions button{font-size:12px;padding:5px 9px}
+#composer-wrap{padding:12px 16px calc(14px + env(safe-area-inset-bottom));}
+#composer{max-width:820px;margin:auto;border:1px solid #3b3b3b;background:#1c1c1c;border-radius:18px;padding:10px}
+#prompt{width:100%;resize:vertical;min-height:60px;max-height:220px;background:transparent;color:white;border:0;outline:none;padding:8px}
+#composer-tools{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+#status{font-size:12px;color:var(--muted);padding:4px 8px}
+#file{display:none}
+#preview{display:flex;gap:8px;flex-wrap:wrap}
+#preview img{width:64px;height:64px;object-fit:cover;border-radius:9px}
+.small{font-size:12px;color:var(--muted)}
+#notice{padding:10px 14px;color:#ffcf9e;display:none}
+@media(max-width:700px){
+ aside{position:fixed;z-index:5;inset:0 auto 0 0;width:280px;transform:translateX(-105%);transition:transform .2s;box-shadow:none}
+ aside.open{transform:translateX(0);box-shadow:0 0 0 100vmax #0008}
+ header{padding:9px}
+ #messages{padding:18px 16px}
+ #composer-wrap{padding:9px}
+ #model{max-width:52vw}
+}
+</style>
+</head>
+<body>
+<div id="layout">
+<aside id="sidebar">
+ <div class="brand">My AI</div>
+ <button id="new-chat">＋ New chat</button>
+ <button id="clear-history">Clear history</button>
+ <div class="small">Your conversations are stored locally on this device.</div>
+ <div id="history"></div>
+ <div style="margin-top:auto" class="small">CometAPI · Models available to your key</div>
+</aside>
+<main>
+ <header>
+  <div id="top-left">
+   <button id="menu" aria-label="Open menu">☰</button>
+   <strong>My AI</strong>
+  </div>
+  <select id="model" aria-label="AI model"><option>Loading models…</option></select>
+ </header>
+ <div id="notice"></div>
+ <section id="messages" aria-live="polite"></section>
+ <div id="composer-wrap">
+  <div id="composer">
+   <div id="preview"></div>
+   <textarea id="prompt" placeholder="Message My AI…" rows="2"></textarea>
+   <div id="composer-tools">
+    <div style="display:flex;gap:7px;flex-wrap:wrap">
+     <button id="attach">＋ Image</button>
+     <input id="file" type="file" accept="image/*">
+     <button id="make-image">Generate image</button>
+     <button id="refresh">Refresh models</button>
+    </div>
+    <button id="send">Send ↑</button>
+   </div>
+  </div>
+  <div class="small" style="max-width:820px;margin:7px auto">AI can make mistakes. Avoid sharing passwords or secret keys.</div>
+ </div>
+</main>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const STORE = "my-ai-single-file-history-v1";
+let chats = [];
+let current = null;
+let attachments = [];
+let busy = false;
+let modelList = [];
 
-const SERVICE_WORKER = `
-const CACHE_NAME = "my-ai-shell-v1";
-self.addEventListener("install", event => {
-  self.skipWaiting();
+function safeParse(value, fallback) {
+  try { return JSON.parse(value) ?? fallback; } catch { return fallback; }
+}
+
+function save() {
+  try { localStorage.setItem(STORE, JSON.stringify({chats,current})); } catch {}
+}
+
+function newChat() {
+  current = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,7),
+    title: "New chat",
+    messages: [],
+    updated: Date.now()
+  };
+  chats.unshift(current);
+  save();
+  render();
+  $("prompt").focus();
+  $("sidebar").classList.remove("open");
+}
+
+function loadState() {
+  const saved = safeParse(localStorage.getItem(STORE), {});
+  chats = Array.isArray(saved.chats) ? saved.chats : [];
+  current = chats.find(chat => chat.id === saved.current) || chats[0] || null;
+  if (!current) newChat();
+  else render();
+}
+
+function esc(value) {
+  return String(value).replace(/[&<>"']/g, char => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  })[char]);
+}
+
+function markdown(value) {
+  let text = esc(value);
+  const codeBlocks = [];
+
+  text = text.replace(/\`\`\`([^\\n\`]*)\\n([\\s\\S]*?)\`\`\`/g, (_, lang, code) => {
+    const i = codeBlocks.length;
+    codeBlocks.push('<pre><code>' + code.replace(/\\n$/, "") + '</code></pre>');
+    return "%%CODE" + i + "%%";
+  });
+
+  text = text.replace(/\\\`([^\`\\n]+)\\\`/g, "<code>$1</code>");
+  text = text.replace(/^### (.+)$/gm, "<h3>$1</h3>");
+  text = text.replace(/^## (.+)$/gm, "<h2>$1</h2>");
+  text = text.replace(/^# (.+)$/gm, "<h1>$1</h1>");
+  text = text.replace(/^&gt; (.+)$/gm, "<blockquote>$1</blockquote>");
+  text = text.replace(/\\*\\*(.+?)\\*\\*/g, "<strong>$1</strong>");
+  text = text.replace(/\\*(.+?)\\*/g, "<em>$1</em>");
+  text = text.replace(/\\n/g, "<br>");
+
+  text = text.replace(/%%CODE(\\d+)%%/g, (_, n) => codeBlocks[Number(n)] || "");
+  return text;
+}
+
+function render() {
+  if (!current) return;
+  $("messages").innerHTML = current.messages.map((message, index) => {
+    const role = message.role === "user" ? "You" : "Assistant";
+    const image = message.image
+      ? '<img alt="Generated image" src="' + esc(message.image) + '">'
+      : "";
+    const content = markdown(message.content || "");
+    const actions = message.role === "assistant"
+      ? '<div class="actions"><button data-copy="' + index + '">Copy</button><button data-regenerate="' + index + '">Regenerate</button></div>'
+      : '<div class="actions"><button data-copy="' + index + '">Copy</button></div>';
+
+    return '<article class="message"><div class="role">' + role + '</div><div class="content">' + content + image + '</div>' + actions + '</article>';
+  }).join("");
+
+  $("history").innerHTML = chats.map(chat =>
+    '<button class="history-item" data-chat="' + esc(chat.id) + '">' +
+    esc(chat.title || "New chat") + '</button>'
+  ).join("");
+
+  $("messages").scrollTop = $("messages").scrollHeight;
+}
+
+function showNotice(message) {
+  $("notice").textContent = message || "";
+  $("notice").style.display = message ? "block" : "none";
+}
+
+async function loadModels() {
+  const select = $("model");
+  select.innerHTML = '<option>Loading models…</option>';
+  showNotice("");
+
+  let lastError = "";
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 22000);
+
+    try {
+      const response = await fetch("/api/models", {
+        signal: controller.signal,
+        cache: "no-store"
+      });
+
+      const text = await response.text();
+      const data = safeParse(text, null);
+
+      if (!response.ok || !data?.ok || !Array.isArray(data.models)) {
+        throw new Error(data?.error || "Model list request failed.");
+      }
+
+      modelList = data.models;
+      select.innerHTML = "";
+
+      modelList.forEach(model => {
+        const option = document.createElement("option");
+        option.value = model.id;
+        option.textContent = model.name || model.id;
+        select.appendChild(option);
+      });
+
+      const saved = localStorage.getItem("my-ai-selected-model");
+      select.value = modelList.some(m => m.id === saved)
+        ? saved
+        : (modelList.some(m => m.id === "gpt-6-astra")
+            ? "gpt-6-astra"
+            : modelList[0].id);
+
+      showNotice("");
+      return;
+    } catch (error) {
+      lastError = error.name === "AbortError"
+        ? "Model list timed out."
+        : error.message;
+    } finally {
+      clearTimeout(timer);
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+  }
+
+  select.innerHTML = '<option value="">Models unavailable</option>';
+  showNotice("Could not load models: " + lastError + " Use Refresh models to retry.");
+}
+
+function addMessage(role, content, extra = {}) {
+  current.messages.push({role, content, ...extra});
+  current.updated = Date.now();
+
+  if (role === "user" && current.title === "New chat") {
+    current.title = content.slice(0, 48) || "New chat";
+  }
+
+  save();
+  render();
+}
+
+function buildMessages() {
+  return current.messages
+    .filter(message => !message.error)
+    .map(message => {
+      if (message.role === "user" && message.imageData) {
+        return {
+          role: "user",
+          content: [
+            {type:"text", text:message.content || "Please examine this image."},
+            {type:"image_url", image_url:{url:message.imageData}}
+          ]
+        };
+      }
+
+      return {role:message.role, content:message.content || ""};
+    });
+}
+
+async function send() {
+  if (busy) return;
+
+  const text = $("prompt").value.trim();
+  if (!text && !attachments.length) return;
+
+  if (!current) newChat();
+
+  let imageData = attachments[0]?.data || null;
+  const userText = text || (imageData ? "Please examine this image." : "");
+
+  addMessage("user", userText, imageData ? {imageData} : {});
+  $("prompt").value = "";
+  attachments = [];
+  $("preview").innerHTML = "";
+
+  busy = true;
+  $("send").disabled = true;
+  showNotice("");
+
+  const assistantIndex = current.messages.length;
+  current.messages.push({role:"assistant",content:"",pending:true});
+  save();
+  render();
+
+  let full = "";
+  let failed = false;
+
+  try {
+    const response = await fetch("/api/chat", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        model:$("model").value,
+        messages:buildMessages()
+      })
+    });
+
+    if (!response.ok) {
+      const body = safeParse(await response.text(), {});
+      throw new Error(body.error || body.details || "Chat request failed.");
+    }
+
+    if (!response.body) throw new Error("No response stream received.");
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    async function processLine(line) {
+      if (!line.startsWith("data:")) return;
+
+      const raw = line.slice(5).trim();
+      if (!raw || raw === "[DONE]") return;
+
+      let chunk;
+      try { chunk = JSON.parse(raw); } catch { return; }
+
+      if (chunk.error) {
+        throw new Error(chunk.error.message || "The model returned a stream error.");
+      }
+
+      const delta = chunk.choices?.[0]?.delta?.content;
+      if (typeof delta === "string" && delta) {
+        full += delta;
+        current.messages[assistantIndex].content = full;
+        current.messages[assistantIndex].pending = true;
+        render();
+      }
+
+      const choiceText = chunk.choices?.[0]?.text;
+      if (typeof choiceText === "string" && choiceText) {
+        full += choiceText;
+        current.messages[assistantIndex].content = full;
+        render();
+      }
+    }
+
+    while (true) {
+      const {value, done} = await reader.read();
+      buffer += decoder.decode(value || new Uint8Array(), {stream:!done});
+
+      const lines = buffer.split(/\\r?\\n/);
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        await processLine(line);
+      }
+
+      if (done) break;
+    }
+
+    if (buffer.trim()) await processLine(buffer);
+
+    if (!full.trim()) {
+      throw new Error("The model finished without returning text.");
+    }
+
+    current.messages[assistantIndex].pending = false;
+    save();
+  } catch (error) {
+    failed = true;
+    current.messages[assistantIndex] = {
+      role:"assistant",
+      content:"Request failed: " + error.message,
+      error:true
+    };
+    showNotice(error.message);
+    save();
+  } finally {
+    busy = false;
+    $("send").disabled = false;
+    render();
+    $("prompt").focus();
+  }
+}
+
+async function generateImage() {
+  if (busy) return;
+
+  const prompt = $("prompt").value.trim();
+  if (!prompt) {
+    showNotice("Enter a description for your image first.");
+    return;
+  }
+
+  busy = true;
+  $("send").disabled = true;
+  $("make-image").disabled = true;
+  showNotice("Generating image…");
+
+  addMessage("user", "Generate an image: " + prompt);
+  $("prompt").value = "";
+
+  try {
+    const response = await fetch("/api/generate-image", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({prompt})
+    });
+
+    const data = safeParse(await response.text(), {});
+
+    if (!response.ok || !data.image) {
+      throw new Error(data.error || "Image generation failed.");
+    }
+
+    addMessage("assistant", "Generated image", {image:data.image});
+    showNotice("");
+  } catch (error) {
+    showNotice(error.message);
+  } finally {
+    busy = false;
+    $("send").disabled = false;
+    $("make-image").disabled = false;
+  }
+}
+
+$("send").addEventListener("click", send);
+$("make-image").addEventListener("click", generateImage);
+$("refresh").addEventListener("click", loadModels);
+$("new-chat").addEventListener("click", newChat);
+$("menu").addEventListener("click", () => $("sidebar").classList.toggle("open"));
+$("attach").addEventListener("click", () => $("file").click());
+
+$("file").addEventListener("change", async event => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) {
+    showNotice("Please select an image file.");
+    return;
+  }
+
+  if (file.size > 8 * 1024 * 1024) {
+    showNotice("Choose an image smaller than 8 MB.");
+    return;
+  }
+
+  const data = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  attachments = [{data, name:file.name}];
+  $("preview").innerHTML = '<img alt="Attachment preview" src="' + esc(data) + '">';
+  showNotice("");
+  event.target.value = "";
 });
-self.addEventListener("activate", event => {
-  event.waitUntil(self.clients.claim());
+
+$("prompt").addEventListener("keydown", event => {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    send();
+  }
 });
-self.addEventListener("fetch", event => {
-  const url = new URL(event.request.url);
-  if (event.request.method !== "GET" || url.pathname.startsWith("/api/")) return;
-  if (url.origin !== self.location.origin) return;
-  event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+
+$("model").addEventListener("change", () => {
+  localStorage.setItem("my-ai-selected-model", $("model").value);
 });
-`;
+
+$("clear-history").addEventListener("click", () => {
+  if (!confirm("Delete all locally saved chats?")) return;
+  chats = [];
+  current = null;
+  save();
+  newChat();
+});
+
+$("history").addEventListener("click", event => {
+  const button = event.target.closest("[data-chat]");
+  if (!button) return;
+  current = chats.find(chat => chat.id === button.dataset.chat) || current;
+  save();
+  render();
+  $("sidebar").classList.remove("open");
+});
+
+$("messages").addEventListener("click", async event => {
+  const copy = event.target.closest("[data-copy]");
+  const regenerate = event.target.closest("[data-regenerate]");
+
+  if (copy) {
+    const message = current.messages[Number(copy.dataset.copy)];
+    const value = message?.content || "";
+    try {
+      await navigator.clipboard.writeText(value);
+      showNotice("Copied.");
+    } catch {
+      showNotice("Clipboard access failed. Select and copy the text manually.");
+    }
+  }
+
+  if (regenerate && !busy) {
+    const index = Number(regenerate.dataset.regenerate);
+    const message = current.messages[index];
+
+    if (!message || message.role !== "assistant") return;
+
+    current.messages = current.messages.slice(0, index);
+    save();
+    render();
+    await sendLastAgain();
+  }
+});
+
+async function sendLastAgain() {
+  // Regenerate the last assistant answer without duplicating the last user turn.
+  if (busy) return;
+
+  const lastUser = [...current.messages].reverse().find(m => m.role === "user");
+  if (!lastUser) return;
+
+  busy = true;
+  $("send").disabled = true;
+
+  const assistantIndex = current.messages.length;
+  current.messages.push({role:"assistant",content:"",pending:true});
+  save();
+  render();
+
+  let full = "";
+
+  try {
+    const response = await fetch("/api/chat", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        model:$("model").value,
+        messages:buildMessages()
+      })
+    });
+
+    if (!response.ok) {
+      const body = safeParse(await response.text(), {});
+      throw new Error(body.error || "Regeneration failed.");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const {value, done} = await reader.read();
+      buffer += decoder.decode(value || new Uint8Array(), {stream:!done});
+      const lines = buffer.split(/\\r?\\n/);
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (!line.startsWith("data:")) continue;
+        const raw = line.slice(5).trim();
+        if (!raw || raw === "[DONE]") continue;
+
+        const chunk = safeParse(raw, null);
+        if (!chunk) continue;
+        if (chunk.error) throw new Error(chunk.error.message || "Stream error.");
+
+        const delta = chunk.choices?.[0]?.delta?.content;
+        if (typeof delta === "string") {
+          full += delta;
+          current.messages[assistantIndex].content = full;
+          render();
+        }
+      }
+
+      if (done) break;
+    }
+
+    current.messages[assistantIndex].pending = false;
+    save();
+  } catch (error) {
+    current.messages[assistantIndex] = {
+      role:"assistant",
+      content:"Regeneration failed: " + error.message,
+      error:true
+    };
+    showNotice(error.message);
+  } finally {
+    busy = false;
+    $("send").disabled = false;
+    render();
+  }
+}
+
+loadState();
+loadModels();
+</script>
+</body>
+</html>`;
+}
+
+function manifest() {
+  return {
+    name: "My AI",
+    short_name: "My AI",
+    start_url: "/",
+    display: "standalone",
+    background_color: "#101010",
+    theme_color: "#101010"
+  };
+}
+
+function icon() {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><rect width="128" height="128" rx="24" fill="#171717"/><path d="M64 18 104 42v44L64 110 24 86V42z" fill="none" stroke="white" stroke-width="7"/><path d="M43 50h42M43 64h42M43 78h25" stroke="white" stroke-width="6" stroke-linecap="round"/></svg>`;
+}
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    const path = url.pathname;
 
     if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: corsHeaders() });
+      return new Response(null, {status:204, headers:HEADERS});
     }
 
-    if (url.pathname === "/" || url.pathname === "/index.html") {
-      return html(APP_HTML);
-    }
+    try {
+      if (path === "/" && request.method === "GET") {
+        return new Response(appHTML(), {
+          headers: {
+            ...HEADERS,
+            "Content-Type":"text/html; charset=utf-8"
+          }
+        });
+      }
 
-    if (url.pathname === "/manifest.json") {
-      return new Response(JSON.stringify(MANIFEST), {
-        headers: { ...corsHeaders(), "Content-Type": "application/manifest+json" }
-      });
-    }
+      if (path === "/api/health" && request.method === "GET") {
+        return json({
+          ok:true,
+          app:"my-ai",
+          provider:"cometapi",
+          imageGeneration:Boolean(env.AI)
+        });
+      }
 
-    if (url.pathname === "/sw.js") {
-      return new Response(SERVICE_WORKER, {
-        headers: {
-          ...corsHeaders(),
-          "Content-Type": "application/javascript; charset=utf-8",
-          "Cache-Control": "no-cache"
-        }
-      });
-    }
+      if (path === "/api/models" && request.method === "GET") {
+        return handleModels(env);
+      }
 
-    if (url.pathname === "/api/health") {
-      return json({
-        ok: true,
-        app: "my-ai",
-        providers: Object.keys(PROVIDERS),
-        imageGeneration: Boolean(env.AI)
-      });
-    }
+      if (path === "/api/chat" && request.method === "POST") {
+        return handleChat(request, env);
+      }
 
-    if (url.pathname === "/api/models" && request.method === "GET") {
-      return handleModels(url, env);
-    }
+      if (
+        (path === "/api/generate-image" || path === "/api/image") &&
+        request.method === "POST"
+      ) {
+        return handleImage(request, env);
+      }
 
-    if (url.pathname === "/api/chat" && request.method === "POST") {
-      return handleChat(request, env);
-    }
+      if (path === "/manifest.json") {
+        return new Response(JSON.stringify(manifest()), {
+          headers: {
+            ...HEADERS,
+            "Content-Type":"application/manifest+json"
+          }
+        });
+      }
 
-    if (url.pathname === "/api/generate-image" && request.method === "POST") {
-      return handleImage(request, env);
-    }
+      if (path === "/icon.svg") {
+        return new Response(icon(), {
+          headers: {
+            ...HEADERS,
+            "Content-Type":"image/svg+xml"
+          }
+        });
+      }
 
-    return json({ error: "Not found." }, 404);
+      return json({error:"Not found", path}, 404);
+    } catch (error) {
+      return json({error:messageOf(error)}, 500);
+    }
   }
 };
